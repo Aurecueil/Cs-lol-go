@@ -1,0 +1,60 @@
+<UserControl x:Class="ModManager.ModDetailsEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:ModManager"
+             Width="500"
+             Background="#1E1E1E">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="{Binding Mod.Name, StringFormat='Edit mod: {0}'}" 
+                   FontSize="16" 
+                   FontWeight="Bold" 
+                   Foreground="White" />
+
+        <StackPanel Grid.Row="1" Margin="0,20,0,20">
+            <!-- Fixed bindings to reference Mod.Info properties -->
+            <TextBox Text="{Binding Mod.Info.Name}" 
+                     Margin="0,5" 
+                     Tag="Name"/>
+            <TextBox Text="{Binding Mod.Info.Author}" 
+                     Margin="0,5" 
+                     Tag="Author"/>
+            <TextBox Text="{Binding Mod.Info.Version}" 
+                     Margin="0,5" 
+                     Tag="Version"/>
+            <TextBox Text="{Binding Mod.Info.Home}" 
+                     Margin="0,5" 
+                     Tag="Home"/>
+            <TextBox Text="{Binding Mod.Info.Heart}" 
+                     Margin="0,5" 
+                     Tag="Heart"/>
+            <TextBox Text="{Binding Mod.Info.Description}" 
+                     Margin="0,5" 
+                     Tag="Description"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,10">
+                <Button Content="Select Image" 
+                        Click="SelectImage_Click" 
+                        Margin="0,0,10,0"/>
+                <TextBlock Text="{Binding Mod.Details.ImagePath}" 
+                           Foreground="White" 
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            <Button Content="CLOSE" 
+                    Click="Close_Click" 
+                    Margin="0,0,10,0"/>
+            <Button Content="APPLY" 
+                    Click="Apply_Click"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

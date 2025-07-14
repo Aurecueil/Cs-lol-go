@@ -1,0 +1,123 @@
+﻿<UserControl x:Class="ModManager.ModListEntry"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="60" MinWidth="500">
+    <Border x:Name="EntryBorder" Background="#FF2A2A2A" CornerRadius="6" Padding="8" Margin="4">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <!-- Checkbox + Name -->
+                <ColumnDefinition Width="*" />
+                <!-- Details (expandable) -->
+                <ColumnDefinition Width="*" />
+                <!-- Action icons -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Checkbox + Name -->
+            <StackPanel Orientation="Horizontal" 
+                        VerticalAlignment="Center" 
+                        Grid.Column="0" 
+                        Margin="0,0,12,0">
+                <CheckBox x:Name="ActiveCheckbox" 
+          Style="{StaticResource CustomCheckBoxStyle}" 
+          VerticalAlignment="Center" 
+          Margin="0,0,8,0"
+          Checked="ActiveCheckbox_Checked"
+          Unchecked="ActiveCheckbox_Unchecked"/>
+                <TextBlock x:Name="EntryName"
+                           Foreground="White"
+                           FontWeight="SemiBold"
+                           FontSize="14"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <!-- Center: Details (for expanded view) -->
+            <TextBlock x:Name="DetailsText"
+                       Grid.Column="1"
+                       Foreground="#CCCCCC"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center" 
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="8,0,8,0"
+                       Visibility="Collapsed"/>
+
+            <!-- Right: Action Icons -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Grid.Column="2"
+                        Margin="8,0,0,0">
+
+                <!-- Mod-only actions (Collapsed by default) -->
+                <Button x:Name="FixingIcon" Style="{StaticResource roundHighlight}"
+        ToolTip="Fixing"
+        Cursor="Hand" Click="Fixer_settings_panel_open"
+        BorderThickness="0"
+        Background="Transparent"
+        Visibility="Collapsed">
+                    <TextBlock Text="🔧" 
+               Style="{StaticResource IconTextBlockStyle}" 
+               Foreground="White" 
+               FontSize="15" 
+               Padding="8" />
+                </Button>
+
+                <Button x:Name="EditModIcon" Style="{StaticResource roundHighlight}"
+        ToolTip="Edit Mod"
+        Cursor="Hand" Click="Open_Info_page"
+        BorderThickness="0"
+        Background="Transparent"
+        Visibility="Collapsed">
+                    <TextBlock Text="✏️" 
+               Style="{StaticResource IconTextBlockStyle}" 
+               Foreground="White" 
+               FontSize="15" 
+               Padding="8" />
+                </Button>
+
+                <Button x:Name="ExportIcon" Style="{StaticResource roundHighlight}"
+        ToolTip="Export"
+        Cursor="Hand" Click="Export_Item"
+        BorderThickness="0"
+        Background="Transparent"
+        Visibility="Collapsed">
+                    <TextBlock Text="📄" 
+               Style="{StaticResource IconTextBlockStyle}" 
+               Foreground="White"
+               FontSize="15" 
+               Padding="8" />
+                </Button>
+
+                <Button x:Name="ModHandlingIcon" Style="{StaticResource roundHighlight}"
+        ToolTip="Mod Handling"
+        Cursor="Hand" Click="Open_details_page"
+        BorderThickness="0"
+        Background="Transparent">
+                    <TextBlock Text="⚙️" 
+               Style="{StaticResource IconTextBlockStyle}" 
+               Foreground="White" 
+               FontSize="15" 
+               Padding="8" />
+                </Button>
+
+                <Button x:Name="DeleteIcon" Style="{StaticResource roundHighlight}"
+        ToolTip="Delete"
+        Cursor="Hand" Click="Delete_click_clicked"
+        BorderThickness="0"
+        Background="Transparent">
+                    <TextBlock Text="❌" 
+               Style="{StaticResource IconTextBlockStyle}" 
+               Foreground="White" 
+               FontSize="15" 
+               Padding="8" />
+                </Button>
+
+
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

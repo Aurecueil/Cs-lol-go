@@ -1,0 +1,63 @@
+<UserControl x:Class="ModLoader.ProfileNameDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="Auto" Width="Auto">
+    <Grid Background="#AA000000" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Border Padding="20" Background="#222" CornerRadius="10" Width="400" VerticalAlignment="Center" HorizontalAlignment="Center" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2,2,2,2">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ProfileNameBox"
+                         KeyDown="ProfileNameBox_KeyDown"
+                         Margin="0 5 5 10" Grid.Column="0"
+                         Foreground="White"
+                         Background="Transparent"
+                         BorderThickness="0,0,0,2"
+                         BorderBrush="#666"
+                         VerticalContentAlignment="Center"
+                         Padding="0,0,10,5"
+                         FontSize="20"
+                         CaretBrush="White">
+                    <TextBox.Template>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="border"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    Background="{TemplateBinding Background}">
+                                <Grid>
+                                    <TextBlock x:Name="placeholderText"
+                                               Text="Profile name..."
+                                               Foreground="#666"
+                                               FontSize="20"
+                                               Margin="0,0,10,5"
+                                               Visibility="Collapsed"
+                                               VerticalAlignment="Center"/>
+                                    <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="Text" Value="">
+                                    <Setter TargetName="placeholderText" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                                <Trigger Property="IsFocused" Value="True">
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </TextBox.Template>
+                </TextBox>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">
+                        <Button Content="Cancel" Click="Cancel_Click" Width="40" Height="40" Margin="0,0,5,0"
+                Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
+                        <Button Content="Create" Click="Create_Click" Width="40" Height="40" Margin="0"
+                Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
+                </StackPanel>
+
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
