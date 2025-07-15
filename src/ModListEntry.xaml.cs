@@ -8,14 +8,31 @@ using System.IO.Compression;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
+using System.Xml.Linq;
 
 namespace ModManager
 {
 
     public partial class ModListEntry : UserControl
     {
+        private DispatcherTimer hoverTimer;
+        private DispatcherTimer closeTimer;
+        private DispatcherTimer distanceTimer;
+        private Popup hoverPopup;
+        private HoverDetailsPopup popupContent;
+        private Point popupShowMousePosition; // Store mouse position when popup was shown
+
+        // Configuration constants
+        private const int HOVER_DELAY_MS = 1500;
+        private const int CLOSE_DELAY_MS = 200;
+        private const int DISTANCE_CHECK_INTERVAL_MS = 100;
+        private const double MAX_DISTANCE_PIXELS = 10;
+
+        public bool hoverEnabled = true;
         private MainWindow Main => (MainWindow)Application.Current.MainWindow;
 
 
@@ -25,6 +42,8 @@ namespace ModManager
         public bool IsMod { get; private set; }
         public bool IsParentFolder { get; private set; }
         public int ParentId { get; private set; }
+
+        public string identifier = string.Empty;
 
         // Selection and dragging properties
         public bool IsSelected { get; set; }
@@ -41,8 +60,9 @@ namespace ModManager
         // Reference to MainWindow for drag handler
         public static MainWindow MainWindowInstance { get; set; }
 
-        public ModListEntry()
+        public ModListEntry(string new_id)
         {
+            identifier = new_id;
             InitializeComponent();
 
             // Add event handlers
@@ -53,7 +73,6 @@ namespace ModManager
 
             // Add event handlers for icons
             AddIconEventHandlers();
-
             // Enable drag and drop
             this.AllowDrop = true;
             this.Drop += OnDrop;
@@ -91,6 +110,131 @@ namespace ModManager
             UpdateUIForMod();
         }
 
+
+        private void InitializeHoverPopup()
+        {
+            popupContent = new HoverDetailsPopup();
+            hoverPopup = new Popup
+            {
+                Child = popupContent,
+                IsOpen = false,
+                AllowsTransparency = true,
+                StaysOpen = true
+            };
+
+            hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HOVER_DELAY_MS) };
+            hoverTimer.Tick += (s, e) => {
+                hoverTimer.Stop();
+                ShowPopup();
+            };
+
+            closeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(CLOSE_DELAY_MS) };
+            closeTimer.Tick += (s, e) => {
+                closeTimer.Stop();
+                hoverPopup.IsOpen = false;
+                StopDistanceTimer();
+            };
+
+            distanceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DISTANCE_CHECK_INTERVAL_MS) };
+            distanceTimer.Tick += (s, e) => CheckMouseDistance();
+
+            this.MouseEnter += (s, e) => {
+                hoverTimer.Start();
+                closeTimer.Stop();
+            };
+
+            this.MouseLeave += (s, e) => {
+                hoverTimer.Stop();
+                if (hoverPopup.IsOpen)
+                    StartDistanceTimer();
+            };
+
+            // Keep popup open when mouse enters it
+            hoverPopup.MouseEnter += (s, e) => {
+                closeTimer.Stop();
+                distanceTimer.Stop();
+            };
+
+            hoverPopup.MouseLeave += (s, e) => StartDistanceTimer();
+        }
+
+        private void StartCloseTimer()
+        {
+            closeTimer.Stop();
+            closeTimer.Start();
+        }
+
+        private void StartDistanceTimer()
+        {
+            distanceTimer.Stop();
+            distanceTimer.Start();
+        }
+
+        private void StopDistanceTimer()
+        {
+            distanceTimer.Stop();
+        }
+
+        private void CheckMouseDistance()
+        {
+            if (!hoverPopup.IsOpen) return;
+
+            // Get current mouse position relative to screen
+            var currentMousePos = Mouse.GetPosition(Application.Current.MainWindow);
+            var screenCurrentMousePos = Application.Current.MainWindow.PointToScreen(currentMousePos);
+
+            // Calculate distance from original popup show position
+            var distance = GetDistance(screenCurrentMousePos, popupShowMousePosition);
+
+            // If mouse is too far from original position, start close timer
+            if (distance > MAX_DISTANCE_PIXELS)
+            {
+                StopDistanceTimer();
+                StartCloseTimer();
+            }
+        }
+
+        private double GetDistance(Point point1, Point point2)
+        {
+            var dx = point1.X - point2.X;
+            var dy = point1.Y - point2.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private void ShowPopup()
+        {
+            if (popupContent == null || hoverPopup == null) return;
+
+            popupContent.SetContent(Main.GetDetails(identifier)); // Replace with actual mod details
+
+            // Store the current mouse position when popup is shown
+            var currentMousePos = Mouse.GetPosition(Application.Current.MainWindow);
+            popupShowMousePosition = Application.Current.MainWindow.PointToScreen(currentMousePos);
+
+            // Set placement target to this control and use relative positioning
+            hoverPopup.PlacementTarget = this;
+            hoverPopup.Placement = PlacementMode.MousePoint;
+            hoverPopup.IsOpen = true;
+
+            // Start distance checking once popup is shown
+            StartDistanceTimer();
+        }
+
+        
+
+        // Optional: Add cleanup method
+        public void Dispose()
+        {
+            hoverTimer?.Stop();
+            closeTimer?.Stop();
+            distanceTimer?.Stop();
+            if (hoverPopup != null)
+            {
+                hoverPopup.IsOpen = false;
+                hoverPopup.Child = null;
+            }
+        }
+
         private void UpdateUIForParentFolder(int parentId)
         {
             IsParentFolder = true;
@@ -118,38 +262,137 @@ namespace ModManager
         }
         private void ActiveCheckbox_Checked(object sender, RoutedEventArgs e)
         {
-            if (IsMod && ModElement != null)
+            if (IsSelected)
             {
-                ModElement.isActive = true;
-                MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
+                foreach (var entry in selectedEntries)
+                {
+                    if (entry.IsMod && entry.ModElement != null)
+                    {
+                        entry.ModElement.isActive = true;
+                        MainWindow.ProfileEntries[entry.ModElement.ModFolder] = entry.ModElement.Details.Priority;
+                    }
+                    else if (entry.FolderElement != null)
+                    {
+                        entry.FolderElement.isActive = true;
+                        MainWindow.ProfileEntries[entry.FolderElement.ID.ToString()] = entry.FolderElement.Priority;
+                    }
+                }
             }
-            else if (FolderElement != null)
+            else
             {
-                FolderElement.isActive = true;
-                MainWindow.ProfileEntries[FolderElement.ID.ToString()] = FolderElement.Priority;
+                if (IsMod && ModElement != null)
+                {
+                    ModElement.isActive = true;
+                    MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
+                }
+                else if (FolderElement != null)
+                {
+                    FolderElement.isActive = true;
+                    MainWindow.ProfileEntries[FolderElement.ID.ToString()] = FolderElement.Priority;
+                }
             }
-
-            MainWindow.SaveProfileEntriesToFile(); // Save immediately
+            MainWindow.SaveProfileEntriesToFile();
         }
 
         private void ActiveCheckbox_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (IsMod && ModElement != null)
+            if (IsSelected)
             {
-                ModElement.isActive = false;
-                MainWindow.ProfileEntries.Remove(ModElement.ModFolder);
+                foreach (var entry in selectedEntries)
+                {
+                    if (entry.IsMod && entry.ModElement != null)
+                    {
+                        entry.ModElement.isActive = false;
+                        MainWindow.ProfileEntries.Remove(entry.ModElement.ModFolder);
+                    }
+                    else if (entry.FolderElement != null)
+                    {
+                        entry.FolderElement.isActive = false;
+                        MainWindow.ProfileEntries.Remove(entry.FolderElement.ID.ToString());
+                    }
+                }
             }
-            else if (FolderElement != null)
-            {
-                FolderElement.isActive = false;
-                MainWindow.ProfileEntries.Remove(FolderElement.ID.ToString());
+            else {
+                if (IsMod && ModElement != null)
+                {
+                    ModElement.isActive = false;
+                    MainWindow.ProfileEntries.Remove(ModElement.ModFolder);
+                }
+                else if (FolderElement != null)
+                {
+                    FolderElement.isActive = false;
+                    MainWindow.ProfileEntries.Remove(FolderElement.ID.ToString());
+                }
             }
+            
 
             MainWindow.SaveProfileEntriesToFile(); // Save immediately
         }
 
         private void Delete_click_clicked(object sender, RoutedEventArgs e)
         {
+            if (IsSelected)
+            {
+                List < (string,int, bool) > meow = new List<(string,int, bool)>();
+                int has_folder = 0;
+                foreach (var entry in selectedEntries)
+                {
+                    if (entry.IsMod)
+                    {
+                        meow.Add((entry.ModElement.ModFolder, 0, true));
+                    }
+                    else
+                    {
+                        has_folder = 1;
+                        meow.Add(("", entry.FolderElement.ID, false));
+                    }
+                }
+                if (has_folder == 1)
+                {
+                    var result = MessageBox.Show(
+                            $"Delete folder All selected Folders?\n\nYes: Delete folder with contents\nNo: Delete only folder (empty)\nCancel: Abort",
+                            "Delete Folder",
+                            MessageBoxButton.YesNoCancel,
+                            MessageBoxImage.Warning,
+                            MessageBoxResult.Cancel);
+                    switch (result)
+                    {
+                        case MessageBoxResult.Yes:
+                            has_folder = 2;
+                            break;
+                        case MessageBoxResult.No:
+                            has_folder = 3;
+                            break;
+                        case MessageBoxResult.Cancel:
+                            has_folder = 4;
+                            break;
+                    }
+                }
+                foreach (var element in meow)
+                {
+                    if (element.Item3)
+                    {
+                        Main.DeleteMod(element.Item1);
+                    }
+                    else
+                    {
+                        switch (has_folder)
+                        {
+                            case 2:
+                                Main.DeleteFolderElement(element.Item2, true);
+                                break;
+                            case 3:
+                                Main.DeleteFolderElement(element.Item2, false);
+                                break;
+                            case 4:
+                                // do nothing
+                                break;
+                        }
+                    }
+                }
+            }
+            else
+            {
                 if (IsMod)
                 {
                     Main.DeleteMod(ModElement.ModFolder);
@@ -162,7 +405,7 @@ namespace ModManager
                         MessageBoxButton.YesNoCancel,
                         MessageBoxImage.Warning,
                         MessageBoxResult.Cancel);
-                    
+
                     switch (result)
                     {
                         case MessageBoxResult.Yes:
@@ -176,6 +419,8 @@ namespace ModManager
                             break;
                     }
                 }
+            }
+            
             
         }
 
@@ -263,7 +508,8 @@ namespace ModManager
         {
             IsParentFolder = false;
 
-            // Set name
+            // InitializeHoverPopup();
+
             EntryName.Text = FolderElement.Name;
 
             // Set details (collapsed for folders)
@@ -294,13 +540,14 @@ namespace ModManager
             // Set name
             EntryName.Text = ModElement.Info.Name;
 
+            // InitializeHoverPopup();
+
             // Set details - show author and version
             string details = $"{ModElement.Info.Version} by {ModElement.Info.Author}";
             if (!string.IsNullOrWhiteSpace(ModElement.Info.Description))
             {
                 details += $"\n{ModElement.Info.Description}";
             }
-
 
             DetailsText.Text = details;
             DetailsText.Visibility = Visibility.Visible;
@@ -352,7 +599,6 @@ namespace ModManager
         {
             // Don't handle selection for parent folders
             if (IsParentFolder) return;
-
             // Check if Ctrl or Shift is pressed
             bool ctrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
             bool shiftPressed = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
@@ -479,9 +725,19 @@ namespace ModManager
             OnDragEnter(sender, e);
         }
 
+        public List<ModListEntry> ReadSelect()
+        {
+            return selectedEntries;
+        }
+
         private void ToggleSelection()
         {
             SetSelected(!IsSelected);
+        }
+
+        public void SetSelection(bool sel)
+        {
+            SetSelected(sel);
         }
 
         private void SetSelected(bool selected)
@@ -499,7 +755,7 @@ namespace ModManager
                 {
                     selectedEntries.Remove(this);
                 }
-
+                Main.CatchSelectedEntries(selectedEntries);
                 UpdateSelectionVisual();
             }
         }
@@ -696,15 +952,36 @@ namespace ModManager
 
             bool isChecked = ActiveCheckbox.IsChecked ?? false;
 
-            if (IsMod && ModElement != null)
+            if (IsSelected)
             {
-                // Update mod's isActive property based on checkbox
-                ModElement.isActive = isChecked;
+                foreach (var entry in selectedEntries)
+                {
+                    if (entry.IsMod && entry.ModElement != null)
+                    {
+                        // Update mod's isActive property based on checkbox
+                        entry.ModElement.isActive = isChecked;
+                        entry.RefreshDisplay();
+                    }
+                    else if (!entry.IsMod && entry.FolderElement != null)
+                    {
+                        // Update folder's isActive property based on checkbox
+                        entry.FolderElement.isActive = isChecked;
+                        entry.RefreshDisplay();
+                    }
+                }
             }
-            else if (!IsMod && FolderElement != null)
+            else
             {
-                // Update folder's isActive property based on checkbox
-                FolderElement.isActive = isChecked;
+                if (IsMod && ModElement != null)
+                {
+                    // Update mod's isActive property based on checkbox
+                    ModElement.isActive = isChecked;
+                }
+                else if (!IsMod && FolderElement != null)
+                {
+                    // Update folder's isActive property based on checkbox
+                    FolderElement.isActive = isChecked;
+                }
             }
         }
 

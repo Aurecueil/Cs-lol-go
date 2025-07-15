@@ -16,7 +16,21 @@ namespace ModLoader
         {
             if (process != null && !process.HasExited)
             {
-                process.Kill();
+                try
+                {
+                    process.Kill();
+                    process.WaitForExit(1000); // Wait up to 1 second
+                }
+                catch (Exception ex)
+                {
+                    // Log if needed
+                }
+                finally
+                {
+                    process?.Close();
+                    process?.Dispose();
+                    process = null;
+                }
             }
         }
 
@@ -32,7 +46,7 @@ namespace ModLoader
 
         public async Task<int> RunAsync(string args, Action<string> onOutput = null, Action<string> onError = null)
         {
-            var process = new Process
+            process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {

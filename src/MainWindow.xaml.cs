@@ -108,6 +108,12 @@ namespace ModManager
         Dictionary<int, HierarchyElement> hierarchyById = new();
         Dictionary<string, Mod> modByFolder = new();
         private static readonly string installedPath = "installed";
+        List<ModListEntry> modListEntriesInDisplay = new List<ModListEntry>();
+        List<ModListEntry> FolderListEntriesInDisplay = new List<ModListEntry>();
+
+        Dictionary<int,List<(string, bool)>> CutEntries = new Dictionary<int, List<(string, bool)>>();
+
+        public static List<string> GlobalselectedEntries = new List<string>();
 
         public Settings settings = new Settings();
 
@@ -183,12 +189,87 @@ namespace ModManager
             OverlayHost.Children.Add(control);
         }
 
-
+        public void CatchSelectedEntries(List<ModListEntry> selected)
+        {
+            GlobalselectedEntries.Clear();
+            foreach (var item in selected)
+            {
+                GlobalselectedEntries.Add(item.identifier);
+            }
+        }
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
             {
                 OverlayHost.Children.Clear();
+            }
+            else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            {
+                foreach (var mod in modListEntriesInDisplay)
+                {
+                    mod.SetSelection(true);
+                    mod.RefreshDisplay();
+                }
+                foreach (var folder in FolderListEntriesInDisplay)
+                {
+                    folder.SetSelection(true);
+                    folder.RefreshDisplay();
+                }
+            }
+            else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            {
+                foreach (var mod in modListEntriesInDisplay)
+                {
+                    mod.SetSelection(false);
+                    mod.RefreshDisplay();
+                }
+                foreach (var folder in FolderListEntriesInDisplay)
+                {
+                    folder.SetSelection(false);
+                    folder.RefreshDisplay();
+                }
+            }
+            else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            {
+                foreach (var mod in modListEntriesInDisplay)
+                {
+                    CutEntries.Clear();
+                    List<ModListEntry> temp = mod.ReadSelect();
+                    int origin = 0;
+                    foreach (var entry in temp)
+                    {
+                        if (entry.IsMod)
+                        {
+                            string path = entry.ModElement.Details.InnerPath;
+
+                            if (!string.IsNullOrEmpty(path))
+                            {
+                                string lastPart = path.Contains('/') ? path.Split('/').Last() : path;
+
+                                if (!int.TryParse(lastPart, out origin))
+                                    origin = 0; // fallback if not a valid int
+                            }
+                        }
+                        else
+                        {
+                            origin = entry.FolderElement.parent;
+                        }
+                        if (!CutEntries.ContainsKey(origin))
+                        {
+                            CutEntries[origin] = new List<(string, bool)>();
+                        }
+                        CutEntries[origin].Add((entry.identifier,entry.IsMod));
+                    }
+                    break;
+                }
+            }
+            else if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            {
+                foreach (int source in CutEntries.Keys)
+                {
+                    DragHandler(CutEntries[source], (Current_location_folder.ToString(), false), true, source);
+                }
+                CutEntries.Clear();
             }
         }
         private void MainWindow_StateChanged(object sender, EventArgs e)
@@ -922,11 +1003,8 @@ namespace ModManager
 
         public async void Stop_loader(object sender, RoutedEventArgs e)
         {
-            await Stop_loader_internal();
-
-            // Disable checkbox for 0.5 seconds to prevent rapid clicking
             Load_check_box.IsEnabled = false;
-            await Task.Delay(1000);
+            await Stop_loader_internal();            
             Load_check_box.IsEnabled = true;
         }
 
@@ -954,8 +1032,11 @@ namespace ModManager
                 await Task.Delay(100);
 
                 ctsToCancel.Dispose();
-            }
 
+                
+            }
+            _currentRunner?.KillProcess();
+            _currentRunner = null;
             try
             {
                 CSLolManager.Stop(); // Properly stop the CSLol process
@@ -1099,7 +1180,7 @@ namespace ModManager
                 })
             );
         }
-
+        private ModToolsRunner _currentRunner;
         public async Task WriteWads(CancellationToken token)
         {
             List<string> MODS = new List<string>();
@@ -1122,12 +1203,13 @@ namespace ModManager
             string mod_list_disp = $"{string.Join("\n", MODS)}";
             // MessageBox.Show(mod_list_disp);
             var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
+            _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
 
             var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)}\" --game:\"{game_path}\" --mods:{mod_list} --noTFT --ignoreConflict";
 
             string err_catch = "";
-            var outputLines = new List<string>();
+            var outputLines = new List<string>();https://www.facebook.com/messages/t/100010163408225
             var errorLines = new List<string>();
             try
             {
@@ -1156,6 +1238,7 @@ namespace ModManager
                         _modLoadCts?.Cancel();
                         ToggleFeed(false);
                         err_catch = allErrors;
+                        _currentRunner = null;
                         throw new InvalidOperationException(allErrors);
                     });
                 }
@@ -1163,9 +1246,9 @@ namespace ModManager
             catch (Exception ex)
             {
                 Load_check_box.IsChecked = false;
-                MessageBox.Show($"{err_catch}", "Error");
+                if (err_catch != "") { MessageBox.Show($"{err_catch}", "Error"); }
             }
-            
+            _currentRunner = null;
         }
 
         public async Task ProcessFolderChildrenAsync(int folderId, CancellationToken token, bool isRandomElement = false, int overrride = 0)
@@ -1335,7 +1418,12 @@ namespace ModManager
             {
                 AddParentFolderEntry(root);
             }
+            if (c_location != Current_location_folder)
+            {
+                GlobalselectedEntries.Clear();
+            }
             Current_location_folder = c_location;
+                       
 
             // Separate folders and mods, then sort each group alphabetically
             var folders = new List<(string childId, HierarchyElement element)>();
@@ -1375,10 +1463,12 @@ namespace ModManager
             // Add folders first
             foreach (var (childId, childElement) in folders)
             {
-                var folderEntry = new ModListEntry();
+                var folderEntry = new ModListEntry(childElement.ID.ToString());
                 folderEntry.InitializeWithFolder(childElement);
                 folderEntry.FolderDoubleClicked += (folderId) => RefreshModListPanel(folderId);
+                FolderListEntriesInDisplay.Add(folderEntry);
                 ModListPanel.Children.Add(folderEntry);
+                if (GlobalselectedEntries.Contains(childElement.ID.ToString())) { folderEntry.SetSelection(true); folderEntry.RefreshDisplay(); }
             }
 
             // Add mods second
@@ -1388,9 +1478,11 @@ namespace ModManager
                 var modWads = childElement.Wads; // string list
                 var modAuthor = childElement.Info.Author; // string
 
-                var modEntry = new ModListEntry();
+                var modEntry = new ModListEntry(childElement.ModFolder);
                 modEntry.InitializeWithMod(childElement);
+                modListEntriesInDisplay.Add(modEntry);
                 ModListPanel.Children.Add(modEntry);
+                if (GlobalselectedEntries.Contains(childElement.ModFolder)) { modEntry.SetSelection(true); modEntry.RefreshDisplay(); }
             }
         }
 
@@ -1524,9 +1616,57 @@ namespace ModManager
             RefreshModListPanel(Current_location_folder);
         }
 
+        public string GetDetails(string new_id)
+        {
+            var sb = new StringBuilder();
+
+            if (int.TryParse(new_id, out int id) && hierarchyById.TryGetValue(id, out var folder))
+            {
+                foreach (var item in folder.Children)
+                {
+                    if (!item.Item2) // Folder
+                    {
+                        if (int.TryParse(item.Item1, out int childId) && hierarchyById.TryGetValue(childId, out var childFolder))
+                        {
+                            sb.AppendLine(childFolder.Name);
+                        }
+
+                        string nested = GetDetails(item.Item1).Trim();
+                        if (!string.IsNullOrEmpty(nested))
+                        {
+                            // Indent nested lines with a dash
+                            foreach (var line in nested.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                sb.AppendLine($"-- {line.Trim()}");
+                            }
+                        }
+                    }
+                }
+
+                foreach (var item in folder.Children)
+                {
+                    if (item.Item2) // Mod
+                    {
+                        if (modByFolder.TryGetValue(item.Item1, out var mod))
+                        {
+                            sb.AppendLine(mod.Info.Name.Trim());
+                        }
+                    }
+                }
+            }
+            else if (modByFolder.TryGetValue(new_id, out var mod))
+            {
+                return $"{mod.Info.Name}\n{mod.ModFolder}".Trim();
+            }
+
+            return sb.ToString().TrimEnd('\n', '\r');
+        }
+
+
+
         void AddParentFolderEntry(HierarchyElement currentElement)
         {
-            var parentEntry = new ModListEntry();
+            var parentEntry = new ModListEntry("0");
 
             // Initialize as parent folder entry
             parentEntry.InitializeAsParentFolder(currentElement.parent);
@@ -1548,13 +1688,19 @@ namespace ModManager
             ModListPanel.Children.Add(parentEntry);
         }
 
-        public void DragHandler(List<(string, bool)> draggedElements, (string, bool) dropTarget)
+        public void DragHandler(List<(string, bool)> draggedElements, (string, bool) dropTarget,bool override_location = false, int location = 0)
         {
             if (dropTarget.Item2)
                 return;
             int dropTargetId = int.Parse(dropTarget.Item1);
 
-            if (!hierarchyById.TryGetValue(Current_location_folder, out var CurrenFolderLocation))
+            int cureent_location = Current_location_folder;
+            if (override_location)
+            {
+                cureent_location = location;
+            }
+
+            if (!hierarchyById.TryGetValue(cureent_location, out var CurrenFolderLocation))
             {
                 return;
             }
@@ -1565,6 +1711,10 @@ namespace ModManager
 
             foreach (var draggedElement in draggedElements)
             {
+                if (draggedElement.Item1 == dropTarget.Item1)
+                {
+                    continue;
+                }
                 // draggedElement is (string name, bool isMod)
                 var match = CurrenFolderLocation.Children.FirstOrDefault(child =>
                     child.Item1 == draggedElement.Item1 && child.Item2 == draggedElement.Item2);

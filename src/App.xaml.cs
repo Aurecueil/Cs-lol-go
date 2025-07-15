@@ -1,4 +1,5 @@
-﻿using System.Configuration;
+﻿using ModManager;
+using System.Configuration;
 using System.Data;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -9,7 +10,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using SystemColors = System.Windows.SystemColors;
 
-namespace ModLoader
+namespace ModManager
 {
     public static class Globals
     {
@@ -265,5 +266,4 @@ namespace ModLoader
             _hwndSource?.Dispose();
         }
     }
-
 }
