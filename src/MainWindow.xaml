@@ -2,6 +2,11 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="using:PrimitivesExperiment.Samples"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
         Title="LoL for GlobalOffensive 2077"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
@@ -10,9 +15,12 @@
     WindowStartupLocation="CenterScreen">
     <Grid x:Name="MainGrid">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="181*"/>
-            <ColumnDefinition Width="91*"/>
-            <ColumnDefinition Width="228*"/>
+            <ColumnDefinition Width="3*" />
+            <!-- ScrollViewer area -->
+            <ColumnDefinition Width="3" />
+            <!-- GridSplitter -->
+            <ColumnDefinition Width="0"  MaxWidth="200"/>
+            <!-- Right panel -->
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -72,12 +80,12 @@
             
         </DockPanel>
 
-        <ScrollViewer Grid.Row="1" Grid.ColumnSpan="3"
+        <ScrollViewer Grid.Row="1" Grid.ColumnSpan="1"
               Background="Transparent"
               VerticalScrollBarVisibility="Auto" AllowDrop="True"
               Drop="DropScrollViewer_Drop"
               DragOver="DropScrollViewer_DragOver"
-              HorizontalScrollBarVisibility="Disabled">
+              HorizontalScrollBarVisibility="Disabled" PreviewMouseDown="ScrollViewer_PreviewMouseDown">
             <ScrollViewer.Resources>
                 <Style TargetType="ScrollBar">
                     <Setter Property="Background" Value="Transparent"/>
@@ -124,7 +132,7 @@
             </ScrollViewer.Resources>
 
 
-            <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10" Background="Transparent" VerticalAlignment="Top"/>
+            <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown"/>
 
 
         </ScrollViewer>
@@ -213,7 +221,7 @@ Margin="0,8,10,0" Panel.ZIndex="10"
 Checked="Start_loader"
 Unchecked="Stop_loader"
               VerticalAlignment="Top"
-              HorizontalAlignment="Right" Grid.Column="2">
+              HorizontalAlignment="Right" Grid.ColumnSpan="3">
             <CheckBox.Style>
                 <Style TargetType="CheckBox">
                     <Setter Property="Background" Value="Transparent" />
@@ -256,6 +264,29 @@ Unchecked="Stop_loader"
                 </Style>
             </CheckBox.Style>
         </CheckBox>
+
+        <GridSplitter Grid.Column="1"
+      Grid.Row="1" 
+      Width="5" x:Name="MySplitter"
+      HorizontalAlignment="Center"
+      VerticalAlignment="Stretch"
+      ResizeBehavior="PreviousAndNext"
+      Background="#FF1E1E1E"
+      DragCompleted="MySplitter_DragCompleted"
+      ShowsPreview="True"/>
+
+        <Border Grid.Column="2" Grid.Row="1" 
+        Background="#FF1E1E1E" 
+        BorderBrush="{DynamicResource AccentBrush}" 
+        BorderThickness="2" 
+        CornerRadius="5" 
+        Margin="5">
+            <TextBlock Text="" x:Name="Details_Panel"
+               Foreground="White" 
+               HorizontalAlignment="Center" 
+               VerticalAlignment="Center" 
+               FontSize="14"/>
+        </Border>
 
         <Grid x:Name="ToggleOverlayRow" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,0">
             <TextBlock Margin="5,0,0,2" x:Name="Feed" Text="Feed" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>

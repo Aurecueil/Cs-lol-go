@@ -1,6 +1,7 @@
 ﻿using ModLoader;
 using System;
 using System.Configuration;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
@@ -16,6 +17,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Xml.Linq;
@@ -51,14 +53,24 @@ namespace ModManager
         public string gamepath { get; set; } = "";
         public bool startup_start { get; set; } = false;
         public bool load_start { get; set; } = false;
-        public bool catch_updated { get; set; } = true;
+        public bool catch_updated { get; set; } = false;  //true laters
         public int import_override { get; set; } = 0;
+
+        public double Tile_height { get; set; } = 60;
+        public int Tile_width { get; set; } = 620;
 
         public bool reinitialize { get; set; } = false;
 
         public string CurrentProfile { get; set; } = "Default Profile";
 
         public Color theme_color { get; set; } = Color.FromRgb(209, 96, 2);
+
+        public double details_column { get; set; } = 200;
+        public bool detials_column_active { get; set; } = false;
+        public bool update_path_on_active { get; set; } = true;
+        public bool details_displ { get; set; } = true;
+        public int startup_index {  get; set; } = 0;
+        public int start_mode { get; set; } = 0;
     }
     public class Folder
     {
@@ -205,29 +217,11 @@ namespace ModManager
             }
             else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
             {
-                foreach (var mod in modListEntriesInDisplay)
-                {
-                    mod.SetSelection(true);
-                    mod.RefreshDisplay();
-                }
-                foreach (var folder in FolderListEntriesInDisplay)
-                {
-                    folder.SetSelection(true);
-                    folder.RefreshDisplay();
-                }
+                Change_State_allButtons(true);
             }
             else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
             {
-                foreach (var mod in modListEntriesInDisplay)
-                {
-                    mod.SetSelection(false);
-                    mod.RefreshDisplay();
-                }
-                foreach (var folder in FolderListEntriesInDisplay)
-                {
-                    folder.SetSelection(false);
-                    folder.RefreshDisplay();
-                }
+                Change_State_allButtons(false);
             }
             else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
             {
@@ -270,6 +264,120 @@ namespace ModManager
                     DragHandler(CutEntries[source], (Current_location_folder.ToString(), false), true, source);
                 }
                 CutEntries.Clear();
+            }
+        }
+        public void detectGamePath()
+        {
+            if (IsValidGamePath(settings.gamepath))
+                return;
+
+            // If not valid, scan running processes
+            var targetNames = new[] { "LeagueClient.exe", "League of Legends.exe" };
+
+            foreach (var process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!targetNames.Contains(process.ProcessName + ".exe", StringComparer.OrdinalIgnoreCase))
+                        continue;
+
+                    string path = GetMainModuleFilePath(process);
+                    if (path.Contains("LeagueClient.exe"))
+                        path = path.Replace("LeagueClient.exe", "Game\\League of Legends.exe");
+                    if (IsValidGamePath(path))
+                    {
+                        settings.gamepath = path;
+                        save_settings();
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Access denied or other issues, skip
+                }
+            }
+        }
+
+        private static bool IsValidGamePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            return File.Exists(path)
+                && Path.GetFileName(path).Equals("League of Legends.exe", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetMainModuleFilePath(Process process)
+        {
+            try
+            {
+                return process.MainModule.FileName;
+            }
+            catch
+            {
+                // Try native method for access-restricted processes
+                return GetExecutablePathViaQueryFullProcessImageName(process.Handle);
+            }
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, System.Text.StringBuilder text, ref int size);
+
+        private static string GetExecutablePathViaQueryFullProcessImageName(IntPtr hProcess)
+        {
+            int capacity = 1024;
+            var buffer = new System.Text.StringBuilder(capacity);
+            if (QueryFullProcessImageName(hProcess, 0, buffer, ref capacity))
+            {
+                return buffer.ToString();
+            }
+            return "";
+        }
+
+        public void update_tile_contrains()
+        {
+            MinColumnWidth = settings.Tile_width;
+            RowHeight = settings.Tile_height;
+            
+            if (TryFindResource("ModListEntryHeight") is double height)
+                Resources["ModListEntryHeight"] = settings.Tile_height;
+            
+            if (TryFindResource("ModListEntryPadding") is Thickness padding)
+                Resources["ModListEntryPadding"] = new Thickness(RowHeight/10, RowHeight / 10, RowHeight / 10, RowHeight / 10);
+            
+            if (TryFindResource("ModListEntryMargin") is Thickness margin)
+                Resources["ModListEntryMargin"] = new Thickness(RowHeight / 20);
+            AdjustModListLayout();
+        }
+
+        private void ModListPanel_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource == sender)
+            {
+                Change_State_allButtons(false);
+            }
+        }
+
+        private void ScrollViewer_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource == sender)
+            {
+                Change_State_allButtons(false);
+            }
+        }
+
+
+        private void Change_State_allButtons(bool check)
+        {
+            foreach (var mod in modListEntriesInDisplay)
+            {
+                mod.SetSelection(check);
+                mod.RefreshDisplay();
+            }
+            foreach (var folder in FolderListEntriesInDisplay)
+            {
+                folder.SetSelection(check);
+                folder.RefreshDisplay();
             }
         }
         private void MainWindow_StateChanged(object sender, EventArgs e)
@@ -335,9 +443,47 @@ namespace ModManager
             _contextMenuWindow?.Close();
             base.OnClosed(e);
         }
+
+        public void details_colums_change(bool active)
+        {
+            if (active)
+            {
+                var width = new GridLength(settings.details_column, GridUnitType.Pixel);
+                MainGrid.ColumnDefinitions[2].Width = width;
+                MySplitter.IsEnabled = true;
+            }
+            else
+            {
+                var width = new GridLength(0, GridUnitType.Pixel);
+                MainGrid.ColumnDefinitions[2].Width = width;
+                MySplitter.IsEnabled = false;
+                save_settings();
+            }
+        }
         public MainWindow()
         {
             InitializeComponent();
+            load_settings();
+            detectGamePath();
+            switch (settings.start_mode)
+            {
+                case 1:
+                    Globals.StartMinimized = true;
+                    break;
+                case 2:
+                    Globals.StartWithLoaded = true;
+                    break;
+                case 3:
+                    Globals.StartMinimized = true;
+                    Globals.StartWithLoaded = true;
+                    break;
+                default:
+                    break;
+            }
+
+            Application.Current.Resources["AccentColor"] = settings.theme_color;
+
+
             Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
             string relativePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "animegurl.ico");
             if (File.Exists(relativePath))
@@ -376,7 +522,6 @@ namespace ModManager
                 LoadMods();
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
-                load_settings();
                 if (!Directory.Exists(ProfilesFolder))
                 {
                     Directory.CreateDirectory(ProfilesFolder);
@@ -392,8 +537,12 @@ namespace ModManager
 
                 if (Globals.StartWithLoaded)
                 {
+                    Load_check_box.IsChecked = true;
                     True_Start_loader();
                 }
+                details_colums_change(settings.detials_column_active);
+                update_tile_contrains();
+
 
 
 
@@ -811,6 +960,19 @@ namespace ModManager
                 }
             }
         }
+        private async void MySplitter_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            await Task.Delay(1);
+            AdjustModListLayout();
+            var column = MainGrid.ColumnDefinitions[2];
+            settings.details_column = column.Width.Value;
+            save_settings();
+        }
+
+        public void UpdateDetailsPanel(string details) {
+            Details_Panel.Text = GetDetails(details);
+        }
+
         public void CloseSettingsOverlay()
         {
             OverlayHost.Children.Clear();
@@ -1130,6 +1292,17 @@ namespace ModManager
         private async Task InitializeModsAsync(CancellationToken token)
         {
             ToggleOverlay(true);
+            if (settings.update_path_on_active)
+            {
+                string old_path = settings.gamepath;
+                settings.gamepath = "";
+                detectGamePath();
+                if (!IsValidGamePath(settings.gamepath))
+                {
+                    settings.gamepath = old_path;
+                }
+                save_settings();
+            }
             WADS = CopyWadsDictionary(EMPTY_WADS);
             await ProcessFolderChildrenAsync(0, token);
             await WriteWads(token);
@@ -1398,7 +1571,7 @@ namespace ModManager
 
 
 
-        void RefreshModListPanel(int c_location)
+        public void RefreshModListPanel(int c_location)
         {
             string searchString = Global_searchText;
             // Clear all existing UI entries
@@ -1420,6 +1593,7 @@ namespace ModManager
             }
             if (c_location != Current_location_folder)
             {
+                Details_Panel.Text = "";
                 GlobalselectedEntries.Clear();
             }
             Current_location_folder = c_location;
@@ -2462,29 +2636,9 @@ namespace ModManager
             }
         }
 
-        const double MinColumnWidth = 620;
-        const double RowHeight = 60;
+        public double MinColumnWidth = 620;
+        public double RowHeight = 60;
 
-        void ModListPanel_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            double panelWidth = ModListPanel.ActualWidth;
-
-            int columns = Math.Max(1, (int)(panelWidth / MinColumnWidth));
-            ModListPanel.Columns = columns;
-
-            double columnWidth = panelWidth / columns;
-
-            foreach (UIElement child in ModListPanel.Children)
-            {
-                if (child is FrameworkElement fe)
-                {
-                    fe.Width = columnWidth;
-                    fe.Height = RowHeight;
-
-                    fe.HorizontalAlignment = HorizontalAlignment.Stretch;
-                }
-            }
-        }
 
 
     }

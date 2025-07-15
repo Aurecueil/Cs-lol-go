@@ -1,20 +1,20 @@
 ﻿<UserControl x:Class="ModManager.ModListEntry"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Height="60" MinWidth="500">
-    <Border x:Name="EntryBorder" Background="#FF2A2A2A" CornerRadius="6" Padding="8" Margin="4">
-        <Grid>
+             Height="{DynamicResource ModListEntryHeight}" MinWidth="350">
+    <Border x:Name="EntryBorder" Background="#FF2A2A2A" CornerRadius="6" Padding="{DynamicResource ModListEntryPadding}" Margin="{DynamicResource ModListEntryMargin}">
+        <Grid x:Name="det_grid">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <!-- First column (more flexible) -->
                 <ColumnDefinition Width="*" />
-                <!-- Checkbox + Name -->
-                <ColumnDefinition Width="*" />
-                <!-- Details (expandable) -->
-                <ColumnDefinition Width="*" />
-                <!-- Action icons -->
+                <!-- Middle content with fixed width -->
+                <ColumnDefinition Width="2*" />
+                <!-- Last column (more flexible) -->
             </Grid.ColumnDefinitions>
 
             <!-- Left: Checkbox + Name -->
-            <StackPanel Orientation="Horizontal" 
+            <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Center" 
                         Grid.Column="0" 
                         Margin="0,0,12,0">
@@ -34,16 +34,17 @@
 
             <!-- Center: Details (for expanded view) -->
             <TextBlock x:Name="DetailsText"
-                       Grid.Column="1"
-                       Foreground="#CCCCCC"
-                       FontSize="12"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center"
-                       TextAlignment="Center" 
-                       TextWrapping="Wrap"
-                       TextTrimming="CharacterEllipsis"
-                       Margin="8,0,8,0"
-                       Visibility="Collapsed"/>
+           Grid.Column="1"
+           Foreground="#CCCCCC"
+           FontSize="12"
+           VerticalAlignment="Center"
+           HorizontalAlignment="Center"
+           TextAlignment="Center"
+           TextWrapping="Wrap"
+           TextTrimming="CharacterEllipsis"
+           Margin="8,0,8,0"
+           Visibility="Collapsed"/>
+
 
             <!-- Right: Action Icons -->
             <StackPanel Orientation="Horizontal"

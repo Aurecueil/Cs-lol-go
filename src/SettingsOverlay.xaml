@@ -3,203 +3,482 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#80000000">
 
-    <Grid>
-        <Border Width="500" Height="450" 
-                Background="{DynamicResource BackgroundBrush}" 
-                CornerRadius="12"
-                HorizontalAlignment="Center" 
+	<Grid>
+		<Border Width="600" Height="500"
+                Background="#FF1E1E1E"
+                CornerRadius="6"
+                BorderBrush="{DynamicResource AccentBrush}"
+                BorderThickness="2"
+                HorizontalAlignment="Center"
                 VerticalAlignment="Center">
 
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="50"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="50"/>
+					<RowDefinition Height="*"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
 
-                <!-- Top Bar -->
-                <Border Grid.Row="0" 
-                        Background="{DynamicResource AccentBrush}" 
-                        CornerRadius="12,12,0,0">
-                    <Grid>
-                        <TextBlock Text="Settings" 
-                                   FontSize="18" 
-                                   FontWeight="Bold" 
+				<!-- Top Bar -->
+				<Border Grid.Row="0"
+                        Background="{DynamicResource AccentBrush}"
+                        CornerRadius="6,6,0,0">
+					<Grid>
+						<TextBlock Text="Settings"
+                                   FontSize="18"
+                                   FontWeight="Bold"
                                    Foreground="White"
-                                   HorizontalAlignment="Center" 
+                                   HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
 
-                        <TextBlock x:Name="CloseIcon"
-                                   Text="❌"
-                                   Foreground="White"
-                                   FontSize="15"
-                                   ToolTip="Close"
-                                   Style="{StaticResource IconTextBlockStyle}"
-                                   Padding="8"
-                                   HorizontalAlignment="Right"
-                                   MouseLeftButtonDown="Close_Click"/>
-                    </Grid>
-                </Border>
+						<Button x:Name="CloseButton"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="Close"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="5"
+                                Click="Close_Click">
+							<TextBlock Text="❌"
+                                       Foreground="LightGray"
+                                       Style="{StaticResource IconTextBlockStyle}"
+                                       Margin="0,-4,0,0"/>
+						</Button>
+					</Grid>
+				</Border>
 
-                <!-- Settings Content -->
-                <ScrollViewer Grid.Row="1" 
-                              VerticalScrollBarVisibility="Auto" 
+				<!-- Settings Content -->
+				<ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
-                              Margin="20">
+                              Background="Transparent"
+                              Margin="15">
+					<ScrollViewer.Resources>
+						<Style TargetType="ScrollBar">
+							<Setter Property="Background" Value="Transparent"/>
+							<Setter Property="Template">
+								<Setter.Value>
+									<ControlTemplate TargetType="ScrollBar">
+										<Grid Background="{TemplateBinding Background}"
+                                              Width="{TemplateBinding Width}">
+											<Track Name="PART_Track" Focusable="False" IsDirectionReversed="true"
+                                                   Orientation="{TemplateBinding Orientation}">
+												<Track.DecreaseRepeatButton>
+													<RepeatButton Style="{StaticResource NoHighlightRepeatButtonStyle}" Width="16" Height="16" IsTabStop="False"/>
+												</Track.DecreaseRepeatButton>
+												<Track.IncreaseRepeatButton>
+													<RepeatButton Style="{StaticResource NoHighlightRepeatButtonStyle}" Width="16" Height="16" IsTabStop="False"/>
+												</Track.IncreaseRepeatButton>
+												<Track.Thumb>
+													<Thumb />
+												</Track.Thumb>
+											</Track>
+										</Grid>
+									</ControlTemplate>
+								</Setter.Value>
+							</Setter>
+						</Style>
 
-                    <StackPanel>
-                        <!-- General Section -->
-                        <TextBlock Text="General" 
-                                   Style="{StaticResource SectionHeaderStyle}"/>
+						<Style TargetType="Thumb">
+							<Setter Property="Background" Value="#666666"/>
+							<Setter Property="OverridesDefaultStyle" Value="True"/>
+							<Setter Property="Template">
+								<Setter.Value>
+									<ControlTemplate TargetType="Thumb">
+										<Border Background="{TemplateBinding Background}" />
+									</ControlTemplate>
+								</Setter.Value>
+							</Setter>
+							<Style.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#999999"/>
+								</Trigger>
+							</Style.Triggers>
+						</Style>
+					</ScrollViewer.Resources>
 
-                        <!-- Automatically detect game path -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+					<StackPanel>
+						<!-- General Section -->
+						<Border Background="#FF1E1E1E"
+                                CornerRadius="6"
+                                Padding="10"
+                                Margin="0,0,0,10">
+							<StackPanel>
+								<TextBlock Text="General"
+                                           Foreground="White"
+                                           FontWeight="Bold"
+                                           FontSize="16"
+                                           Margin="0,0,0,0"/>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Automatically detect game path" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+								<!-- Automatically detect game path -->
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
+									<Grid Margin="0,0,0,0">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
 
-                            <CheckBox Grid.Column="1" 
-                                      x:Name="AutoDetectPathToggle"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="True"
-                                      Checked="AutoDetectPath_Changed"
-                                      Unchecked="AutoDetectPath_Changed"/>
-                        </Grid>
+										<CheckBox Grid.Column="0"
+												  x:Name="AutoDetectPathToggle"
+												  Style="{StaticResource CustomCheckBoxStyle}"
+												  IsChecked="True"
+												  Checked="AutoDetectPath_Changed"
+												  Unchecked="AutoDetectPath_Changed"
+												  Margin="0,0,8,0"/>
 
-                        <!-- Game path -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+										<TextBlock Grid.Column="1"
+												   Text="Automatically detect game path"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+									</Grid>
+									<Grid Margin="0,0,0,0" Grid.Column="2">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Game path" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+										<CheckBox Grid.Column="0"
+												  x:Name="path_reload"
+												  Style="{StaticResource CustomCheckBoxStyle}"
+												  IsChecked="True"
+												  Checked="path_reload_Changed"
+												  Unchecked="path_reload_Changed"
+												  Margin="0,0,8,0"/>
 
-                            <TextBox Grid.Column="1" 
-                                     x:Name="GamePathTextBox"
-                                     Style="{StaticResource PathTextBoxStyle}"
-                                     Text=""
-                                     Margin="10,0,0,0"/>
+										<TextBlock Grid.Column="1"
+												   Text="Reload Path on Read"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+									</Grid>
 
-                            <Button Grid.Column="2" 
-                                    Content="Browse..."
-                                    Style="{StaticResource BrowseButtonStyle}"
-                                    Click="BrowseGamePath_Click"/>
-                        </Grid>
+								</Grid>
 
-                        <!-- Start on startup -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+								<!-- Game path -->
+								<Grid Margin="4,0,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="auto"/>
+										<ColumnDefinition Width="120"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Start on startup" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+									<TextBlock Grid.Column="1"
+                                               Text="Game path"
+                                               Foreground="White"
+                                               FontSize="14" Margin="14,0,0,0"
+                                               VerticalAlignment="Center"/>
 
-                            <CheckBox Grid.Column="1" 
-                                      x:Name="StartOnStartupToggle"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="False"
-                                      Checked="StartOnStartup_Changed"
-                                      Unchecked="StartOnStartup_Changed"/>
-                        </Grid>
+									<TextBox Grid.Column="2"
+                                             x:Name="GamePathTextBox"
+                                             Margin="10,0,10,0"
+                                             VerticalAlignment="Center"
+                                             Foreground="White"
+                                             Background="Transparent"
+                                             BorderThickness="0,0,0,2"
+                                             BorderBrush="#666"
+                                             VerticalContentAlignment="Center"
+                                             Padding="5"
+                                             FontSize="14"
+                                             CaretBrush="White"/>
 
-                        <!-- Load mods on start -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+									<Button Grid.Column="0"
+                                            Content="Browse..."
+                                            Style="{StaticResource IconButtonStyle}"
+                                            Background="{DynamicResource AccentBrush}"
+                                            Foreground="White"
+                                            Padding="10,5"
+                                            Click="BrowseGamePath_Click"/>
+								</Grid>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Load mods on start" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+								<!-- Start on startup -->
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="1.5*"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
 
-                            <CheckBox Grid.Column="1" 
-                                      x:Name="LoadModsOnStartToggle"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="False"
-                                      Checked="LoadModsOnStart_Changed"
-                                      Unchecked="LoadModsOnStart_Changed"/>
-                        </Grid>
+									<Grid Margin="0,0,0,0">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="1.7*"/>
+										</Grid.ColumnDefinitions>
 
-                        <!-- Catch updates -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+										<CheckBox Grid.Column="0"
+												  x:Name="StartOnStartupToggle"
+												  Style="{StaticResource CustomCheckBoxStyle}"
+												  IsChecked="False"
+												  Checked="StartOnStartup_Changed"
+												  Unchecked="StartOnStartup_Changed"
+												  Margin="0,0,8,0"/>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Catch updates" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+										<TextBlock Grid.Column="1"
+												   Text="Start on startup"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+										
+										<ComboBox Grid.Column="2"
+                                              x:Name="Startup_Choice"
+											  Width="155"
+                                              Style="{StaticResource StyledComboBox}"
+                                              SelectedIndex="0"
+                                              SelectionChanged="Startup_Choice_Changed"
+                                              Margin="5,0,0,0">
+											<ComboBoxItem Content="Normal"/>
+											<ComboBoxItem Content="Minimized"/>
+											<ComboBoxItem Content="Mod Active"/>
+											<ComboBoxItem Content="Minimized + Mod Active"/>
+										</ComboBox>
+									</Grid>
+									
+									<Grid Margin="5,0,0,0" Grid.Column="1">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
+										<TextBlock Grid.Column="0"
+												   Text="App Start"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+										
+										<ComboBox Grid.Column="1"
+                                              x:Name="Start_Normal"
+											  Width="140"
+                                              Style="{StaticResource StyledComboBox}"
+                                              SelectedIndex="0"
+                                              SelectionChanged="Start_Normal_Changed"
+                                              Margin="5,0,0,0">
+											<ComboBoxItem Content="Normal"/>
+											<ComboBoxItem Content="Minimized"/>
+											<ComboBoxItem Content="Mod Active"/>
+											<ComboBoxItem Content="Minimized + Mod Active"/>
+										</ComboBox>
+									</Grid>
+								</Grid>
+								<!-- Load mods on start -->
+								<Grid Margin="0,0,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
 
-                            <CheckBox Grid.Column="1" 
-                                      x:Name="CatchUpdatesToggle"
-                                      Style="{StaticResource ToggleSwitchStyle}"
-                                      IsChecked="True"
-                                      Checked="CatchUpdates_Changed"
-                                      Unchecked="CatchUpdates_Changed"/>
-                        </Grid>
+									<CheckBox Grid.Column="0"
+                                              x:Name="reinitialized"
+                                              Style="{StaticResource CustomCheckBoxStyle}"
+                                              IsChecked="False"
+                                              Checked="reinitialized_Changed"
+                                              Unchecked="reinitialized_Changed"
+                                              Margin="0,0,8,0"/>
 
-                        <!-- Import override -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+									<TextBlock Grid.Column="1"
+                                               Text="ReLoad mods each Game (for random folders/mods)"
+                                               Foreground="White"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"/>
+								</Grid>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Import override" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+								<!-- Catch updates -->
+								<Grid Margin="0,0,0,0" IsEnabled="False">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
 
-                            <ComboBox Grid.Column="1" 
-                                      x:Name="ImportOverrideComboBox"
-                                      Style="{StaticResource StyledComboBox}"
-                                      SelectedIndex="0"
-                                      SelectionChanged="ImportOverride_Changed"
-                                      Margin="10,0,0,0">
-                                <ComboBoxItem Content="No (error)"/>
-                                <ComboBoxItem Content="Soft overwrite"/>
-                                <ComboBoxItem Content="Hard overwrite"/>
-                                <ComboBoxItem Content="Dupe"/>
-                            </ComboBox>
-                        </Grid>
+									<CheckBox Grid.Column="0"
+                                              x:Name="CatchUpdatesToggle"
+                                              Style="{StaticResource CustomCheckBoxStyle}"
+                                              IsChecked="False"
+                                              Checked="CatchUpdates_Changed"
+                                              Unchecked="CatchUpdates_Changed"
+                                              Margin="0,0,8,0"/>
 
-                        <!-- Theme Section -->
-                        <TextBlock Text="Theme" 
-                                   Style="{StaticResource SectionHeaderStyle}"/>
+									<TextBlock Grid.Column="1"
+                                               Text="Catch updates"
+                                               Foreground="White"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"/>
+								</Grid>
 
-                        <!-- Color (placeholder) -->
-                        <Grid Style="{StaticResource OptionRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+								<!-- Import override -->
+								<Grid Margin="14,0,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="120"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0" 
-                                       Text="Color" 
-                                       Style="{StaticResource OptionLabelStyle}"/>
+									<TextBlock Grid.Column="0"
+                                               Text="Import override"
+                                               Foreground="White"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"/>
 
-                            <TextBlock Grid.Column="1" 
-                                       Text="(Placeholder)" 
-                                       Style="{StaticResource OptionLabelStyle}"
-                                       Foreground="#FFAAAAAA"
-                                       FontStyle="Italic"
-                                       Margin="10,0,0,0"/>
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-        </Border>
-    </Grid>
+									<ComboBox Grid.Column="1"
+                                              x:Name="ImportOverrideComboBox"
+                                              Style="{StaticResource StyledComboBox}"
+                                              SelectedIndex="0"
+                                              SelectionChanged="ImportOverride_Changed"
+                                              Margin="10,0,0,0">
+										<ComboBoxItem Content="No (error)"/>
+										<ComboBoxItem Content="Soft overwrite"/>
+										<ComboBoxItem Content="Hard overwrite"/>
+										<ComboBoxItem Content="Dupe"/>
+									</ComboBox>
+								</Grid>
+							</StackPanel>
+						</Border>
+
+						<!-- Theme Section -->
+						<Border Background="#FF1E1E1E"
+                                CornerRadius="6"
+                                Padding="15"
+                                Margin="0,0,0,0">
+							<StackPanel>
+								<TextBlock Text="Theme"
+                                           Foreground="White"
+                                           FontWeight="Bold"
+                                           FontSize="16"
+                                           Margin="0,0,0,10"/>
+
+								<!-- Color (placeholder) -->
+								<Grid Margin="0,0,0,0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="120"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
+
+									<TextBlock Grid.Column="0"
+                                               Text="Color"
+                                               Foreground="White"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"/>
+
+									<TextBlock Grid.Column="1"
+                                               Text="(Placeholder)"
+                                               Foreground="#CCCCCC"
+                                               FontSize="14"
+                                               FontStyle="Italic"
+                                               VerticalAlignment="Center"
+                                               Margin="10,0,0,0"/>
+								</Grid>
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
+								<Grid Margin="0,0,0,0" Grid.Column="0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="Auto"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
+
+									<CheckBox Grid.Column="0"
+											  x:Name="Details_columns_state"
+											  Style="{StaticResource CustomCheckBoxStyle}"
+											  IsChecked="True"
+											  Checked="Details_columns_state_Changed"
+											  Unchecked="Details_columns_state_Changed"
+											  Margin="0,0,8,0"/>
+
+									<TextBlock Grid.Column="1"
+											   Text="Details Collumn"
+											   Foreground="White"
+											   FontSize="14"
+											   VerticalAlignment="Center"/>
+								</Grid>
+									
+									
+									<Grid Margin="0,0,0,0" Grid.Column="1">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
+
+										<CheckBox Grid.Column="0"
+												  x:Name="DetailsDeisplay"
+												  Style="{StaticResource CustomCheckBoxStyle}"
+												  IsChecked="True"
+												  Checked="DetailsDeisplay_Changed"
+												  Unchecked="DetailsDeisplay_Changed"
+												  Margin="0,0,8,0"/>
+
+										<TextBlock Grid.Column="1"
+												   Text="Details Display"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+									</Grid>
+									
+									
+									
+									
+								</Grid>
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="*"/>
+									</Grid.ColumnDefinitions>
+
+									<Grid Margin="0,0,0,0" Grid.Column="0" HorizontalAlignment="Center">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
+
+										<TextBox Grid.Column="0"
+												 x:Name="TilesHeights"
+												 Width="40"
+												 Text="60"
+												 Margin="0,0,8,0"
+												 VerticalContentAlignment="Center"
+												 TextChanged="TilesHeight"
+												 PreviewTextInput="Details_columns_state_PreviewTextInput"
+												 LostFocus="TilesHeight_LostFocus"
+												 MaxLength="2"/>
+
+										<TextBlock Grid.Column="1"
+												   Text="Details Column"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+									</Grid>
+
+									<Grid Margin="0,0,0,0" Grid.Column="1" HorizontalAlignment="Center">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
+
+										<TextBox Grid.Column="0"
+												 x:Name="TilesWidths"
+												 Width="40"
+												 Text="60"
+												 Margin="0,0,8,0"
+												 VerticalContentAlignment="Center"
+												 TextChanged="Tileswidth"
+												 PreviewTextInput="Details_columns_state_PreviewTextInput"
+												 LostFocus="TilesWidth_LostFocus"
+												 MaxLength="3"/>
+
+										<TextBlock Grid.Column="1"
+												   Text="Details Column"
+												   Foreground="White"
+												   FontSize="14"
+												   VerticalAlignment="Center"/>
+									</Grid>
+
+
+								</Grid>
+							</StackPanel>
+						</Border>
+					</StackPanel>
+				</ScrollViewer>
+			</Grid>
+		</Border>
+	</Grid>
 </UserControl>

@@ -19,20 +19,6 @@ namespace ModManager
 
     public partial class ModListEntry : UserControl
     {
-        private DispatcherTimer hoverTimer;
-        private DispatcherTimer closeTimer;
-        private DispatcherTimer distanceTimer;
-        private Popup hoverPopup;
-        private HoverDetailsPopup popupContent;
-        private Point popupShowMousePosition; // Store mouse position when popup was shown
-
-        // Configuration constants
-        private const int HOVER_DELAY_MS = 1500;
-        private const int CLOSE_DELAY_MS = 200;
-        private const int DISTANCE_CHECK_INTERVAL_MS = 100;
-        private const double MAX_DISTANCE_PIXELS = 10;
-
-        public bool hoverEnabled = true;
         private MainWindow Main => (MainWindow)Application.Current.MainWindow;
 
 
@@ -108,131 +94,6 @@ namespace ModManager
             IsMod = true;
 
             UpdateUIForMod();
-        }
-
-
-        private void InitializeHoverPopup()
-        {
-            popupContent = new HoverDetailsPopup();
-            hoverPopup = new Popup
-            {
-                Child = popupContent,
-                IsOpen = false,
-                AllowsTransparency = true,
-                StaysOpen = true
-            };
-
-            hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HOVER_DELAY_MS) };
-            hoverTimer.Tick += (s, e) => {
-                hoverTimer.Stop();
-                ShowPopup();
-            };
-
-            closeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(CLOSE_DELAY_MS) };
-            closeTimer.Tick += (s, e) => {
-                closeTimer.Stop();
-                hoverPopup.IsOpen = false;
-                StopDistanceTimer();
-            };
-
-            distanceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DISTANCE_CHECK_INTERVAL_MS) };
-            distanceTimer.Tick += (s, e) => CheckMouseDistance();
-
-            this.MouseEnter += (s, e) => {
-                hoverTimer.Start();
-                closeTimer.Stop();
-            };
-
-            this.MouseLeave += (s, e) => {
-                hoverTimer.Stop();
-                if (hoverPopup.IsOpen)
-                    StartDistanceTimer();
-            };
-
-            // Keep popup open when mouse enters it
-            hoverPopup.MouseEnter += (s, e) => {
-                closeTimer.Stop();
-                distanceTimer.Stop();
-            };
-
-            hoverPopup.MouseLeave += (s, e) => StartDistanceTimer();
-        }
-
-        private void StartCloseTimer()
-        {
-            closeTimer.Stop();
-            closeTimer.Start();
-        }
-
-        private void StartDistanceTimer()
-        {
-            distanceTimer.Stop();
-            distanceTimer.Start();
-        }
-
-        private void StopDistanceTimer()
-        {
-            distanceTimer.Stop();
-        }
-
-        private void CheckMouseDistance()
-        {
-            if (!hoverPopup.IsOpen) return;
-
-            // Get current mouse position relative to screen
-            var currentMousePos = Mouse.GetPosition(Application.Current.MainWindow);
-            var screenCurrentMousePos = Application.Current.MainWindow.PointToScreen(currentMousePos);
-
-            // Calculate distance from original popup show position
-            var distance = GetDistance(screenCurrentMousePos, popupShowMousePosition);
-
-            // If mouse is too far from original position, start close timer
-            if (distance > MAX_DISTANCE_PIXELS)
-            {
-                StopDistanceTimer();
-                StartCloseTimer();
-            }
-        }
-
-        private double GetDistance(Point point1, Point point2)
-        {
-            var dx = point1.X - point2.X;
-            var dy = point1.Y - point2.Y;
-            return Math.Sqrt(dx * dx + dy * dy);
-        }
-
-        private void ShowPopup()
-        {
-            if (popupContent == null || hoverPopup == null) return;
-
-            popupContent.SetContent(Main.GetDetails(identifier)); // Replace with actual mod details
-
-            // Store the current mouse position when popup is shown
-            var currentMousePos = Mouse.GetPosition(Application.Current.MainWindow);
-            popupShowMousePosition = Application.Current.MainWindow.PointToScreen(currentMousePos);
-
-            // Set placement target to this control and use relative positioning
-            hoverPopup.PlacementTarget = this;
-            hoverPopup.Placement = PlacementMode.MousePoint;
-            hoverPopup.IsOpen = true;
-
-            // Start distance checking once popup is shown
-            StartDistanceTimer();
-        }
-
-        
-
-        // Optional: Add cleanup method
-        public void Dispose()
-        {
-            hoverTimer?.Stop();
-            closeTimer?.Stop();
-            distanceTimer?.Stop();
-            if (hoverPopup != null)
-            {
-                hoverPopup.IsOpen = false;
-                hoverPopup.Child = null;
-            }
         }
 
         private void UpdateUIForParentFolder(int parentId)
@@ -508,8 +369,6 @@ namespace ModManager
         {
             IsParentFolder = false;
 
-            // InitializeHoverPopup();
-
             EntryName.Text = FolderElement.Name;
 
             // Set details (collapsed for folders)
@@ -540,17 +399,22 @@ namespace ModManager
             // Set name
             EntryName.Text = ModElement.Info.Name;
 
-            // InitializeHoverPopup();
-
-            // Set details - show author and version
-            string details = $"{ModElement.Info.Version} by {ModElement.Info.Author}";
-            if (!string.IsNullOrWhiteSpace(ModElement.Info.Description))
+            if (Main.settings.details_displ)
             {
-                details += $"\n{ModElement.Info.Description}";
-            }
+                string details = $"{ModElement.Info.Version} by {ModElement.Info.Author}";
+                if (!string.IsNullOrWhiteSpace(ModElement.Info.Description))
+                {
+                    details += $"\n{ModElement.Info.Description}";
+                }
 
-            DetailsText.Text = details;
-            DetailsText.Visibility = Visibility.Visible;
+                DetailsText.Text = details;
+                DetailsText.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                det_grid.ColumnDefinitions[1].Width = new GridLength(0);
+            }
+            
 
             // Set checkbox based on isActive property
             ActiveCheckbox.IsChecked = ModElement.isActive;
@@ -605,12 +469,10 @@ namespace ModManager
 
             if (ctrlPressed)
             {
-                // Toggle selection
                 ToggleSelection();
             }
             else if (shiftPressed)
             {
-                // Range selection
                 HandleRangeSelection();
             }
             else
@@ -622,6 +484,8 @@ namespace ModManager
                     SetSelected(true);
                 }
             }
+
+            Main.UpdateDetailsPanel(identifier);
 
             // Store drag start point
             dragStartPoint = e.GetPosition(this);
