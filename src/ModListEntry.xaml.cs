@@ -210,21 +210,21 @@ namespace ModManager
                 }
                 if (has_folder == 1)
                 {
-                    var result = MessageBox.Show(
-                            $"Delete folder All selected Folders?\n\nYes: Delete folder with contents\nNo: Delete only folder (empty)\nCancel: Abort",
-                            "Delete Folder",
-                            MessageBoxButton.YesNoCancel,
-                            MessageBoxImage.Warning,
-                            MessageBoxResult.Cancel);
+                    var result = CustomMessageBox.Show(
+    $"Delete folder All selected Folders?",
+    new[] { "Delete with content", "Only Folders", "Cancel" },
+    "Delete Folder");
+
                     switch (result)
                     {
-                        case MessageBoxResult.Yes:
+                        case "Delete with content":
                             has_folder = 2;
                             break;
-                        case MessageBoxResult.No:
+                        case "Only Folders":
                             has_folder = 3;
                             break;
-                        case MessageBoxResult.Cancel:
+                        case "Cancel":
+                        case "": // Empty string is returned when dialog is closed without selecting a button
                             has_folder = 4;
                             break;
                     }
@@ -260,23 +260,21 @@ namespace ModManager
                 }
                 else
                 {
-                    var result = MessageBox.Show(
-                        $"Delete folder \"{FolderElement.Name}\"?\n\nYes: Delete folder with contents\nNo: Delete only folder (empty)\nCancel: Abort",
-                        "Delete Folder",
-                        MessageBoxButton.YesNoCancel,
-                        MessageBoxImage.Warning,
-                        MessageBoxResult.Cancel);
+                    var result = CustomMessageBox.Show(
+    $"Delete folder \"{FolderElement.Name}\"?", new[] { "Delete with content", "Only Folders", "Cancel" },
+    "Delete Folder");
 
                     switch (result)
                     {
-                        case MessageBoxResult.Yes:
+                        case "Delete with content":
                             Main.DeleteFolderElement(FolderElement.ID, true);
                             break;
-                        case MessageBoxResult.No:
+                        case "Only Folders":
                             Main.DeleteFolderElement(FolderElement.ID, false);
                             break;
-                        case MessageBoxResult.Cancel:
-                            // do nothing
+                        case "Cancel":
+                        case "": // Empty string is returned when dialog is closed without selecting a button
+                                 // do nothing
                             break;
                     }
                 }

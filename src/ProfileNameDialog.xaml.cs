@@ -7,7 +7,7 @@ using System.Windows.Input;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace ModLoader
+namespace ModManager
 {
     public partial class ProfileNameDialog : UserControl
     {
@@ -21,7 +21,8 @@ namespace ModLoader
 
         public void SetPlaceholderText(string text)
         {
-            // Find the placeholderText TextBlock inside the TextBox's template
+            ProfileNameBox.ApplyTemplate();
+
             if (ProfileNameBox.Template != null)
             {
                 var placeholder = (TextBlock)ProfileNameBox.Template.FindName("placeholderText", ProfileNameBox);

@@ -1,4 +1,5 @@
-﻿using ModLoader;
+﻿using Microsoft.Win32;
+using ModLoader;
 using System;
 using System.Configuration;
 using System.Diagnostics;
@@ -151,6 +152,7 @@ namespace ModManager
         private void show_profile(object sender, RoutedEventArgs e)
         {
             var control = new ProfileNameDialog();
+
             control.SetPlaceholderText("New Folder Name");
             control.OnProfileCreated += newProfileName =>
             {
@@ -209,21 +211,33 @@ namespace ModManager
                 GlobalselectedEntries.Add(item.identifier);
             }
         }
+        private bool ShouldBlockShortcuts()
+        {
+            return ToggleOverlayRow.Visibility == Visibility.Visible
+                || OverlayHost.Children.Count > 0
+                || OverlayHost2.Children.Count > 0;
+        }
+
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
             {
                 OverlayHost.Children.Clear();
+                OverlayHost2.Children.Clear();
             }
-            else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            else if (e.Key == Key.F5 && !ShouldBlockShortcuts())
+            {
+                Internal_restart(Current_location_folder);
+            }
+            else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
             {
                 Change_State_allButtons(true);
             }
-            else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
             {
                 Change_State_allButtons(false);
             }
-            else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
             {
                 foreach (var mod in modListEntriesInDisplay)
                 {
@@ -257,7 +271,7 @@ namespace ModManager
                     break;
                 }
             }
-            else if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !SearchBox.IsFocused)
+            else if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
             {
                 foreach (int source in CutEntries.Keys)
                 {
@@ -388,6 +402,90 @@ namespace ModManager
                 this.ShowInTaskbar = false;
             }
         }
+        public async Task ProcessArguments(string args)
+        {
+            var splitArgs = SplitArgs(args);
+
+            bool hasStart = false;
+            bool hasStop = false;
+            string spValue = null;
+
+            for (int i = 0; i < splitArgs.Count; i++)
+            {
+                string arg = splitArgs[i];
+
+                if (arg == "--start")
+                {
+                    hasStart = true;
+                }
+                else if (arg == "--sp" && i + 1 < splitArgs.Count)
+                {
+                    spValue = splitArgs[i + 1];
+                    i++; 
+                }
+                else if (arg == "--stop")
+                {
+                    hasStop = true;
+                }
+            }
+
+            if (hasStop)
+            {
+                Load_check_box.IsEnabled = false;
+                await Stop_loader_internal();
+                Load_check_box.IsEnabled = true;
+            }
+            if (spValue != null)
+            {
+                if (ProfileExists(spValue))
+                {
+                    ProfileComboBox.SelectedItem = spValue;
+                    settings.CurrentProfile = spValue;
+                    save_settings();
+                    ReadCurrentProfile();
+                }
+            }
+            if (hasStart)
+            {
+                True_Start_loader();
+            }
+        }
+
+        public static List<string> SplitArgs(string input)
+        {
+            var args = new List<string>();
+            var currentArg = new StringBuilder();
+            bool inQuotes = false;
+
+            foreach (char c in input)
+            {
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                }
+                else if (char.IsWhiteSpace(c) && !inQuotes)
+                {
+                    if (currentArg.Length > 0)
+                    {
+                        args.Add(currentArg.ToString());
+                        currentArg.Clear();
+                    }
+                }
+                else
+                {
+                    currentArg.Append(c);
+                }
+            }
+
+            if (currentArg.Length > 0)
+                args.Add(currentArg.ToString());
+
+            return args;
+        }
+
+
+
+
 
         private void OnTrayIconDoubleClick()
         {
@@ -406,11 +504,55 @@ namespace ModManager
                 _contextMenuWindow = new ContextMenuWindow();
                 _contextMenuWindow.OnShowClicked += () => RestoreWindow();
                 _contextMenuWindow.OnExitClicked += () => Application.Current.Shutdown();
+
+                _contextMenuWindow.OnLoaderClicked += () =>
+                {
+                    HandleLoaderClick();
+                };
             }
+
+            // Update loader state before showing the menu
+            bool isRunning = IsLoaderRunning();
+            bool isDisabled = !IsLoaderEnabled();
+            _contextMenuWindow.UpdateLoaderState(isRunning, isDisabled);
 
             // Get cursor position
             var point = GetCursorPosition();
             _contextMenuWindow.ShowAt(point.X, point.Y);
+        }
+        public void UpdateContextMenuLoaderState()
+        {
+            if (_contextMenuWindow != null)
+            {
+                bool isRunning = IsLoaderRunning();
+                bool isDisabled = !IsLoaderEnabled();
+                _contextMenuWindow.UpdateLoaderState(isRunning, isDisabled);
+            }
+        }
+
+        private void HandleLoaderClick()
+        {
+            if (IsLoaderRunning())
+            {
+                Stop_loader(null, null);
+            }
+            else
+            {
+                Start_loader(null, null);
+            }
+        }
+
+        public bool IsLoaderRunning()
+        {
+            lock (_loaderLock)
+            {
+                return _isLoaderRunning;
+            }
+        }
+
+        public bool IsLoaderEnabled()
+        {
+            return Load_check_box.IsEnabled;
         }
 
         private void RestoreWindow()
@@ -459,6 +601,63 @@ namespace ModManager
                 MySplitter.IsEnabled = false;
                 save_settings();
             }
+        }
+        private void restart_button(object sender, EventArgs e)
+        {
+            Internal_restart(Current_location_folder);
+        }
+
+        private void Import_Mods(object sender, EventArgs e)
+        {
+            string[] paths = OpenSupportedFileDialog(true);
+            foreach (string path in paths)
+            {
+                if (IsAcceptedDropItem(path))
+                {
+                    HandleDroppedItem(path);
+                }
+            }
+        }
+        public static string[] OpenSupportedFileDialog(bool allowMultiple = false, Window owner = null)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select file(s)",
+                Filter = "Supported Files (*.fantom, *.zip, *.wad, *.client)|*.fantom;*.zip;*.wad;*.client|All Files (*.*)|*.*",
+                Multiselect = allowMultiple
+            };
+
+            bool? result = owner == null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
+
+            return result == true ? dialog.FileNames : Array.Empty<string>();
+        }
+        private void Internal_restart(int loc)
+        {
+            hierarchyById.Clear();
+            modByFolder.Clear();
+            CutEntries.Clear();
+            Stop_loader_internal();
+            load_settings();
+            var root_folder = new HierarchyElement
+            {
+                Name = "root",
+                Override = 0,
+                Priority = 0,
+                Random = false,
+                ID = 0,
+                parent = 0,
+                InnerPath = "",
+                Children = new List<Tuple<string, bool>>
+                {
+                }
+            };
+            hierarchyById[0] = root_folder;
+            LoadFolders();
+            LoadMods();
+            InitializeProfiles();
+            LoadWadFiles();
+            ReadCurrentProfile();
+            RefreshModListPanel(loc);
         }
         public MainWindow()
         {
@@ -844,10 +1043,13 @@ namespace ModManager
             {
                 string currentProfile = ProfileComboBox.SelectedItem.ToString();
 
-                var result = MessageBox.Show($"Are you sure you want to delete profile '{currentProfile}'?",
-                    "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                string q = $"Are you sure you want to delete profile '{currentProfile}'?";
+                string title = "meow meow meow";
+                IEnumerable<string> options = new[] { "Yes", "No" };
 
-                if (result == MessageBoxResult.Yes)
+                string result = CustomMessageBox.Show(q , options, title);
+
+                if (result == "Yes")
                 {
                     DeleteProfile(currentProfile);
 
@@ -1145,7 +1347,8 @@ namespace ModManager
                 _isLoaderRunning = true;
                 Load_check_box.IsEnabled = false; // Disable during startup
             }
-
+            Load_check_box.IsChecked = true;
+            UpdateContextMenuLoaderState();
             try
             {
                 ToggleOverlay(true);
@@ -1158,21 +1361,21 @@ namespace ModManager
                 await Stop_loader_internal();
             }
             finally
-            {
-                Load_check_box.IsEnabled = true;
-            }
+            {}
+            Load_check_box.IsEnabled = true;
+            UpdateContextMenuLoaderState();
         }
 
         public async void Stop_loader(object sender, RoutedEventArgs e)
         {
-            Load_check_box.IsEnabled = false;
-            await Stop_loader_internal();            
-            Load_check_box.IsEnabled = true;
+            await Stop_loader_internal();        
         }
 
         private async Task Stop_loader_internal()
         {
-            // Note: Don't disable checkbox here since Stop_loader handles it
+            ToggleOverlay(true);
+            Load_check_box.IsEnabled = false;
+            UpdateContextMenuLoaderState();
 
             CancellationTokenSource ctsToCancel = null;
 
@@ -1208,9 +1411,11 @@ namespace ModManager
                 // Log or handle CSLol stop errors if needed
                 System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
             }
-
+            Load_check_box.IsChecked = false;
             ToggleOverlay(false);
             ToggleFeed(false);
+            Load_check_box.IsEnabled = true;
+            UpdateContextMenuLoaderState();
         }
 
         public async void Load_Mods()
@@ -1568,8 +1773,6 @@ namespace ModManager
 
             }
         }
-
-
 
         public void RefreshModListPanel(int c_location)
         {
@@ -2503,6 +2706,7 @@ namespace ModManager
                         Mod new_mod = CreateModFromFolder(extractTargetDir);
                         if (new_mod != null)
                         {
+                            new_mod.Details.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
                             Console.WriteLine($"Successfully loaded mod: {new_mod.Info?.Name ?? folderName}");
                             bool was_added = false;
                             if (modByFolder.ContainsKey(folderName))
@@ -2514,6 +2718,7 @@ namespace ModManager
                                 if (innerPath == "")
                                 {
                                     was_added = true;
+                                    MessageBox.Show("");
                                     AddChild(Current_location_folder, folderName, true);
                                 }
                                 else
@@ -2525,6 +2730,7 @@ namespace ModManager
                                         int part = int.Parse(parts[i]);
                                         if (hierarchyById.ContainsKey(part))
                                         {
+                                            MessageBox.Show("");
                                             was_added = true;
                                             AddChild(part, folderName, true);
                                             break;
@@ -2532,6 +2738,8 @@ namespace ModManager
                                     }
                                 }
                             }
+                            SaveModDetails(new_mod);
+                            SaveModInfo(new_mod);
                         }
 
                     }
@@ -2551,6 +2759,7 @@ namespace ModManager
             {
                 MessageBox.Show($"Error handling dropped item:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+            RefreshModListPanel(Current_location_folder);
         }
 
         private void HandleWadImport(string path)

@@ -2,6 +2,8 @@
 using System.Configuration;
 using System.Data;
 using System.Drawing;
+using System.IO.Pipes;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,6 +11,9 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using SystemColors = System.Windows.SystemColors;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace ModManager
 {
@@ -16,12 +21,25 @@ namespace ModManager
     {
         public static bool StartWithLoaded = false;
         public static bool StartMinimized = false;
+
     }
+
     public partial class App : Application
     {
+        const string PipeName = "ModdoLoudaDA_paipu";
+        private static Mutex _mutex;
+
         protected override void OnStartup(StartupEventArgs e)
         {
-            base.OnStartup(e);
+            bool isNewInstance;
+            _mutex = new Mutex(true, @"Global\ModdoLoudaDA", out isNewInstance);
+
+            if (!isNewInstance)
+            {
+                SendArgsToExistingInstance(e.Args);
+                Shutdown();
+                return;
+            }
 
             if (e.Args.Contains("--startup"))
             {
@@ -31,13 +49,123 @@ namespace ModManager
             {
                 Globals.StartMinimized = true;
             }
+
+            base.OnStartup(e);
+
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        using var server = new NamedPipeServerStream(PipeName, PipeDirection.In);
+                        using var reader = new StreamReader(server);
+                        server.WaitForConnection();
+                        string arguments = reader.ReadToEnd();
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            HandleArguments(arguments);
+                            if (!arguments.Contains("--dbu"))
+                            {
+                                BringToFront();
+                            }
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Pipe error: {ex.Message}");
+                    }
+                }
+            });
         }
 
+        void HandleArguments(string args)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (Application.Current.MainWindow is MainWindow mainWindow)
+                {
+                    mainWindow.ProcessArguments(args);
+                }
+            });
+        }
+
+
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        const int SW_RESTORE = 9;
+
+        void BringToFront()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var mainWindow = Application.Current.MainWindow;
+                if (mainWindow == null) return;
+
+                // If your app uses "Hide to Tray", it might be Visibility.Hidden
+                if (mainWindow.Visibility != Visibility.Visible)
+                {
+                    mainWindow.Show(); // Bring it back
+                }
+
+                // Also handle minimize
+                if (mainWindow.WindowState == WindowState.Minimized)
+                {
+                    mainWindow.WindowState = WindowState.Normal;
+                }
+
+                // Bring it to foreground
+                mainWindow.Activate(); // Better than SetForegroundWindow in WPF
+                mainWindow.Topmost = true;  // Force z-order
+                mainWindow.Topmost = false; // Reset
+                mainWindow.Focus();
+            });
+        }
+
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            _mutex?.ReleaseMutex();
+            _mutex?.Dispose();
+            base.OnExit(e);
+        }
+        void SendArgsToExistingInstance(string[] args)
+        {
+            try
+            {
+                using (var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out))
+                {
+                    client.Connect(500);
+                    using (var writer = new StreamWriter(client))
+                    {
+                        writer.WriteLine(string.Join(" ", args));
+                        writer.Flush(); // Ensure data is sent
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Pipe error: {ex.Message}"); // Debug the actual error
+            }
+        }
     }
+
+
+
+
     public class ContextMenuWindow : Window
     {
         public event Action OnShowClicked;
         public event Action OnExitClicked;
+        public event Action OnLoaderClicked;
+
+        private Button _loaderButton;
+        private bool _isLoaderRunning = false;
+        private bool _isLoaderDisabled = false;
 
         public ContextMenuWindow()
         {
@@ -53,7 +181,7 @@ namespace ModManager
             this.ShowInTaskbar = false;
             this.Topmost = true;
             this.Width = 120;
-            this.Height = 80;
+            this.Height = 76; // Increased height to accommodate third button
             this.Deactivated += (s, e) => this.Hide();
         }
 
@@ -67,33 +195,36 @@ namespace ModManager
             {
                 Background = backgroundBrush,
                 BorderBrush = borderBrush,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(2)
+                BorderThickness = new Thickness(2), // Increased from 1 to 3 (2px thicker)
+                CornerRadius = new CornerRadius(3)
             };
 
             var stackPanel = new StackPanel();
 
+            // Create loader button (positioned at top)
+            _loaderButton = CreateMenuItem("Load Mods", textBrush);
+            _loaderButton.Click += (s, e) => { OnLoaderClicked?.Invoke(); this.Hide(); };
+
             var showButton = CreateMenuItem("Show", textBrush);
             showButton.Click += (s, e) => { OnShowClicked?.Invoke(); this.Hide(); };
-
-            var separator = new Separator { Margin = new Thickness(2, 0, 2, 0) };
 
             var exitButton = CreateMenuItem("Exit", textBrush);
             exitButton.Click += (s, e) => { OnExitClicked?.Invoke(); this.Hide(); };
 
+            // Add buttons in order: Loader, Show, Exit
+            stackPanel.Children.Add(_loaderButton);
             stackPanel.Children.Add(showButton);
-            stackPanel.Children.Add(separator);
             stackPanel.Children.Add(exitButton);
 
             border.Child = stackPanel;
             this.Content = border;
         }
 
-
         private Button CreateMenuItem(string text, System.Windows.Media.Brush foreground)
         {
             return new Button
             {
+                Style = (Style)Application.Current.Resources["tray_highlight"],
                 Content = text,
                 Background = System.Windows.Media.Brushes.Transparent,
                 Foreground = foreground,
@@ -104,6 +235,29 @@ namespace ModManager
             };
         }
 
+        public void UpdateLoaderState(bool isRunning, bool isDisabled = false)
+        {
+            _isLoaderRunning = isRunning;
+            _isLoaderDisabled = isDisabled;
+
+            if (_loaderButton != null)
+            {
+                _loaderButton.Content = isRunning ? "Stop Mods" : "Load Mods";
+                _loaderButton.IsEnabled = !isDisabled;
+
+                // Optional: Change appearance when disabled
+                if (isDisabled)
+                {
+                    _loaderButton.Foreground = System.Windows.Media.Brushes.Gray;
+                    _loaderButton.Cursor = Cursors.Arrow;
+                }
+                else
+                {
+                    _loaderButton.Foreground = System.Windows.Media.Brushes.White;
+                    _loaderButton.Cursor = Cursors.Hand;
+                }
+            }
+        }
 
         public void ShowAt(int x, int y)
         {

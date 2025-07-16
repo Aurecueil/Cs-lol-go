@@ -10,9 +10,10 @@
         Title="LoL for GlobalOffensive 2077"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
-        MinWidth="400" 
+        MinWidth="400"
         MinHeight="300"
     WindowStartupLocation="CenterScreen">
+    
     <Grid x:Name="MainGrid">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="3*" />
@@ -39,7 +40,7 @@
             Style="{StaticResource IconButtonStyle}" 
             ToolTip="Settings"
             Margin="10,5,5,5">
-                <TextBlock Text="⚙️" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+                <TextBlock Text="⚙" FontFamily="Segoe UI Emoji" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
 
             <ComboBox 
@@ -58,7 +59,7 @@
         ToolTip="Create Profile" x:Name="CreateProfile"
         Margin="5,5,10,5"
         Click="CreateProfile_Click">
-                <TextBlock Text="⚙️" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+                <TextBlock Text="➕" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
             <Button DockPanel.Dock="Left" 
         Style="{StaticResource IconButtonStyle}" 
@@ -72,9 +73,9 @@
             
             <Button DockPanel.Dock="Right" x:Name="create_folder"
                     Style="{StaticResource IconButtonStyle}" 
-                    ToolTip="Play" Click="show_profile"
+                    ToolTip="Create Folder" Click="show_profile"
                     Margin="5,5,50,5">
-                <TextBlock Text="F" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+                <TextBlock Text="📁" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
 
             
@@ -150,11 +151,11 @@
             <StackPanel DockPanel.Dock="Right" 
                 Orientation="Horizontal" 
                 Margin="0,0,20,0">
-                <Button Content="🔄" Width="50" Height="50" Margin="5"
+                <Button Content="🔄" Width="50" Height="50" Margin="5" Click="restart_button" ToolTip="Refresh Mods"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
-                <Button Content="➕" Width="50" Height="50" Margin="5"
+                <Button Content="➕" Width="50" Height="50" Margin="5" IsEnabled="False" ToolTip="Create Mod"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
-                <Button Content="📄" Width="50" Height="50" Margin="5"
+                <Button Content="📄" Width="50" Height="50" Margin="5" Click="Import_Mods" ToolTip="Import Mods"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
             </StackPanel>
 
@@ -240,8 +241,8 @@ Unchecked="Stop_loader"
                              HorizontalAlignment="Center" 
                              VerticalAlignment="Center"
                              Foreground="White"
-                             FontSize="16"
-                             Text="▶️"
+                             FontSize="18"
+                             Text="▶"
                              Margin="10,5,10,5"/>
                                 </Grid>
                                 <ControlTemplate.Triggers>
