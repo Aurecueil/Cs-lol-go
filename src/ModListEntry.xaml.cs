@@ -847,7 +847,6 @@ namespace ModManager
             }
         }
 
-        // Method to refresh the display (useful if data changes externally)
         public void RefreshDisplay()
         {
             if (IsParentFolder)

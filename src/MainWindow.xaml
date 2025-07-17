@@ -86,7 +86,7 @@
               VerticalScrollBarVisibility="Auto" AllowDrop="True"
               Drop="DropScrollViewer_Drop"
               DragOver="DropScrollViewer_DragOver"
-              HorizontalScrollBarVisibility="Disabled" PreviewMouseDown="ScrollViewer_PreviewMouseDown">
+              HorizontalScrollBarVisibility="Disabled">
             <ScrollViewer.Resources>
                 <Style TargetType="ScrollBar">
                     <Setter Property="Background" Value="Transparent"/>
@@ -132,9 +132,11 @@
                 </Style>
             </ScrollViewer.Resources>
 
-
-            <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown"/>
-
+            <Grid PreviewMouseDown="Grid_PreviewMouseDown"
+      VerticalAlignment="Stretch"
+      Background="Transparent">
+                <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown"/>
+            </Grid>
 
         </ScrollViewer>
 
@@ -145,7 +147,8 @@
             <!-- Left Button -->
 
 
-            <CheckBox Style="{StaticResource CustomCheckBoxStyle}" Margin="10,5,5,5" DockPanel.Dock="Left" Content="Your label text"/>
+            <CheckBox Style="{StaticResource CustomCheckBoxStyle}" Margin="10,5,5,5" DockPanel.Dock="Left" ToolTip="Show Only Active"
+                      Checked="set_active_only_disp" Unchecked="set_active_only_disp" x:Name="only_active_disp_checkbox"/>
 
             <!-- Right Buttons -->
             <StackPanel DockPanel.Dock="Right" 
@@ -153,7 +156,7 @@
                 Margin="0,0,20,0">
                 <Button Content="🔄" Width="50" Height="50" Margin="5" Click="restart_button" ToolTip="Refresh Mods"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
-                <Button Content="➕" Width="50" Height="50" Margin="5" IsEnabled="False" ToolTip="Create Mod"
+                <Button Content="➕" Width="50" Height="50" Margin="5" Click="AddMod_diag" ToolTip="Create Mod"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
                 <Button Content="📄" Width="50" Height="50" Margin="5" Click="Import_Mods" ToolTip="Import Mods"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>

@@ -48,9 +48,26 @@ namespace ModLoader
             Startup_Choice.SelectedIndex = mainWindow.settings.startup_index;
 
             Start_Normal.SelectedIndex = mainWindow.settings.start_mode;
+
+            no_tft.IsChecked = mainWindow.settings.not_tft;
+            supress_install.IsChecked = mainWindow.settings.supress_install_confilcts;
         }
 
         #region Event Handlers
+        private void supress_install_Changed(object sender, RoutedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
+
+            mainWindow.settings.supress_install_confilcts = supress_install.IsChecked ?? false;
+            mainWindow.save_settings();
+        }
+        private void no_tft_Changed(object sender, RoutedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
+
+            mainWindow.settings.not_tft = no_tft.IsChecked ?? false;
+            mainWindow.save_settings();
+        }
 
         private void DetailsDeisplay_Changed(object sender, RoutedEventArgs e)
         {

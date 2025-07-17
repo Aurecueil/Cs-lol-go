@@ -51,7 +51,7 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Background="Transparent"
-                              Margin="15">
+                              Margin="15,15,0,15">
 					<ScrollViewer.Resources>
 						<Style TargetType="ScrollBar">
 							<Setter Property="Background" Value="Transparent"/>
@@ -115,7 +115,7 @@
 										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="*"/>
 									</Grid.ColumnDefinitions>
-									<Grid Margin="0,0,0,0">
+                                    <Grid Margin="0,0,0,0" ToolTip="Automatically try to detect game Path is it not yet set&#x0a;(requires client or game to be open)">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -135,7 +135,7 @@
 												   FontSize="14"
 												   VerticalAlignment="Center"/>
 									</Grid>
-									<Grid Margin="0,0,0,0" Grid.Column="2">
+                                    <Grid Margin="0,0,0,0" Grid.Column="2" ToolTip="Loader will try to reload game path&#x0a;every time mods are loaded&#x0a;(Good to have on if youre switching between PBE and LIVE)">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -159,7 +159,7 @@
 								</Grid>
 
 								<!-- Game path -->
-								<Grid Margin="4,0,0,0">
+								<Grid Margin="4,0,0,0" ToolTip="Set Game Path, duhh">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="auto"/>
 										<ColumnDefinition Width="120"/>
@@ -201,7 +201,7 @@
 										<ColumnDefinition Width="*"/>
 									</Grid.ColumnDefinitions>
 
-									<Grid Margin="0,0,0,0">
+                                    <Grid Margin="0,0,0,0" ToolTip="Makes Laucnher start with your system&#x0a;Normal --> Open launcher Normally&#x0a;Minimized --> Launcher will start minimized to tray when starting system&#x0a;Mod Active --> Will auto load mods when starting with system&#x0a;Last option --> start with system, minimized to tray and auto load mods">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -236,7 +236,7 @@
 										</ComboBox>
 									</Grid>
 									
-									<Grid Margin="5,0,0,0" Grid.Column="1">
+									<Grid Margin="5,0,0,0" Grid.Column="1" ToolTip="Same as on startup, except this define behavour when app is started by user and no on windows start">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -262,7 +262,7 @@
 									</Grid>
 								</Grid>
 								<!-- Load mods on start -->
-								<Grid Margin="0,0,0,0">
+								<Grid Margin="0,0,0,0" ToolTip="Reloads mods between games">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="Auto"/>
 										<ColumnDefinition Width="*"/>
@@ -283,8 +283,57 @@
                                                VerticalAlignment="Center"/>
 								</Grid>
 
-								<!-- Catch updates -->
-								<Grid Margin="0,0,0,0" IsEnabled="False">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Margin="0,0,0,0" ToolTip="Will Supress install conflicts when loading Mods">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0"
+										  x:Name="supress_install"
+										  Style="{StaticResource CustomCheckBoxStyle}"
+										  IsChecked="True"
+										  Checked="supress_install_Changed"
+										  Unchecked="supress_install_Changed"
+										  Margin="0,0,8,0"/>
+
+                                        <TextBlock Grid.Column="1"
+										   Text="Supress Install Conflicts"
+										   Foreground="White"
+										   FontSize="14"
+										   VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <Grid Margin="0,0,0,0" Grid.Column="2" ToolTip="Will skip TFT wads when loading mods">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0"
+										  x:Name="no_tft"
+										  Style="{StaticResource CustomCheckBoxStyle}"
+										  IsChecked="True"
+										  Checked="no_tft_Changed"
+										  Unchecked="no_tft_Changed"
+										  Margin="0,0,8,0"/>
+
+                                        <TextBlock Grid.Column="1"
+										   Text="No TFT"
+										   Foreground="White"
+										   FontSize="14"
+										   VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                </Grid>
+
+
+                                <!-- Catch updates -->
+                                <Grid Margin="0,0,0,0" IsEnabled="False" ToolTip="When importing mods, will try to catch updates for already existing mods&#x0a;(if so, will override currently existing mod, even if import override is disabled)">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="Auto"/>
 										<ColumnDefinition Width="*"/>
@@ -306,7 +355,7 @@
 								</Grid>
 
 								<!-- Import override -->
-								<Grid Margin="14,0,0,0">
+                                <Grid Margin="14,0,0,0" ToolTip="When importing mod, mod already exists:&#x0a;a) throw error&#x0a;b)override it with new files, but keep old files that arent in new one&#x0a;c)delte old one and replace with new one&#x0a;d)Install new one alongside old one">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="120"/>
 										<ColumnDefinition Width="*"/>
@@ -346,7 +395,7 @@
                                            Margin="0,0,0,10"/>
 
 								<!-- Color (placeholder) -->
-								<Grid Margin="0,0,0,0">
+								<Grid Margin="0,0,0,0" ToolTip="Choose Theme Color !!!">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="120"/>
 										<ColumnDefinition Width="*"/>
@@ -371,7 +420,7 @@
 										<ColumnDefinition Width="*"/>
 										<ColumnDefinition Width="*"/>
 									</Grid.ColumnDefinitions>
-								<Grid Margin="0,0,0,0" Grid.Column="0">
+								<Grid Margin="0,0,0,0" Grid.Column="0" ToolTip="if Enabled, there will be Bar on rightside with details of curently selected mod/folder">
 									<Grid.ColumnDefinitions>
 										<ColumnDefinition Width="Auto"/>
 										<ColumnDefinition Width="*"/>
@@ -386,14 +435,14 @@
 											  Margin="0,0,8,0"/>
 
 									<TextBlock Grid.Column="1"
-											   Text="Details Collumn"
+											   Text="Details Sidebar"
 											   Foreground="White"
 											   FontSize="14"
 											   VerticalAlignment="Center"/>
 								</Grid>
 									
 									
-									<Grid Margin="0,0,0,0" Grid.Column="1">
+									<Grid Margin="0,0,0,0" Grid.Column="1" ToolTip="Toggles details (author, version, description) on mod tiles">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -424,7 +473,7 @@
 										<ColumnDefinition Width="*"/>
 									</Grid.ColumnDefinitions>
 
-									<Grid Margin="0,0,0,0" Grid.Column="0" HorizontalAlignment="Center">
+									<Grid Margin="0,0,0,0" Grid.Column="0" HorizontalAlignment="Center" ToolTip="Modifies Height of Tiles (in px)">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -442,13 +491,13 @@
 												 MaxLength="2"/>
 
 										<TextBlock Grid.Column="1"
-												   Text="Details Column"
+												   Text="Tiles Height"
 												   Foreground="White"
 												   FontSize="14"
 												   VerticalAlignment="Center"/>
 									</Grid>
 
-									<Grid Margin="0,0,0,0" Grid.Column="1" HorizontalAlignment="Center">
+                                    <Grid Margin="0,0,0,0" Grid.Column="1" HorizontalAlignment="Center" ToolTip="Modifies Width of Tiles (in px)">
 										<Grid.ColumnDefinitions>
 											<ColumnDefinition Width="Auto"/>
 											<ColumnDefinition Width="*"/>
@@ -466,7 +515,7 @@
 												 MaxLength="3"/>
 
 										<TextBlock Grid.Column="1"
-												   Text="Details Column"
+												   Text="Tiles Width"
 												   Foreground="White"
 												   FontSize="14"
 												   VerticalAlignment="Center"/>

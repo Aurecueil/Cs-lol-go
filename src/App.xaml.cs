@@ -14,6 +14,8 @@ using SystemColors = System.Windows.SystemColors;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using Application = System.Windows.Application;
+using Cursors = System.Windows.Input.Cursors;
 
 namespace ModManager
 {

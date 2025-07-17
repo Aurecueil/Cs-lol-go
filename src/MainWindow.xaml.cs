@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Policy;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -27,6 +28,7 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using DataFormats = System.Windows.DataFormats;
 using Path = System.IO.Path;
 
 namespace ModManager
@@ -72,6 +74,9 @@ namespace ModManager
         public bool details_displ { get; set; } = true;
         public int startup_index {  get; set; } = 0;
         public int start_mode { get; set; } = 0;
+        public bool not_tft {  get; set; } = false;
+        public bool supress_install_confilcts { get; set; } = false;
+        public string default_author { get; set; } = "Unknown";
     }
     public class Folder
     {
@@ -95,12 +100,12 @@ namespace ModManager
     }
     public class ModInfo
     {
-        public string Author { get; set; }
-        public string Description { get; set; }
-        public string Heart { get; set; }
-        public string Home { get; set; }
-        public string Name { get; set; }
-        public string Version { get; set; }
+        public string Author { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Heart { get; set; } = "";
+        public string Home { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Version { get; set; } = "1.0.0";
     }
     public class ModDetails
     {
@@ -117,6 +122,8 @@ namespace ModManager
     {
         private TrayIcon _trayIcon;
         private ContextMenuWindow _contextMenuWindow;
+
+        private bool display_only_active = false;
 
         Dictionary<int, HierarchyElement> hierarchyById = new();
         Dictionary<string, Mod> modByFolder = new();
@@ -229,15 +236,15 @@ namespace ModManager
             {
                 Internal_restart(Current_location_folder);
             }
-            else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
+            else if (e.Key == Key.A && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
                 Change_State_allButtons(true);
             }
-            else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
+            else if (e.Key == Key.D && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
                 Change_State_allButtons(false);
             }
-            else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
+            else if (e.Key == Key.X && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
                 foreach (var mod in modListEntriesInDisplay)
                 {
@@ -271,7 +278,7 @@ namespace ModManager
                     break;
                 }
             }
-            else if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts())
+            else if (e.Key == Key.V && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
                 foreach (int source in CutEntries.Keys)
                 {
@@ -366,19 +373,24 @@ namespace ModManager
 
         private void ModListPanel_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.Source == sender)
+            {
+                Change_State_allButtons(false);
+            }
+        }
+
+        private void Grid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Only trigger if the click was directly on the Grid background
             if (e.OriginalSource == sender)
             {
                 Change_State_allButtons(false);
             }
         }
 
-        private void ScrollViewer_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (e.OriginalSource == sender)
-            {
-                Change_State_allButtons(false);
-            }
-        }
+
+
+
 
 
         private void Change_State_allButtons(bool check)
@@ -394,6 +406,7 @@ namespace ModManager
                 folder.RefreshDisplay();
             }
         }
+
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
             if (this.WindowState == WindowState.Minimized)
@@ -623,7 +636,7 @@ namespace ModManager
             var dialog = new OpenFileDialog
             {
                 Title = "Select file(s)",
-                Filter = "Supported Files (*.fantom, *.zip, *.wad, *.client)|*.fantom;*.zip;*.wad;*.client|All Files (*.*)|*.*",
+                Filter = "Supported Files (*.fantome, *.zip, *.wad, *.client)|*.fantome;*.zip;*.wad;*.client|All Files (*.*)|*.*",
                 Multiselect = allowMultiple
             };
 
@@ -691,7 +704,7 @@ namespace ModManager
             }
 
             _trayIcon = new TrayIcon();
-            _trayIcon.ShowTrayIcon("My WPF App", OnTrayIconDoubleClick, OnTrayIconRightClick, "animegurl.ico");
+            _trayIcon.ShowTrayIcon("Yamete, mitenai de yo, onii-san!", OnTrayIconDoubleClick, OnTrayIconRightClick, "animegurl.ico");
             this.StateChanged += MainWindow_StateChanged;
 
 
@@ -715,10 +728,10 @@ namespace ModManager
                 };
                 hierarchyById[0] = root_folder;
 
-
-
+                LoadWadFiles();
                 LoadFolders();
                 LoadMods();
+                details_colums_change(settings.detials_column_active);
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
                 if (!Directory.Exists(ProfilesFolder))
@@ -726,7 +739,6 @@ namespace ModManager
                     Directory.CreateDirectory(ProfilesFolder);
                 }
                 InitializeProfiles();
-                LoadWadFiles();
 
                 if (Globals.StartMinimized)
                 {
@@ -739,7 +751,6 @@ namespace ModManager
                     Load_check_box.IsChecked = true;
                     True_Start_loader();
                 }
-                details_colums_change(settings.detials_column_active);
                 update_tile_contrains();
 
 
@@ -797,27 +808,36 @@ namespace ModManager
         private void InitializeProfiles()
         {
             // Load all profiles into combo box
-            var profiles = GetAllProfiles();
-            ProfileComboBox.ItemsSource = profiles;
+            List<string> profiles = GetAllProfiles();
 
-            // Check if current profile exists, if not create it
-            if (!string.IsNullOrEmpty(settings.CurrentProfile))
+            // If the current profile is set but doesn't exist, clear it
+            if (!string.IsNullOrEmpty(settings.CurrentProfile) && !ProfileExists(settings.CurrentProfile))
             {
-                if (!ProfileExists(settings.CurrentProfile))
+                settings.CurrentProfile = null;
+            }
+
+            // Handle profile initialization
+            if (string.IsNullOrEmpty(settings.CurrentProfile))
+            {
+                if (profiles.Count > 0)
                 {
-                    CreateEmptyProfile(settings.CurrentProfile);
-                    // Refresh the list to include the new profile
-                    profiles = GetAllProfiles();
-                    ProfileComboBox.ItemsSource = profiles;
+                    // Use the first existing profile
+                    settings.CurrentProfile = profiles[0];
                 }
-                ProfileComboBox.SelectedItem = settings.CurrentProfile;
+                else
+                {
+                    // Create a new empty profile
+                    settings.CurrentProfile = "Default";
+                    CreateEmptyProfile(settings.CurrentProfile);
+                    profiles = GetAllProfiles(); // Refresh after creation
+                }
             }
-            else if (profiles.Count > 0)
-            {
-                ProfileComboBox.SelectedItem = profiles[0];
-                settings.CurrentProfile = profiles[0];
-            }
+
+            // Set combo box items and selected item
+            ProfileComboBox.ItemsSource = profiles;
+            ProfileComboBox.SelectedItem = settings.CurrentProfile;
         }
+
         public void LoadWadFiles()
         {
             // Clear existing entries
@@ -853,7 +873,6 @@ namespace ModManager
                     if (trimmedWad.EndsWith(".wad"))
                         trimmedWad = trimmedWad.Substring(0, trimmedWad.Length - 4);
 
-
                     EMPTY_WADS[trimmedWad] = new Tuple<string, Dictionary<string, bool>>(relativePath, new Dictionary<string, bool>());
                 }
 
@@ -875,27 +894,15 @@ namespace ModManager
         }
         public void DeleteMod(string mod_folder)
         {
-            if (modByFolder.TryGetValue(mod_folder, out var childElement))
+            if (modByFolder.TryGetValue(mod_folder, out var old_entry))
             {
-                var innerPath = childElement.Details.InnerPath ?? "";
-                var segments = innerPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
-                int parID = 0;
-                if (segments.Length > 0)
+                int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
+                if (hierarchyById.TryGetValue(parent, out var old_parent))
                 {
-                    if (!int.TryParse(segments[^1], out int parentId))
-                    {
-                        parID = parentId;
-                    }
+                    old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
                 }
-
-                if (!hierarchyById.TryGetValue(parID, out var parentElement))
-                {
-                    return;
-                }
-
-                parentElement.Children.RemoveAll(t => t.Item1 == mod_folder && t.Item2 == true);
-
                 modByFolder.Remove(mod_folder);
+
 
                 string relativePath = Path.Combine("installed", mod_folder);
 
@@ -1179,6 +1186,17 @@ namespace ModManager
         {
             OverlayHost.Children.Clear();
         }
+        private void AddMod_diag(object sender, RoutedEventArgs e)
+        {
+            // Ensure only one settings overlay is open
+            foreach (UIElement child in OverlayHost.Children)
+            {
+                if (child is ModCreatorUserControl)
+                    return;
+            }
+
+            OverlayHost.Children.Add(new ModCreatorUserControl());
+        }
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             // Ensure only one settings overlay is open
@@ -1351,9 +1369,10 @@ namespace ModManager
             UpdateContextMenuLoaderState();
             try
             {
+                LoadMods();
                 ToggleOverlay(true);
                 ToggleFeed(true);
-                Load_Mods(); // Call without await since it's async void
+                Load_Mods();
             }
             catch (Exception ex)
             {
@@ -1479,13 +1498,17 @@ namespace ModManager
             }
         }
 
-        public Dictionary<string, Tuple<string, Dictionary<string, bool>>> WADS = new();
-        public static Dictionary<string, Tuple<string, Dictionary<string, bool>>> EMPTY_WADS = new();
+        public Dictionary<string, Tuple<string, Dictionary<string, bool>>> WADS =
+    new(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, Tuple<string, Dictionary<string, bool>>> EMPTY_WADS =
+            new(StringComparer.OrdinalIgnoreCase);
+
 
         public static Dictionary<string, Tuple<string, Dictionary<string, bool>>> CopyWadsDictionary(
-            Dictionary<string, Tuple<string, Dictionary<string, bool>>> source)
+    Dictionary<string, Tuple<string, Dictionary<string, bool>>> source)
         {
-            var copy = new Dictionary<string, Tuple<string, Dictionary<string, bool>>>();
+            var copy = new Dictionary<string, Tuple<string, Dictionary<string, bool>>>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in source)
             {
                 var innerCopy = new Dictionary<string, bool>(kvp.Value.Item2);
@@ -1493,6 +1516,7 @@ namespace ModManager
             }
             return copy;
         }
+
 
         private async Task InitializeModsAsync(CancellationToken token)
         {
@@ -1577,14 +1601,35 @@ namespace ModManager
                 }
 
             }
+
+            for (int i = 0; i < MODS.Count; i++)
+            {
+                string current = MODS[i];
+                int lastIndex = MODS.LastIndexOf(current);
+                if (lastIndex != i)
+                {
+                    MODS.RemoveAt(i);
+                    i--; // Adjust index after removal
+                }
+            }
             string mod_list = $"\"{string.Join("\"/\"", MODS)}\"";
-            string mod_list_disp = $"{string.Join("\n", MODS)}";
-            // MessageBox.Show(mod_list_disp);
+            string mod_list_disp = $"{string.Join("\n", MODS)}"; 
+            CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
             var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
             _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
+            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)}\" --game:\"{game_path}\" --mods:{mod_list}";
 
-            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)}\" --game:\"{game_path}\" --mods:{mod_list} --noTFT --ignoreConflict";
+            if (settings.not_tft) 
+            {
+                args += " --noTFT";
+            }
+
+            if (settings.supress_install_confilcts) 
+            {
+                args += " --ignoreConflict";
+            }
+
 
             string err_catch = "";
             var outputLines = new List<string>();https://www.facebook.com/messages/t/100010163408225
@@ -1624,7 +1669,10 @@ namespace ModManager
             catch (Exception ex)
             {
                 Load_check_box.IsChecked = false;
-                if (err_catch != "") { MessageBox.Show($"{err_catch}", "Error"); }
+                if (!string.IsNullOrEmpty(err_catch))
+                {
+                    CustomMessageBox.Show(err_catch, new[] { "OK" }, "Error");
+                }
             }
             _currentRunner = null;
         }
@@ -1669,7 +1717,6 @@ namespace ModManager
                 skipMap[id] = skip;
             }
 
-            // Handle override clearing
             if (overrride == 1)
             {
                 foreach (var (id, priority, isMod) in workingList.OrderBy(x => x.Priority))
@@ -1692,14 +1739,9 @@ namespace ModManager
                             }
                         }
                     }
-                    else if (hierarchyById.TryGetValue(int.Parse(id), out var folderr))
-                    {
-                        await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.Override);
-                    }
                 }
             }
 
-            // Main mod writing
             foreach (var (id, priority, isMod) in workingList.OrderBy(x => x.Priority))
             {
                 token.ThrowIfCancellationRequested();
@@ -1714,7 +1756,6 @@ namespace ModManager
                         foreach (string wad in mod.Wads)
                         {
                             string trimmedWad = TrimWadName(wad);
-
                             if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                             {
                                 if (mod.Details.Override == 1)
@@ -1733,7 +1774,7 @@ namespace ModManager
         }
 
         // Utility function to trim .wad/.client/.locale suffixes
-        private string TrimWadName(string wad)
+        public string TrimWadName(string wad)
         {
             string trimmed = wad;
 
@@ -1776,6 +1817,9 @@ namespace ModManager
 
         public void RefreshModListPanel(int c_location)
         {
+            FolderListEntriesInDisplay.Clear();
+            modListEntriesInDisplay.Clear();
+
             string searchString = Global_searchText;
             // Clear all existing UI entries
             ModListPanel.Children.Clear();
@@ -1840,6 +1884,7 @@ namespace ModManager
             // Add folders first
             foreach (var (childId, childElement) in folders)
             {
+                if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
                 var folderEntry = new ModListEntry(childElement.ID.ToString());
                 folderEntry.InitializeWithFolder(childElement);
                 folderEntry.FolderDoubleClicked += (folderId) => RefreshModListPanel(folderId);
@@ -1851,7 +1896,7 @@ namespace ModManager
             // Add mods second
             foreach (var (childId, childElement) in mods)
             {
-                // Collect additional mod data for future filtering
+                if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
                 var modWads = childElement.Wads; // string list
                 var modAuthor = childElement.Info.Author; // string
 
@@ -1862,6 +1907,12 @@ namespace ModManager
                 if (GlobalselectedEntries.Contains(childElement.ModFolder)) { modEntry.SetSelection(true); modEntry.RefreshDisplay(); }
             }
         }
+        private void set_active_only_disp(object sender, RoutedEventArgs e)
+        {
+            display_only_active = only_active_disp_checkbox.IsChecked == true;
+            RefreshModListPanel(Current_location_folder);
+        }
+
 
         private bool MatchesSearchCriteria(HierarchyElement folderElement, Mod modElement, string searchString)
         {
@@ -2237,9 +2288,10 @@ namespace ModManager
 
             if (!Directory.Exists(installedPath))
             {
-                Console.WriteLine($"Directory '{installedPath}' does not exist.");
+                Directory.CreateDirectory(installedPath);
                 return;
             }
+
 
             string[] modFolders = Directory.GetDirectories(installedPath);
             //int j = 0;
@@ -2251,38 +2303,7 @@ namespace ModManager
                 try
                 {
                     Mod mod = CreateModFromFolder(modFolderPath);
-                    if (mod != null)
-                    {
-                        modByFolder[modFolderName] = mod;
-                        Console.WriteLine($"Successfully loaded mod: {mod.Info?.Name ?? modFolderName}");
-                        bool was_added = false;
-                        string innerPath = mod.Details.InnerPath;
-                        if (innerPath == "")
-                        {
-                            was_added = true;
-                            AddChild(0, modFolderName, true);
-                        }
-                        else { 
-                            string[] parts = innerPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-                            for (int i = parts.Length - 1; i >= 0; i--)
-                            {
-                                int part = int.Parse(parts[i]);
-                                if (hierarchyById.ContainsKey(part))
-                                {
-                                    was_added = true;
-                                    AddChild(part, modFolderName, true);
-                                    break;
-                                }
-                            }
-                        }
-                        if (was_added == false)
-                        {
-                            AddChild(0, modFolderName, true);
-                        }
-
-
-                    }
+                    
                 }
                 catch (Exception ex)
                 {
@@ -2400,7 +2421,7 @@ namespace ModManager
             }
         }
 
-        private static Mod CreateModFromFolder(string modFolderPath)
+        public Mod CreateModFromFolder(string modFolderPath, bool override_inner_path = false)
         {
             string modFolderName = Path.GetFileName(modFolderPath);
             string metaPath = Path.Combine(modFolderPath, "META");
@@ -2408,15 +2429,12 @@ namespace ModManager
             string detailsPath = Path.Combine(metaPath, "details.json");
             string wadPath = Path.Combine(modFolderPath, "WAD");
 
-            // Check if META directory exists
             if (!Directory.Exists(metaPath))
             {
-                Console.WriteLine($"META directory not found for mod: {modFolderName}");
-                return null;
+                Directory.CreateDirectory(metaPath);
             }
 
-            // Load ModInfo
-            ModInfo modInfo = null;
+            ModInfo modInfo = new ModInfo();
             if (File.Exists(infoPath))
             {
                 try
@@ -2426,17 +2444,18 @@ namespace ModManager
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading info.json for mod '{modFolderName}': {ex.Message}");
+                    MessageBox.Show($"Error reading info.json for mod '{modFolderName}': {ex.Message}");
                     return null;
                 }
             }
             else
             {
-                Console.WriteLine($"info.json not found for mod: {modFolderName}");
-                return null;
+                modInfo.Name = modFolderName;
+                modInfo.Author = settings.default_author;
+                string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(infoPath, defaultDetailsJson);
             }
 
-            // Load or create ModDetails
             ModDetails modDetails = new ModDetails(); // Default values
             if (File.Exists(detailsPath))
             {
@@ -2444,25 +2463,29 @@ namespace ModManager
                 {
                     string detailsJson = File.ReadAllText(detailsPath);
                     modDetails = JsonSerializer.Deserialize<ModDetails>(detailsJson) ?? new ModDetails();
+                    if(override_inner_path){
+                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading details.json for mod '{modFolderName}': {ex.Message}");
-                    // Use default values if reading fails
+                    MessageBox.Show($"Error reading details.json for mod '{modFolderName}': {ex.Message}");
                 }
             }
             else
             {
-                // Create details.json with default values
                 try
                 {
+                    if (override_inner_path)
+                    {
+                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
+                    }
                     string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(detailsPath, defaultDetailsJson);
-                    Console.WriteLine($"Created default details.json for mod: {modFolderName}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error creating details.json for mod '{modFolderName}': {ex.Message}");
+                    MessageBox.Show($"Error creating details.json for mod '{modFolderName}': {ex.Message}");
                 }
             }
 
@@ -2475,23 +2498,62 @@ namespace ModManager
                     string[] wadEntries = Directory.GetFileSystemEntries(wadPath);
                     foreach (string entry in wadEntries)
                     {
-                        wads.Add(Path.GetFileName(entry));
+                        var lastPart = entry.Split('\\').Last();
+                        wads.Add(Path.GetFileName(lastPart));
+                        
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
+                    MessageBox.Show($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
                 }
             }
             // Create and return Mod object
-            return new Mod
+            Mod new_mod_netyr = new Mod
             {
                 Info = modInfo,
                 Details = modDetails,
                 ModFolder = modFolderName,
                 Wads = wads
             };
+
+            if (modByFolder.TryGetValue(modFolderName, out var old_entry))
+            {
+                int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
+                if (hierarchyById.TryGetValue(parent, out var old_parent)) {
+                    old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
+                }
+                modByFolder.Remove(modFolderName);
+            }
+            int new_parent = get_parent_from_innerPath(new_mod_netyr.Details.InnerPath);
+            modByFolder[modFolderName] = new_mod_netyr;
+            AddChild(new_parent, new_mod_netyr.ModFolder, true);
+            return new_mod_netyr;
         }
+
+        public int get_parent_from_innerPath(string innerPath)
+        {
+            int parent = 0;
+
+            var parts = innerPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            for (int i = parts.Length - 1; i >= 0; i--)
+            {
+                string possibleParent = parts[i];
+
+                if (!string.IsNullOrWhiteSpace(possibleParent) && int.TryParse(possibleParent, out int id))
+                {
+                    if (hierarchyById.ContainsKey(id))
+                    {
+                        parent = id;
+                        break;
+                    }
+                }
+            }
+
+            return parent;
+        }
+
 
 
         private void DropScrollViewer_DragOver(object sender, DragEventArgs e)
@@ -2703,45 +2765,9 @@ namespace ModManager
                             }
                         }
                         string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                        Mod new_mod = CreateModFromFolder(extractTargetDir);
-                        if (new_mod != null)
-                        {
-                            new_mod.Details.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
-                            Console.WriteLine($"Successfully loaded mod: {new_mod.Info?.Name ?? folderName}");
-                            bool was_added = false;
-                            if (modByFolder.ContainsKey(folderName))
-                            { was_added = true;}
-                            modByFolder[folderName] = new_mod;
-                            string innerPath = new_mod.Details.InnerPath;
-                            if (was_added == false)
-                            {
-                                if (innerPath == "")
-                                {
-                                    was_added = true;
-                                    MessageBox.Show("");
-                                    AddChild(Current_location_folder, folderName, true);
-                                }
-                                else
-                                {
-                                    string[] parts = innerPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-                                    for (int i = parts.Length - 1; i >= 0; i--)
-                                    {
-                                        int part = int.Parse(parts[i]);
-                                        if (hierarchyById.ContainsKey(part))
-                                        {
-                                            MessageBox.Show("");
-                                            was_added = true;
-                                            AddChild(part, folderName, true);
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            SaveModDetails(new_mod);
-                            SaveModInfo(new_mod);
-                        }
-
+                        Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                        SaveModDetails(new_mod);
+                        SaveModInfo(new_mod);
                     }
                     catch (Exception ex)
                     {

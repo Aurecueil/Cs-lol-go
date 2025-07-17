@@ -2,6 +2,8 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Application = System.Windows.Application;
+using Button = System.Windows.Controls.Button;
 
 namespace ModManager
 {
