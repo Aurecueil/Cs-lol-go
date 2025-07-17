@@ -180,7 +180,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border"
-        Background="#444"
+        Background="#333"
         BorderBrush="{DynamicResource AccentBrush}"
         BorderThickness="{TemplateBinding BorderThickness}"
         Padding="{TemplateBinding Padding}"
@@ -202,6 +202,93 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="ModCreate_ToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Border x:Name="TrackBorder"
+                            Width="50"
+                            Height="24"
+                            Background="#FF2A2A2A"
+                            BorderBrush="#FF3A3A3A"
+                            BorderThickness="2"
+                            CornerRadius="12"
+                            SnapsToDevicePixels="True">
+                                <Canvas>
+                                    <Border x:Name="ThumbBorder"
+                                    Width="16"
+                                    Height="16"
+                                    Background="#FF4A4A4A"
+                                    CornerRadius="8"
+                                    Canvas.Left="2"
+                                    Canvas.Top="2">
+                                        <Border.RenderTransform>
+                                            <TranslateTransform x:Name="ThumbTransform" X="0"/>
+                                        </Border.RenderTransform>
+                                    </Border>
+                                </Canvas>
+                            </Border>
+
+                           
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <!-- Hover effect -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TrackBorder" Property="Background" Value="#F333"/>
+                            </Trigger>
+
+                            <!-- Pressed effect -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="TrackBorder" Property="Background" Value="#FF2A2A2A"/>
+                            </Trigger>
+
+                            <!-- Checked state -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="TrackBorder" Property="BorderBrush" Value="{DynamicResource ResourceKey=AccentBrush}"/>
+                                <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource ResourceKey=AccentBrush}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform"
+                                                   Storyboard.TargetProperty="X"
+                                                   To="26"
+                                                   Duration="0:0:0.2">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbTransform"
+                                                   Storyboard.TargetProperty="X"
+                                                   To="0"
+                                                   Duration="0:0:0.2">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <QuadraticEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+
+                            <!-- Disabled state -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
         <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">

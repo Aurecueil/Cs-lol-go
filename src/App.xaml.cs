@@ -23,6 +23,7 @@ namespace ModManager
     {
         public static bool StartWithLoaded = false;
         public static bool StartMinimized = false;
+        public static bool is_startup = false;
 
     }
 
@@ -50,6 +51,10 @@ namespace ModManager
             if (e.Args.Contains("--minimized"))
             {
                 Globals.StartMinimized = true;
+            }
+            if (e.Args.Contains("--isstartup"))
+            {
+                Globals.is_startup = true;
             }
 
             base.OnStartup(e);

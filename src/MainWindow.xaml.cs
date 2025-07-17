@@ -1,6 +1,8 @@
 ﻿using Microsoft.Win32;
+using Microsoft.Windows.Themes;
 using ModLoader;
 using System;
+using System.ComponentModel;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
@@ -22,6 +24,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using System.Xml.Linq;
 using static System.Net.Mime.MediaTypeNames;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -36,20 +39,97 @@ namespace ModManager
     public class HierarchyElement
     {
         public string Name { get; set; }
-        public int Override { get; set; }
-        public int Priority { get; set; }
-        public bool Random { get; set; }
+        public bool override_ { get; set; } = false;
+        public int Priority { get; set; } = 10;
+        public bool Random { get; set; } = false;
         public int ID { get; set; }
-        public int parent { get; set; }
+        public int parent { get; set; } = 0;
 
-        public bool isActive { get; set; }
+        public bool isActive { get; set; } = false;
 
         public string InnerPath { get; set; }
 
-        // Tuple<string, bool>: Item ID/name + isMod (true for mod, false for folder)
         public List<Tuple<string, bool>> Children { get; set; } = new();
     }
+    public class Color_menager : INotifyPropertyChanged
+    {
+        private readonly Settings _settings;
+        public Color_menager(Settings settings)
+        {
+            _settings = settings;
+        }
+        public Color theme_color
+        {
+            get => _settings.theme_color;
+            set
+            {
+                if (_settings.theme_color != value)
+                {
+                    _settings.theme_color = value;
+                    OnPropertyChanged(nameof(theme_color));
+                    UpdateAccentColorResource(value);
+                }
+            }
+        }
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged(string propName) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propName));
+
+        private static DateTime _lastUpdateTime = DateTime.MinValue;
+        private static Color? _pendingColor = null;
+        private static DispatcherTimer _throttleTimer = null;
+
+        private void UpdateAccentColorResource(Color newColor)
+        {
+            var now = DateTime.Now;
+            var timeSinceLastUpdate = now - _lastUpdateTime;
+
+            if (timeSinceLastUpdate.TotalMilliseconds >= 100)
+            {
+                _lastUpdateTime = now;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var newBrush = new SolidColorBrush(newColor);
+                    Application.Current.Resources["AccentBrush"] = newBrush;
+                });
+
+                // Save the color back to settings here
+                _settings.theme_color = newColor;
+            }
+            else
+            {
+                _pendingColor = newColor;
+
+                if (_throttleTimer == null)
+                {
+                    _throttleTimer = new DispatcherTimer
+                    {
+                        Interval = TimeSpan.FromMilliseconds(100)
+                    };
+                    _throttleTimer.Tick += (s, e) =>
+                    {
+                        if (_pendingColor.HasValue)
+                        {
+                            _lastUpdateTime = DateTime.Now;
+                            Application.Current.Resources["AccentBrush"] =
+                                new SolidColorBrush(_pendingColor.Value);
+
+                            // Save the pending color to settings here
+                            _settings.theme_color = _pendingColor.Value;
+
+                            _pendingColor = null;
+                        }
+                        _throttleTimer.Stop();
+                    };
+                }
+
+                _throttleTimer.Stop();
+                _throttleTimer.Start();
+            }
+        }
+
+    }
     public class Settings
     {
         public bool autodetect_game_path { get; set; } = true;
@@ -77,14 +157,17 @@ namespace ModManager
         public bool not_tft {  get; set; } = false;
         public bool supress_install_confilcts { get; set; } = false;
         public string default_author { get; set; } = "Unknown";
+        public string default_Hearth { get; set; } = "";
+        public string default_home { get; set; } = "";
+        public bool reinitialize_mods_before_each_write { get; set; } = false;
     }
     public class Folder
     {
         public string InnerPath { get; set; } = "";
         public string name { get; set; } = "";
-        public int override_ { get; set; }
-        public int priority { get; set; }
-        public bool random { get; set; }
+        public bool Override { get; set; } = false ;
+        public int priority { get; set; } = 10;
+        public bool random { get; set; } = false;
         public int ID { get; set; }
         public int parent { get; set; }
     }
@@ -110,7 +193,7 @@ namespace ModManager
     public class ModDetails
     {
         public int Priority { get; set; } = 10;
-        public int Override { get; set; } = 0;
+        public bool override_ { get; set; } = false;
         public string InnerPath { get; set; } = "";
 
         public bool Random { get; set; } = false;
@@ -136,6 +219,7 @@ namespace ModManager
         public static List<string> GlobalselectedEntries = new List<string>();
 
         public Settings settings = new Settings();
+        public Color_menager colorManager;
 
         public int Current_location_folder = 0;
         public bool search_flat = false;
@@ -185,7 +269,7 @@ namespace ModManager
                 var element = new HierarchyElement
                 {
                     Name = newProfileName,
-                    Override = 0,
+                    override_ = false,
                     Priority = 10,
                     Random = false,
                     ID = key,
@@ -220,15 +304,34 @@ namespace ModManager
         }
         private bool ShouldBlockShortcuts()
         {
-            return ToggleOverlayRow.Visibility == Visibility.Visible
-                || OverlayHost.Children.Count > 0
-                || OverlayHost2.Children.Count > 0;
+            return OverlayHost2.Visibility == Visibility.Visible
+                || OverlayHost.Children.Count > 0;
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
             {
+                var metaEditor = OverlayHost.Children
+        .OfType<MetaEdior>()
+        .FirstOrDefault();
+
+                if (metaEditor != null)
+                {
+                    var mod = metaEditor.ModElement;
+                    var folder = metaEditor.FolderElement;
+
+                    if (mod != null)
+                    {
+                        SaveModInfo(mod);
+                        SaveModDetails(mod);
+                    }
+
+                    if (folder != null)
+                    {
+                        SaveFolder(folder);
+                    }
+                }
                 OverlayHost.Children.Clear();
                 OverlayHost2.Children.Clear();
             }
@@ -559,7 +662,13 @@ namespace ModManager
         {
             lock (_loaderLock)
             {
-                return _isLoaderRunning;
+                // Check if mod loading process is running
+                bool modLoadingRunning = _isLoaderRunning || _modLoadCts != null;
+
+                // Check if CSLol process is running
+                bool cslolRunning = CSLolManager.IsRunning();
+
+                return modLoadingRunning || cslolRunning;
             }
         }
 
@@ -654,7 +763,7 @@ namespace ModManager
             var root_folder = new HierarchyElement
             {
                 Name = "root",
-                Override = 0,
+                override_ = false,
                 Priority = 0,
                 Random = false,
                 ID = 0,
@@ -676,22 +785,27 @@ namespace ModManager
         {
             InitializeComponent();
             load_settings();
+            colorManager = new Color_menager(settings);
             detectGamePath();
-            switch (settings.start_mode)
+            if (!Globals.is_startup)
             {
-                case 1:
-                    Globals.StartMinimized = true;
-                    break;
-                case 2:
-                    Globals.StartWithLoaded = true;
-                    break;
-                case 3:
-                    Globals.StartMinimized = true;
-                    Globals.StartWithLoaded = true;
-                    break;
-                default:
-                    break;
+                switch (settings.start_mode)
+                {
+                    case 1:
+                        Globals.StartMinimized = true;
+                        break;
+                    case 2:
+                        Globals.StartWithLoaded = true;
+                        break;
+                    case 3:
+                        Globals.StartMinimized = true;
+                        Globals.StartWithLoaded = true;
+                        break;
+                    default:
+                        break;
+                }
             }
+               
 
             Application.Current.Resources["AccentColor"] = settings.theme_color;
 
@@ -716,7 +830,7 @@ namespace ModManager
                 var root_folder = new HierarchyElement
                 {
                     Name = "root",
-                    Override = 0,
+                    override_ = false,
                     Priority = 0,
                     Random = false,
                     ID = 0,
@@ -907,7 +1021,12 @@ namespace ModManager
                 string relativePath = Path.Combine("installed", mod_folder);
 
                 string fullPath = Path.GetFullPath(relativePath);
-                Directory.Delete(fullPath, true);
+                if (Directory.Exists(fullPath))
+                {
+                    Directory.Delete(fullPath, true); // true = recursive delete
+                }
+
+                MainWindow.ProfileEntries.Remove(old_entry.ModFolder);
 
                 RefreshModListPanel(Current_location_folder);
             }
@@ -989,24 +1108,6 @@ namespace ModManager
             }
         }
 
-        public void ElementsSettings(string element, bool isMod)
-        {
-            if (isMod)
-            {
-                if (modByFolder.TryGetValue(element, out var mod_element))
-                {
-                    OverlayHost.Children.Add(new HierarchyElementEditor(mod_element, mod_element.Details.Random));
-                }
-            }
-            else
-            {
-                if (hierarchyById.TryGetValue(int.Parse(element), out var folder_element))
-                {
-                    OverlayHost.Children.Add(new HierarchyElementEditor(folder_element, folder_element.Random));
-                }
-            }
-
-        }
         private void CreateProfile_Click(object sender, RoutedEventArgs e)
         {
             var control = new ProfileNameDialog();
@@ -1178,9 +1279,17 @@ namespace ModManager
             save_settings();
         }
 
-        public void UpdateDetailsPanel(string details) {
-            Details_Panel.Text = GetDetails(details);
-        }
+        public void UpdateDetailsPanel(string details, bool update = true) {
+            if (update)
+            {
+                Details_Panel.Text = GetDetails(details);
+            }
+            else
+            {
+                Details_Panel.Text = "";
+            }
+
+            }
 
         public void CloseSettingsOverlay()
         {
@@ -1287,7 +1396,7 @@ namespace ModManager
                     var element = new HierarchyElement
                     {
                         Name = folder.name,
-                        Override = folder.override_,
+                        override_ = folder.Override,
                         Priority = folder.priority,
                         Random = folder.random,
                         ID = folder.ID,
@@ -1311,7 +1420,7 @@ namespace ModManager
                         var element = new HierarchyElement
                         {
                             Name = folder.name,
-                            Override = folder.override_,
+                            override_ = folder.Override,
                             Priority = folder.priority,
                             Random = folder.random,
                             ID = folder.ID,
@@ -1329,7 +1438,7 @@ namespace ModManager
                     var element = new HierarchyElement
                     {
                         Name = folder.name,
-                        Override = folder.override_,
+                        override_ = folder.Override,
                         Priority = folder.priority,
                         Random = folder.random,
                         ID = folder.ID,
@@ -1369,7 +1478,11 @@ namespace ModManager
             UpdateContextMenuLoaderState();
             try
             {
-                LoadMods();
+                if (settings.reinitialize_mods_before_each_write)
+                {
+                    LoadMods();
+                    ReadCurrentProfile();
+                }
                 ToggleOverlay(true);
                 ToggleFeed(true);
                 Load_Mods();
@@ -1614,7 +1727,7 @@ namespace ModManager
             }
             string mod_list = $"\"{string.Join("\"/\"", MODS)}\"";
             string mod_list_disp = $"{string.Join("\n", MODS)}"; 
-            CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
+            //CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
             var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
             _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
@@ -1677,7 +1790,7 @@ namespace ModManager
             _currentRunner = null;
         }
 
-        public async Task ProcessFolderChildrenAsync(int folderId, CancellationToken token, bool isRandomElement = false, int overrride = 0)
+        public async Task ProcessFolderChildrenAsync(int folderId, CancellationToken token, bool isRandomElement = false, bool overrride = false)
         {
             if (!hierarchyById.TryGetValue(folderId, out var folder))
                 return;
@@ -1717,7 +1830,7 @@ namespace ModManager
                 skipMap[id] = skip;
             }
 
-            if (overrride == 1)
+            if (overrride)
             {
                 foreach (var (id, priority, isMod) in workingList.OrderBy(x => x.Priority))
                 {
@@ -1758,7 +1871,7 @@ namespace ModManager
                             string trimmedWad = TrimWadName(wad);
                             if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                             {
-                                if (mod.Details.Override == 1)
+                                if (mod.Details.override_)
                                     modsTuple.Item2.Clear();
 
                                 modsTuple.Item2[mod.ModFolder] = mod.has_changed;
@@ -1768,7 +1881,7 @@ namespace ModManager
                 }
                 else if (hierarchyById.TryGetValue(int.Parse(id), out var folderr))
                 {
-                    await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.Override);
+                    await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.override_);
                 }
             }
         }
@@ -1919,97 +2032,169 @@ namespace ModManager
             if (string.IsNullOrWhiteSpace(searchString))
                 return true;
 
-            // Parse search string for quoted terms and regular terms
-            var searchTerms = ParseSearchString(searchString);
+            // Split the entire search string by OR groups "||"
+            var orGroups = searchString.Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries);
 
-            foreach (var term in searchTerms)
+            foreach (var group in orGroups)
             {
-                bool termMatched = false;
+                // Parse group into (prefix, term) pairs using the new method
+                var searchGroups = ParseSearchGroups(group);
 
-                // Check if term is a specific field search (name:, author:, wad:)
-                if (IsPartialMatch(term, "name:", out string nameSearch))
+                bool allTermsMatch = true;
+
+                foreach (var (prefix, term) in searchGroups)
                 {
-                    if (folderElement != null)
+                    bool termMatched = false;
+
+                    if (!string.IsNullOrWhiteSpace(prefix))
                     {
-                        termMatched = folderElement.Name.Contains(nameSearch, StringComparison.OrdinalIgnoreCase);
+                        // Check prefixes with partial matching
+
+                        if (IsPartialMatch(prefix, "name:", out _)) // prefix here like "a:" or "name:"
+                        {
+                            if (folderElement != null)
+                                termMatched = folderElement.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
+                            else if (modElement != null)
+                                termMatched = modElement.Info.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
+                        }
+                        else if (IsPartialMatch(prefix, "author:", out _))
+                        {
+                            if (modElement != null)
+                                termMatched = modElement.Info.Author.Contains(term, StringComparison.OrdinalIgnoreCase);
+                        }
+                        else if (IsPartialMatch(prefix, "wad:", out _))
+                        {
+                            if (modElement != null)
+                                termMatched = modElement.Wads.Any(wad => wad.Contains(term, StringComparison.OrdinalIgnoreCase));
+                        }
+                        else
+                        {
+                            // Unknown prefix — treat as no match
+                            termMatched = false;
+                        }
                     }
-                    else if (modElement != null)
+                    else
                     {
-                        termMatched = modElement.Info.Name.Contains(nameSearch, StringComparison.OrdinalIgnoreCase);
+                        // No prefix => search only mod/folder names (your requested logic)
+                        if (folderElement != null)
+                            termMatched = folderElement.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
+                        else if (modElement != null)
+                            termMatched = modElement.Info.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
                     }
-                }
-                else if (IsPartialMatch(term, "author:", out string authorSearch))
-                {
-                    if (modElement != null)
+
+                    if (!termMatched)
                     {
-                        termMatched = modElement.Info.Author.Contains(authorSearch, StringComparison.OrdinalIgnoreCase);
-                    }
-                }
-                else if (IsPartialMatch(term, "wad:", out string wadSearch))
-                {
-                    if (modElement != null)
-                    {
-                        termMatched = modElement.Wads.Any(wad => wad.Contains(wadSearch, StringComparison.OrdinalIgnoreCase));
-                    }
-                }
-                else
-                {
-                    // General search - check all applicable fields
-                    if (folderElement != null)
-                    {
-                        termMatched = folderElement.Name.Contains(term, StringComparison.OrdinalIgnoreCase);
-                    }
-                    else if (modElement != null)
-                    {
-                        termMatched = modElement.Info.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                                     modElement.Info.Author.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                                     modElement.Wads.Any(wad => wad.Contains(term, StringComparison.OrdinalIgnoreCase));
+                        allTermsMatch = false;
+                        break;
                     }
                 }
 
-                // If any term doesn't match, this item doesn't match
-                if (!termMatched)
-                    return false;
+                if (allTermsMatch)
+                    return true; // One OR group matched fully
             }
 
-            return true;
+            return false; // No OR group matched completely
         }
 
-        private List<string> ParseSearchString(string searchString)
+
+
+        private List<(string prefix, string term)> ParseSearchGroups(string searchString)
+{
+    var results = new List<(string prefix, string term)>();
+    if (string.IsNullOrWhiteSpace(searchString))
+        return results;
+
+    // Split on || first to handle OR groups separately
+    var orGroups = searchString.Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries);
+
+    foreach (var orGroup in orGroups)
+    {
+        var tokens = new List<string>();
+        var current = new StringBuilder();
+        bool inQuotes = false;
+
+        // Tokenize respecting quotes and spaces
+        for (int i = 0; i < orGroup.Length; i++)
         {
-            var terms = new List<string>();
-            var current = new StringBuilder();
-            bool inQuotes = false;
-
-            for (int i = 0; i < searchString.Length; i++)
+            char c = orGroup[i];
+            if (c == '"')
             {
-                char c = searchString[i];
-
-                if (c == '"')
+                inQuotes = !inQuotes;
+                // Include the quote in the token for clarity
+                // or skip adding quotes (your choice)
+                continue;
+            }
+            else if (char.IsWhiteSpace(c) && !inQuotes)
+            {
+                if (current.Length > 0)
                 {
-                    inQuotes = !inQuotes;
-                }
-                else if (c == ' ' && !inQuotes)
-                {
-                    if (current.Length > 0)
-                    {
-                        terms.Add(current.ToString().Trim());
-                        current.Clear();
-                    }
-                }
-                else
-                {
-                    current.Append(c);
+                    tokens.Add(current.ToString());
+                    current.Clear();
                 }
             }
-
-            if (current.Length > 0)
+            else
             {
-                terms.Add(current.ToString().Trim());
+                current.Append(c);
             }
-
-            return terms.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
         }
+        if (current.Length > 0)
+            tokens.Add(current.ToString());
+
+        // Now group tokens by prefix boundaries
+        string currentPrefix = null;
+        var currentTerms = new List<string>();
+
+        bool IsPrefix(string token, out string prefix)
+        {
+            prefix = null;
+            int colonIndex = token.IndexOf(':');
+            if (colonIndex > 0)
+            {
+                prefix = token.Substring(0, colonIndex + 1).ToLower(); // include colon
+                return true;
+            }
+            return false;
+        }
+
+        void FlushCurrentGroup()
+        {
+            if (currentTerms.Count > 0)
+            {
+                string combinedTerm = string.Join(" ", currentTerms);
+                results.Add((currentPrefix, combinedTerm));
+                currentTerms.Clear();
+            }
+        }
+
+        foreach (var token in tokens)
+        {
+            if (IsPrefix(token, out string prefix))
+            {
+                // Flush previous group before starting new prefix group
+                FlushCurrentGroup();
+
+                currentPrefix = prefix;
+                // Add rest of token after colon as first term
+                var afterColon = token.Substring(prefix.Length);
+                if (!string.IsNullOrWhiteSpace(afterColon))
+                    currentTerms.Add(afterColon);
+            }
+            else
+            {
+                currentTerms.Add(token);
+            }
+        }
+
+        FlushCurrentGroup();
+
+        // Note: If you want to handle OR groups separately,
+        // you could store that info or return a list of lists.
+        // For now, just flattening all.
+    }
+
+    return results;
+}
+
 
         private bool IsPartialMatch(string term, string fullPrefix, out string searchValue)
         {
@@ -2237,7 +2422,7 @@ namespace ModManager
                 {
                     ID = element.ID,
                     name = element.Name,
-                    override_ = element.Override,
+                    Override = element.override_,
                     priority = element.Priority,
                     random = element.Random,
                     InnerPath = element.InnerPath,
@@ -2346,7 +2531,6 @@ namespace ModManager
 
             try
             {
-                ProfileEntries[mod.ModFolder] = mod.Details.Priority;
                 var options = new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = null };
                 string json = JsonSerializer.Serialize(mod.Details, options);
 
@@ -2358,22 +2542,12 @@ namespace ModManager
             }
             RefreshModListPanel(Current_location_folder);
         }
-        public void ModInfoEdit(string Modfolder)
-        {
-            if (modByFolder.TryGetValue(Modfolder, out var mod_element))
-                {
 
-                    ModDetailsEditor editor = new ModDetailsEditor(mod_element);
-                    OverlayHost.Children.Add(editor);
-                }
-
-        }
         public void SaveFolder(HierarchyElement _folder)
         {
             if (hierarchyById.TryGetValue(_folder.ID, out var mod_element))
             {
                 mod_element = _folder;
-                ProfileEntries[mod_element.ID.ToString()] = mod_element.Priority;
                 SaveOrUpdateHierarchyElement(_folder, hierarchyById);
             }
         }
@@ -2434,6 +2608,25 @@ namespace ModManager
                 Directory.CreateDirectory(metaPath);
             }
 
+            List<string> wads = new List<string>();
+            if (Directory.Exists(wadPath))
+            {
+                try
+                {
+                    string[] wadEntries = Directory.GetFileSystemEntries(wadPath);
+                    foreach (string entry in wadEntries)
+                    {
+                        var lastPart = entry.Split('\\').Last();
+                        wads.Add(Path.GetFileName(lastPart));
+
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
+                }
+            }
+
             ModInfo modInfo = new ModInfo();
             if (File.Exists(infoPath))
             {
@@ -2444,8 +2637,12 @@ namespace ModManager
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error reading info.json for mod '{modFolderName}': {ex.Message}");
-                    return null;
+                    modInfo.Name = modFolderName;
+                    modInfo.Author = settings.default_author;
+                    modInfo.Heart = settings.default_Hearth;
+                    modInfo.Home = settings.default_home;
+                    string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(infoPath, defaultDetailsJson);
                 }
             }
             else
@@ -2469,45 +2666,26 @@ namespace ModManager
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error reading details.json for mod '{modFolderName}': {ex.Message}");
-                }
-            }
-            else
-            {
-                try
-                {
                     if (override_inner_path)
                     {
                         modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
                     }
                     string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(detailsPath, defaultDetailsJson);
+                    
                 }
-                catch (Exception ex)
+            }
+            else
+            {
+                if (override_inner_path)
                 {
-                    MessageBox.Show($"Error creating details.json for mod '{modFolderName}': {ex.Message}");
+                    modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
                 }
+                string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(detailsPath, defaultDetailsJson);
             }
 
-            // Load WAD files/folders
-            List<string> wads = new List<string>();
-            if (Directory.Exists(wadPath))
-            {
-                try
-                {
-                    string[] wadEntries = Directory.GetFileSystemEntries(wadPath);
-                    foreach (string entry in wadEntries)
-                    {
-                        var lastPart = entry.Split('\\').Last();
-                        wads.Add(Path.GetFileName(lastPart));
-                        
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
-                }
-            }
+            
             // Create and return Mod object
             Mod new_mod_netyr = new Mod
             {
@@ -2766,8 +2944,7 @@ namespace ModManager
                         }
                         string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
                         Mod new_mod = CreateModFromFolder(extractTargetDir, true);
-                        SaveModDetails(new_mod);
-                        SaveModInfo(new_mod);
+                        RefreshModListPanel(Current_location_folder);
                     }
                     catch (Exception ex)
                     {

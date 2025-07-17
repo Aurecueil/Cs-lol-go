@@ -67,18 +67,6 @@
                Padding="8" />
                 </Button>
 
-                <Button x:Name="EditModIcon" Style="{StaticResource roundHighlight}"
-        ToolTip="Edit Mod"
-        Cursor="Hand" Click="Open_Info_page"
-        BorderThickness="0"
-        Background="Transparent"
-        Visibility="Collapsed">
-                    <TextBlock Text="✏️" 
-               Style="{StaticResource IconTextBlockStyle}" 
-               Foreground="White" 
-               FontSize="15" 
-               Padding="8" />
-                </Button>
 
                 <Button x:Name="ExportIcon" Style="{StaticResource roundHighlight}"
         ToolTip="Export"
@@ -98,7 +86,7 @@
         Cursor="Hand" Click="Open_details_page"
         BorderThickness="0"
         Background="Transparent">
-                    <TextBlock Text="⚙️" 
+                    <TextBlock Text="✏️" 
                Style="{StaticResource IconTextBlockStyle}" 
                Foreground="White" 
                FontSize="15" 

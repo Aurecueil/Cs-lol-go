@@ -12,14 +12,24 @@ namespace ModLoader
     public partial class SettingsOverlay : UserControl
     {
         private MainWindow mainWindow;
-
+        private Color _originalColor;
         public SettingsOverlay()
         {
             InitializeComponent();
-
-            // Find the MainWindow instance
+            
             this.mainWindow = Application.Current.MainWindow as MainWindow;
+            DataContext = mainWindow.colorManager;
+            _originalColor = mainWindow.settings.theme_color;
             LoadSettingsFromMainWindow();
+        }
+        private void Restore_color(object sender, RoutedEventArgs e)
+        {
+            mainWindow.colorManager.theme_color = _originalColor;
+            mainWindow.save_settings();
+        }
+        private void Save_color(object sender, RoutedEventArgs e)
+        {
+            mainWindow.save_settings();
         }
 
         public void LoadSettingsFromMainWindow()
@@ -192,16 +202,16 @@ namespace ModLoader
                 switch (index)
                 {
                     case 0:
-                        key.SetValue(appName, $"\"{exePath}\"");
+                        key.SetValue(appName, $"\"{exePath}\" --isstartup");
                         break;
                     case 1:
-                        key.SetValue(appName, $"\"{exePath}\" --minimized");
+                        key.SetValue(appName, $"\"{exePath}\" --isstartup --minimized");
                         break;
                     case 2:
-                        key.SetValue(appName, $"\"{exePath}\" --startup");
+                        key.SetValue(appName, $"\"{exePath}\" --isstartup --startup");
                         break;
                     case 3:
-                        key.SetValue(appName, $"\"{exePath}\" --startup --minimized");
+                        key.SetValue(appName, $"\"{exePath}\" --isstartup --startup --minimized");
                         break;
                 }
             }

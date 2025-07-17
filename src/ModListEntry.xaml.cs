@@ -57,8 +57,6 @@ namespace ModManager
             this.MouseMove += OnMouseMove;
             this.MouseLeftButtonUp += OnMouseLeftButtonUp;
 
-            // Add event handlers for icons
-            AddIconEventHandlers();
             // Enable drag and drop
             this.AllowDrop = true;
             this.Drop += OnDrop;
@@ -114,7 +112,6 @@ namespace ModManager
 
             // Hide all action icons for parent folder
             FixingIcon.Visibility = Visibility.Collapsed;
-            EditModIcon.Visibility = Visibility.Collapsed;
             ExportIcon.Visibility = Visibility.Collapsed;
             ModHandlingIcon.Visibility = Visibility.Collapsed;
             DeleteIcon.Visibility = Visibility.Collapsed;
@@ -324,22 +321,19 @@ namespace ModManager
         }
         private void Open_details_page(object sender, RoutedEventArgs e)
         {
-            if (IsMod)
+            MetaEdior metaEdior = new MetaEdior
             {
-                Main.ElementsSettings(ModElement.ModFolder, true);
-            }
+                CallerModListEntry = this // ← pass reference to self
+            };
+
+            if (IsMod)
+                metaEdior.InitializeWithMod(ModElement);
             else
-            {
-                Main.ElementsSettings(FolderElement.ID.ToString(), false);
-            }
+                metaEdior.InitializeWithFolder(FolderElement);
+
+            Main.OverlayHost.Children.Add(metaEdior);
         }
-        private void Open_Info_page(object sender, RoutedEventArgs e)
-        {
-            if (IsMod)
-            {
-                Main.ModInfoEdit(ModElement.ModFolder);
-            }
-        }
+
         private void Fixer_settings_panel_open(object sender, RoutedEventArgs e)
         {
             string url = "https://www.youtube.com/watch?v=BbeeuzU5Qc8&autoplay=1"; // Replace with your actual URL
@@ -356,12 +350,6 @@ namespace ModManager
                 MessageBox.Show($"Failed to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        // Your delete method example
-        private void DeleteElement(HierarchyElement element, bool withContents)
-        {
-            // delete logic here
-        }
-
 
         private void UpdateUIForFolder()
         {
@@ -378,7 +366,6 @@ namespace ModManager
 
             // Hide mod-specific icons
             FixingIcon.Visibility = Visibility.Collapsed;
-            EditModIcon.Visibility = Visibility.Collapsed;
             ExportIcon.Visibility = Visibility.Collapsed;
 
             // Show common icons
@@ -419,7 +406,6 @@ namespace ModManager
 
             // Show all mod-specific icons
             FixingIcon.Visibility = Visibility.Visible;
-            EditModIcon.Visibility = Visibility.Visible;
             ExportIcon.Visibility = Visibility.Visible;
             ModHandlingIcon.Visibility = Visibility.Visible;
             DeleteIcon.Visibility = Visibility.Visible;
@@ -482,8 +468,15 @@ namespace ModManager
                     SetSelected(true);
                 }
             }
+            if (selectedEntries.Count <= 1)
+            {
+                Main.UpdateDetailsPanel(identifier);
+            }
+            else
+            {
+                Main.UpdateDetailsPanel(identifier, false);
+            }
 
-            Main.UpdateDetailsPanel(identifier);
 
             // Store drag start point
             dragStartPoint = e.GetPosition(this);
@@ -729,123 +722,7 @@ namespace ModManager
                 FolderDoubleClicked?.Invoke(FolderElement.ID);
             }
         }
-
-        private void AddIconEventHandlers()
-        {
-            // Add click handlers for all icons
-            FixingIcon.MouseLeftButtonUp += OnFixingClicked;
-            EditModIcon.MouseLeftButtonUp += OnEditModClicked;
-            ExportIcon.MouseLeftButtonUp += OnExportClicked;
-            ModHandlingIcon.MouseLeftButtonUp += OnModHandlingClicked;
-            DeleteIcon.MouseLeftButtonUp += OnDeleteClicked;
-
-            // Add checkbox handler
-            ActiveCheckbox.Checked += OnCheckboxChanged;
-            ActiveCheckbox.Unchecked += OnCheckboxChanged;
-        }
-
-        private void OnFixingClicked(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // Prevent drag operation
-            if (IsMod && ModElement != null)
-            {
-                // Handle fixing action for mod
-                MessageBox.Show($"Fixing mod: {ModElement.Info.Name}");
-            }
-        }
-
-        private void OnEditModClicked(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // Prevent drag operation
-            if (IsMod && ModElement != null)
-            {
-                // Handle edit mod action
-                MessageBox.Show($"Editing mod: {ModElement.Info.Name}");
-            }
-        }
-
-        private void OnExportClicked(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // Prevent drag operation
-            if (IsMod && ModElement != null)
-            {
-                // Handle export action
-                MessageBox.Show($"Exporting mod: {ModElement.Info.Name}");
-            }
-        }
-
-        private void OnModHandlingClicked(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // Prevent drag operation
-            if (IsMod && ModElement != null)
-            {
-                // Handle mod settings
-                MessageBox.Show($"Mod settings for: {ModElement.Info.Name}");
-            }
-            else if (!IsMod && FolderElement != null)
-            {
-                // Handle folder settings
-                MessageBox.Show($"Folder settings for: {FolderElement.Name}");
-            }
-        }
-
-        private void OnDeleteClicked(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // Prevent drag operation
-            string itemName = IsMod ? ModElement.Info.Name : FolderElement.Name;
-            string itemType = IsMod ? "mod" : "folder";
-
-            var result = MessageBox.Show($"Are you sure you want to delete this {itemType}: {itemName}?",
-                                       "Confirm Delete",
-                                       MessageBoxButton.YesNo,
-                                       MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                // Handle delete action
-                MessageBox.Show($"Deleted {itemType}: {itemName}");
-            }
-        }
-
-        private void OnCheckboxChanged(object sender, RoutedEventArgs e)
-        {
-            // Don't handle checkbox changes for parent folders
-            if (IsParentFolder) return;
-
-            bool isChecked = ActiveCheckbox.IsChecked ?? false;
-
-            if (IsSelected)
-            {
-                foreach (var entry in selectedEntries)
-                {
-                    if (entry.IsMod && entry.ModElement != null)
-                    {
-                        // Update mod's isActive property based on checkbox
-                        entry.ModElement.isActive = isChecked;
-                        entry.RefreshDisplay();
-                    }
-                    else if (!entry.IsMod && entry.FolderElement != null)
-                    {
-                        // Update folder's isActive property based on checkbox
-                        entry.FolderElement.isActive = isChecked;
-                        entry.RefreshDisplay();
-                    }
-                }
-            }
-            else
-            {
-                if (IsMod && ModElement != null)
-                {
-                    // Update mod's isActive property based on checkbox
-                    ModElement.isActive = isChecked;
-                }
-                else if (!IsMod && FolderElement != null)
-                {
-                    // Update folder's isActive property based on checkbox
-                    FolderElement.isActive = isChecked;
-                }
-            }
-        }
+        
 
         public void RefreshDisplay()
         {
@@ -863,17 +740,6 @@ namespace ModManager
             }
         }
 
-        // Helper method to clear all selections (can be called from outside)
-        public static void ClearAllSelectionsStatic()
-        {
-            ClearAllSelections();
-        }
-
-        // Helper method to get all selected entries
-        public static List<ModListEntry> GetSelectedEntries()
-        {
-            return selectedEntries.ToList();
-        }
     }
 
     // Extension method to help find visual children

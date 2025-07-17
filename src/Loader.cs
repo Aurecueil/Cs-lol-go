@@ -110,6 +110,11 @@ namespace ModManager
             _workerThread.Start();
         }
 
+        public static bool IsRunning()
+        {
+            return _workerThread != null && _workerThread.IsAlive && !(_internalCts?.IsCancellationRequested ?? true);
+        }
+
         public static void Stop()
         {
             _internalCts?.Cancel();
