@@ -17,6 +17,7 @@
 
         <Style TargetType="ToolTip">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
@@ -624,7 +625,7 @@
 
                             <!-- Unchecked state -->
                             <Trigger Property="IsChecked" Value="False">
-                                <Setter TargetName="CheckboxBorder" Property="Background" Value="Transparent"/>
+                                <Setter TargetName="CheckboxBorder" Property="Background" Value="#FF2A2A2A"/>
                                 <Setter TargetName="CheckboxBorder" Property="BorderBrush" Value="Gray"/>
                                 <Setter TargetName="CheckMark" Property="Opacity" Value="0"/>
                             </Trigger>

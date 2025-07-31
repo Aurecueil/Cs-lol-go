@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077"
+        Title="LoL for GlobalOffensive 2077 - 0.0.9"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
@@ -297,6 +297,6 @@ Unchecked="Stop_loader"
         </Grid>
 
         <Grid x:Name="OverlayHost"  Panel.ZIndex="12" IsHitTestVisible="True" Grid.RowSpan="3" Grid.ColumnSpan="3"/>
-        <Grid x:Name="OverlayHost2" IsHitTestVisible="True" Grid.RowSpan="2" Grid.ColumnSpan="3"/>
+        <Grid x:Name="OverlayHost2" IsHitTestVisible="True" Grid.RowSpan="2" Grid.ColumnSpan="3" Visibility="Collapsed"/>
     </Grid>
 </Window>

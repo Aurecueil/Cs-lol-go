@@ -26,6 +26,15 @@
 
                 </Grid>
 
+                <Grid Grid.Row="1" Grid.RowSpan="2">
+                    <Image x:Name="bg_img_border"
+Opacity="0.1" 
+       HorizontalAlignment="Center"
+       VerticalAlignment="Center"
+Stretch="UniformToFill"
+Panel.ZIndex="0"/>
+                </Grid>
+
                 <!-- Top Bar -->
                 <Border Grid.Row="0"
                         Background="{DynamicResource AccentBrush}"
@@ -49,6 +58,21 @@
                                        Foreground="LightGray"
                                        Style="{StaticResource IconTextBlockStyle}"
                                        Margin="0,-4,0,0"/>
+                            
+                        </Button>
+
+                        <Button x:Name="RevertButton"
+        Style="{StaticResource IconButtonStyle}"
+        ToolTip="Close"
+        HorizontalAlignment="Right"
+        VerticalAlignment="Center"
+        Margin="5,5,45,5"
+        Click="revert_Click">
+                            <TextBlock Text="↩️"
+               Foreground="LightGray"
+               Style="{StaticResource IconTextBlockStyle}"
+               Margin="0,-4,0,0"/>
+
                         </Button>
                     </Grid>
                 </Border>
@@ -362,7 +386,7 @@ Unchecked="Override_Checked"/>
                     </Border>
 
                     <!-- Drop area at bottom -->
-                    <Border Grid.Row="1" Background="#FF1E1E1E" Visibility="Collapsed" x:Name="dropPanelDisp"
+                    <Border Grid.Row="1" Visibility="Collapsed" x:Name="dropPanelDisp"
                             CornerRadius="6"
                             Padding="15,0,15,0">
                         <Grid>

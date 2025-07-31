@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Xml.Linq;
 using Application = System.Windows.Application;
@@ -25,6 +26,7 @@ namespace ModManager
         private string installedPath = Path.Combine(Directory.GetCurrentDirectory(), "installed");
         private MainWindow Main => (MainWindow)Application.Current.MainWindow;
 
+        private string image_path = "";
         public ModCreatorUserControl()
         {
             InitializeComponent();
@@ -97,8 +99,6 @@ namespace ModManager
             string invalidChars = new string(Path.GetInvalidFileNameChars());
             string escaped = Regex.Escape(invalidChars);
             string sanitized = Regex.Replace(name, $"[{escaped}]", "");
-
-            sanitized = sanitized.Trim().TrimEnd('.', ' ');
 
             return sanitized;
         }
@@ -197,247 +197,156 @@ namespace ModManager
                 OnFilesDropped(droppedPaths);
             }
         }
+        private string TrimWadName(string fileName)
+        {
+            string trimmed = fileName;
+            if (trimmed.EndsWith(".client", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring(0, trimmed.Length - 7);
+            if (trimmed.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                trimmed = trimmed.Substring(0, trimmed.Length - 4);
+            return trimmed;
+        }
+        private static readonly HashSet<string> ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".tif", ".ico"
+};
 
+        private bool IsImageFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return ImageExtensions.Contains(extension);
+        }
+
+        private bool IsValidImage(string imagePath)
+        {
+            try
+            {
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.UriSource = new Uri(imagePath, UriKind.Absolute);
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.EndInit();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void UpdateBackgroundImage()
+        {
+            // Direct access to the named Image control
+            if (!string.IsNullOrEmpty(image_path) && File.Exists(image_path))
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(image_path, UriKind.Absolute);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bg_img_border.Source = bitmap;
+                }
+                catch
+                {
+                    // If loading fails, clear the image
+                    bg_img_border.Source = null;
+                    image_path = "";
+                }
+            }
+            else
+            {
+                bg_img_border.Source = null;
+            }
+        }
         private void OnFilesDropped(IEnumerable<string> paths)
         {
-            var existingPaths = new HashSet<string>(droppedFiles.Select(f => f.FullPath), StringComparer.OrdinalIgnoreCase);
-
-            // Dictionary to track the newest file/directory for each trimmed name (case insensitive)
-            var newestByTrimmedName = new Dictionary<string, (string path, DateTime lastWrite)>(StringComparer.OrdinalIgnoreCase);
-
-            // Initialize with existing files
-            foreach (var existingFile in droppedFiles)
+            foreach (var path in paths.Where(p => File.Exists(p) && IsImageFile(p)))
             {
-                var trimmedName = File.Exists(existingFile.FullPath) ?
-                    Main.TrimWadName(Path.GetFileNameWithoutExtension(existingFile.Name)) :
-                    Main.TrimWadName(existingFile.Name); // For directories, use the full name
-                var lastWrite = File.Exists(existingFile.FullPath) ?
-                    new FileInfo(existingFile.FullPath).LastWriteTime :
-                    new DirectoryInfo(existingFile.FullPath).LastWriteTime;
-
-                newestByTrimmedName[trimmedName] = (existingFile.FullPath, lastWrite);
+                if (IsValidImage(path))
+                {
+                    image_path = path;
+                    UpdateBackgroundImage();
+                    break; // Use only the first valid image found
+                }
+                else
+                {
+                    image_path = "";
+                    UpdateBackgroundImage();
+                }
             }
-
             foreach (var path in paths)
             {
                 if (File.Exists(path))
                 {
-                    var extension = Path.GetExtension(path)?.ToLowerInvariant();
-                    if ((extension == ".wad" || extension == ".client") && !existingPaths.Contains(path))
+                    string trimmed = TrimWadName(Path.GetFileName(path));
+                    if (!Main.EMPTY_WADS.ContainsKey(trimmed)) { continue; }
+                    bool skip = false;
+                    var info = new FileInfo(path);
+                    for (int i = 0; i < droppedFiles.Count; i++)
                     {
-                        var info = new FileInfo(path);
-                        var trimmedName = Main.TrimWadName(Path.GetFileNameWithoutExtension(info.Name));
-
-                        // Check if we need to replace an existing file with the same trimmed name
-                        if (newestByTrimmedName.TryGetValue(trimmedName, out var existing))
+                        if (TrimWadName(droppedFiles[i].Name) == trimmed)
                         {
-                            if (info.LastWriteTime >= existing.lastWrite)
+                            skip = true;
+                            droppedFiles[i] = new DroppedFile
                             {
-                                // Find the index of the existing file to replace it at the same position
-                                var existingIndex = droppedFiles.FindIndex(f => f.FullPath == existing.path);
-
-                                // Remove the older entry
-                                RemoveExistingFile(existing.path, existingPaths);
-
-                                // Add the newer file at the same position
-                                var newFile = new DroppedFile
-                                {
-                                    Name = info.Name,
-                                    Size = $"{info.Length / 1024.0:F1} KB",
-                                    FullPath = path
-                                };
-
-                                if (existingIndex >= 0 && existingIndex < droppedFiles.Count)
-                                {
-                                    droppedFiles.Insert(existingIndex, newFile);
-                                }
-                                else
-                                {
-                                    droppedFiles.Add(newFile);
-                                }
-
-                                existingPaths.Add(path);
-                                newestByTrimmedName[trimmedName] = (path, info.LastWriteTime);
-                                AnimateFileAdded(info.Name);
-                            }
-                            // If current is older, skip it
-                        }
-                        else
-                        {
-                            // First occurrence of this trimmed name
-                            AddFileToDroppedFiles(info, existingPaths);
-                            newestByTrimmedName[trimmedName] = (path, info.LastWriteTime);
-                            AnimateFileAdded(info.Name);
+                                Name = $"{trimmed}.wad.client",
+                                Size = $"{info.Length / 1024.0:F1} KB",
+                                FullPath = path
+                            };
+                            AnimateFileAdded($"{trimmed}.wad.client");
+                            break; 
                         }
                     }
+                    if (skip) { continue; }
+                    droppedFiles.Add(new DroppedFile
+                    {
+                        Name = $"{trimmed}.wad.client",
+                        Size = $"{info.Length / 1024.0:F1} KB",
+                        FullPath = path
+                    });
+                    AnimateFileAdded($"{trimmed}.wad.client");
+
                 }
                 else if (Directory.Exists(path))
                 {
-                    ProcessDirectory(path, existingPaths, newestByTrimmedName);
+                    var info = new DirectoryInfo(path);
+                    string trimmed = TrimWadName(info.Name);
+                    if (!Main.EMPTY_WADS.ContainsKey(trimmed))
+                    {
+                        OnFilesDropped(Directory.EnumerateFileSystemEntries(path, "*", SearchOption.TopDirectoryOnly)); continue; }
+                    bool skip = false;
+                    for (int i = 0; i < droppedFiles.Count; i++)
+                    {
+                        if (TrimWadName(droppedFiles[i].Name) == trimmed)
+                        {
+                            skip = true;
+                            droppedFiles[i] = new DroppedFile
+                            {
+                                Name = $"{trimmed}.wad.client",
+                                Size = $"{GetDirectorySize(info) / 1024.0:F1} KB",
+                                FullPath = path
+                            };
+                            AnimateFileAdded($"{trimmed}.wad.client");
+                            break;
+                        }
+                    }
+                    if (skip) { continue; }
+                    droppedFiles.Add(new DroppedFile
+                    {
+                        Name = $"{trimmed}.wad.client",
+                        Size = $"{GetDirectorySize(info) / 1024.0:F1} KB",
+                        FullPath = path
+                    });
+                    AnimateFileAdded($"{trimmed}.wad.client");
                 }
             }
 
             UpdateDropVisuals();
         }
 
-        private void ProcessDirectory(string dirPath, HashSet<string> existingPaths, Dictionary<string, (string path, DateTime lastWrite)> newestByTrimmedName)
-        {
-            var queue = new Queue<string>();
-            queue.Enqueue(dirPath);
-
-            while (queue.Count > 0)
-            {
-                var currentPath = queue.Dequeue();
-                var dirInfo = new DirectoryInfo(currentPath);
-                var trimmedName = Main.TrimWadName(dirInfo.Name);
-
-                if (Main.EMPTY_WADS.ContainsKey(trimmedName))
-                {
-                    if (!existingPaths.Contains(currentPath))
-                    {
-                        var lastWriteTime = dirInfo.LastWriteTime;
-
-                        // Check if this is the newest for this trimmed name
-                        if (newestByTrimmedName.TryGetValue(trimmedName, out var existing))
-                        {
-                            if (lastWriteTime >= existing.lastWrite)
-                            {
-                                // Find the index of the existing file to replace it at the same position
-                                var existingIndex = droppedFiles.FindIndex(f => f.FullPath == existing.path);
-
-                                // Remove the older entry
-                                RemoveExistingFile(existing.path, existingPaths);
-
-                                // Add newer directory at the same position
-                                var dirSizeBytes = GetDirectorySize(dirInfo);
-                                var dirSizeKB = dirSizeBytes / 1024.0;
-                                var newDir = new DroppedFile
-                                {
-                                    Name = dirInfo.Name,
-                                    Size = $"{dirSizeKB:F1} KB",
-                                    FullPath = currentPath
-                                };
-
-                                if (existingIndex >= 0 && existingIndex < droppedFiles.Count)
-                                {
-                                    droppedFiles.Insert(existingIndex, newDir);
-                                }
-                                else
-                                {
-                                    droppedFiles.Add(newDir);
-                                }
-
-                                existingPaths.Add(currentPath);
-                                newestByTrimmedName[trimmedName] = (currentPath, lastWriteTime);
-                                AnimateFileAdded(dirInfo.Name);
-                            }
-                            // If current is older, skip it
-                        }
-                        else
-                        {
-                            // First occurrence of this trimmed name
-                            newestByTrimmedName[trimmedName] = (currentPath, lastWriteTime);
-                            AddDirectoryToDroppedFiles(dirInfo, currentPath, existingPaths);
-                            AnimateFileAdded(dirInfo.Name);
-                        }
-                    }
-                    continue; // Skip subfolders
-                }
-
-                // Process files in current directory
-                foreach (var file in Directory.GetFiles(currentPath))
-                {
-                    var extension = Path.GetExtension(file)?.ToLowerInvariant();
-                    if ((extension == ".wad" || extension == ".client") && !existingPaths.Contains(file))
-                    {
-                        var info = new FileInfo(file);
-                        var fileTrimmedName = Main.TrimWadName(Path.GetFileNameWithoutExtension(info.Name));
-
-                        // Check if we need to replace an existing file with the same trimmed name
-                        if (newestByTrimmedName.TryGetValue(fileTrimmedName, out var existing))
-                        {
-                            if (info.LastWriteTime >= existing.lastWrite)
-                            {
-                                // Find the index of the existing file to replace it at the same position
-                                var existingIndex = droppedFiles.FindIndex(f => f.FullPath == existing.path);
-
-                                // Remove the older entry
-                                RemoveExistingFile(existing.path, existingPaths);
-
-                                // Add newer file at the same position
-                                var newFile = new DroppedFile
-                                {
-                                    Name = info.Name,
-                                    Size = $"{info.Length / 1024.0:F1} KB",
-                                    FullPath = file
-                                };
-
-                                if (existingIndex >= 0 && existingIndex < droppedFiles.Count)
-                                {
-                                    droppedFiles.Insert(existingIndex, newFile);
-                                }
-                                else
-                                {
-                                    droppedFiles.Add(newFile);
-                                }
-
-                                existingPaths.Add(file);
-                                newestByTrimmedName[fileTrimmedName] = (file, info.LastWriteTime);
-                                AnimateFileAdded(info.Name);
-                            }
-                            // If current is older, skip it
-                        }
-                        else
-                        {
-                            // First occurrence of this trimmed name
-                            AddFileToDroppedFiles(info, existingPaths);
-                            newestByTrimmedName[fileTrimmedName] = (file, info.LastWriteTime);
-                            AnimateFileAdded(info.Name);
-                        }
-                    }
-                }
-
-                // Add subdirectories to queue
-                foreach (var subDir in Directory.GetDirectories(currentPath))
-                {
-                    queue.Enqueue(subDir);
-                }
-            }
-        }
-
-        private void AddDirectoryToDroppedFiles(DirectoryInfo dirInfo, string currentPath, HashSet<string> existingPaths)
-        {
-            var dirSizeBytes = GetDirectorySize(dirInfo);
-            var dirSizeKB = dirSizeBytes / 1024.0;
-            droppedFiles.Add(new DroppedFile
-            {
-                Name = dirInfo.Name,
-                Size = $"{dirSizeKB:F1} KB",
-                FullPath = currentPath
-            });
-            existingPaths.Add(currentPath);
-        }
-
-        private void AddFileToDroppedFiles(FileInfo info, HashSet<string> existingPaths)
-        {
-            droppedFiles.Add(new DroppedFile
-            {
-                Name = info.Name,
-                Size = $"{info.Length / 1024.0:F1} KB",
-                FullPath = info.FullName
-            });
-            existingPaths.Add(info.FullName);
-        }
-
-        private void RemoveExistingFile(string pathToRemove, HashSet<string> existingPaths)
-        {
-            var oldFile = droppedFiles.FirstOrDefault(f => f.FullPath == pathToRemove);
-            if (oldFile != null)
-            {
-                droppedFiles.Remove(oldFile);
-                existingPaths.Remove(pathToRemove);
-            }
-        }
+       
 
         private void AnimateFileAdded(string fileName)
         {
@@ -495,6 +404,7 @@ namespace ModManager
 
         private void CreateMod_Click(object sender, RoutedEventArgs e)
         {
+            true_folder_name = true_folder_name.Trim().TrimEnd('.', ' ');
             Block.Visibility = Visibility.Visible;
             ModInfo modInfo = new ModInfo();
             ModDetails modDetails = new ModDetails();
@@ -505,7 +415,6 @@ namespace ModManager
             modInfo.Name = txtName.Text;
             modInfo.Heart = txtHeart.Text;
             modInfo.Home = txtHome.Text;
-
             modDetails.Random = false;
             if (txtPriority.Text == "")
             {
@@ -520,6 +429,10 @@ namespace ModManager
 
             string Pathh = Path.Combine(installedPath, true_folder_name, "META");
             Directory.CreateDirectory(Pathh);
+            if (image_path != "")
+            {
+                using (var img = System.Drawing.Image.FromFile(image_path)) img.Save(Path.Combine(Pathh, "image.png"), System.Drawing.Imaging.ImageFormat.Png);
+            }
             Pathh = Path.Combine(installedPath, true_folder_name, "WAD");
             Directory.CreateDirectory(Pathh);
 

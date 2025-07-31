@@ -16,6 +16,9 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Application = System.Windows.Application;
 using Cursors = System.Windows.Input.Cursors;
+using System.Windows.Media.Imaging;
+using System.Drawing.Imaging;
+using Image = System.Drawing.Image;
 
 namespace ModManager
 {
@@ -34,6 +37,7 @@ namespace ModManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            File.AppendAllText("startup.log", DateTime.Now + " - App launched\n");
             bool isNewInstance;
             _mutex = new Mutex(true, @"Global\ModdoLoudaDA", out isNewInstance);
 
@@ -272,6 +276,51 @@ namespace ModManager
             this.Top = y;
             this.Show();
             this.Activate();
+        }
+    }
+    public static class ImageLoader
+    {
+        public static BitmapImage GetModImage(string modFolder)
+        {
+            string metaFolder = Path.Combine(Directory.GetCurrentDirectory(), "installed", modFolder, "META");
+
+            if (!Directory.Exists(metaFolder))
+                return null;
+
+            // Supported extensions
+            string[] extensions = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
+
+            foreach (var ext in extensions)
+            {
+                string imagePath = Path.Combine(metaFolder, "image" + ext);
+                if (File.Exists(imagePath))
+                {
+                    var image = LoadBitmapImage(imagePath);
+                    if (image != null)
+                        return image;
+                }
+            }
+
+            return null; // No valid image found
+        }
+
+        private static BitmapImage LoadBitmapImage(string filePath)
+        {
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad; // Load image into memory immediately
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache; // Force refresh, ignore cache
+                bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
+                bitmap.EndInit();
+                bitmap.Freeze(); // Makes it safe for multi-threaded use
+                return bitmap;
+            }
+            catch
+            {
+                return null; // In case of an invalid image or error
+            }
         }
     }
 

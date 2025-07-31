@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -27,12 +28,16 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using static System.Net.Mime.MediaTypeNames;
+using static System.Net.WebRequestMethods;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using DataFormats = System.Windows.DataFormats;
+using File = System.IO.File;
 using Path = System.IO.Path;
+using System.Net.Http.Headers;
+
 
 namespace ModManager
 {
@@ -136,7 +141,7 @@ namespace ModManager
         public string gamepath { get; set; } = "";
         public bool startup_start { get; set; } = false;
         public bool load_start { get; set; } = false;
-        public bool catch_updated { get; set; } = false;  //true laters
+        public bool catch_updated { get; set; } = false;
         public int import_override { get; set; } = 0;
 
         public double Tile_height { get; set; } = 60;
@@ -159,7 +164,11 @@ namespace ModManager
         public string default_author { get; set; } = "Unknown";
         public string default_Hearth { get; set; } = "";
         public string default_home { get; set; } = "";
-        public bool reinitialize_mods_before_each_write { get; set; } = false;
+        public bool reinitialize_mods_before_each_write { get; set; } = true;
+
+        public bool show_thumbs { get; set; } = true;
+        public float thumb_opacity { get; set; } = 0.4f;
+        public bool auto_update_hashes { get; set; } = true;
     }
     public class Folder
     {
@@ -198,6 +207,7 @@ namespace ModManager
 
         public bool Random { get; set; } = false;
     }
+
     
 
 
@@ -323,19 +333,69 @@ namespace ModManager
 
                     if (mod != null)
                     {
+                        List<string> wads = new List<string>();
+                        string wadPath = Path.Combine(installedPath, mod.ModFolder, "WAD");
+                        if (Directory.Exists(wadPath))
+                        {
+                            try
+                            {
+                                string[] wadEntries = Directory.GetFileSystemEntries(wadPath);
+                                foreach (string entry in wadEntries)
+                                {
+                                    var lastPart = entry.Split('\\').Last();
+                                    wads.Add(Path.GetFileName(lastPart));
+
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+
+                            }
+                        }
+                        mod.Wads = wads;
+                        if (metaEditor.image_path != "")
+                        {
+                            try
+                            {
+                                using (var img = System.Drawing.Image.FromFile(metaEditor.image_path))
+                                {
+                                    img.Save(Path.Combine(installedPath, mod.ModFolder, "META", "image.png"), System.Drawing.Imaging.ImageFormat.Png);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                CustomMessageBox.Show(
+                                    "Failed to change the image.\n\nError: " + ex.Message,
+                                    new[] { "OK" },
+                                    "Mod List"
+                                );
+                            }
+
+                        }
                         SaveModInfo(mod);
                         SaveModDetails(mod);
                     }
+                    
 
-                    if (folder != null)
+                        if (folder != null)
                     {
                         SaveFolder(folder);
                     }
                 }
+                var settings = OverlayHost.Children
+        .OfType<SettingsOverlay>()
+        .FirstOrDefault();
+
+                if (settings != null)
+                { save_settings(); }
                 OverlayHost.Children.Clear();
                 OverlayHost2.Children.Clear();
             }
             else if (e.Key == Key.F5 && !ShouldBlockShortcuts())
+            {
+                Internal_restart(Current_location_folder);
+            }
+            else if (e.Key == Key.R && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
                 Internal_restart(Current_location_folder);
             }
@@ -753,6 +813,137 @@ namespace ModManager
 
             return result == true ? dialog.FileNames : Array.Empty<string>();
         }
+        private static readonly string[] GitHubUrls =
+        {
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.0",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.1"
+        };
+
+        private const string DownloadUrl = "https://raw.communitydragon.org/binviewer/hashes/hashes.game.txt";
+        private static readonly string BasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cslol-tools");
+        private static readonly string HashesFilePath = Path.Combine(BasePath, "hashes.game.txt");
+        private static readonly string CheckFilePath = Path.Combine(BasePath, "hashes.check.txt");
+
+        public async Task<string> RunCurlCommandAsync(string url)
+        {
+            var curlCommand = $"curl -I -H \"User-Agent: cslol-tools\" -H \"Accept: application/vnd.github.v3+json\" \"{url}\"";
+
+            var processStartInfo = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c {curlCommand}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = new Process { StartInfo = processStartInfo };
+            process.Start();
+
+            string output = await process.StandardOutput.ReadToEndAsync();
+            string error = await process.StandardError.ReadToEndAsync();
+
+            process.WaitForExit();
+            return output;
+        }
+
+
+
+        public void StartHashUpdate()
+        {
+            Task.Run(async () =>
+            {
+                Dispatcher.Invoke(() => ToggleFeed(true));
+                try
+                {
+                    Dispatcher.Invoke(() => Feed.Text = "Checking for hash updates...");
+
+                    Directory.CreateDirectory(BasePath);
+
+                    long lastUpdateTicks = 0;
+                    if (File.Exists(CheckFilePath))
+                        long.TryParse(File.ReadAllText(CheckFilePath).Trim(), out lastUpdateTicks);
+
+                    DateTimeOffset lastUpdate = new DateTimeOffset(lastUpdateTicks, TimeSpan.Zero);
+                    bool needsUpdate = !File.Exists(HashesFilePath);
+                    if (!needsUpdate) {
+
+                        foreach (var url in GitHubUrls)
+                        {
+                            Dispatcher.Invoke(() => Feed.Text = $"Checking {Path.GetFileName(url)}...");
+
+                            var curlOutput = await RunCurlCommandAsync(url);
+
+                            DateTimeOffset? remoteModified = null;
+                            if (!string.IsNullOrEmpty(curlOutput))
+                            {
+                                var lines = curlOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                                var lastModifiedLine = lines.FirstOrDefault(line => line.StartsWith("Last-Modified:", StringComparison.OrdinalIgnoreCase));
+
+                                if (lastModifiedLine != null)
+                                {
+                                    var lastModifiedValue = lastModifiedLine.Substring("Last-Modified:".Length).Trim();
+                                    if (DateTimeOffset.TryParse(lastModifiedValue, out var parsedDate))
+                                    {
+                                        remoteModified = parsedDate;
+                                    }
+                                }
+                            }
+
+                            if (remoteModified.HasValue)
+                            {
+
+                                if (remoteModified.Value > lastUpdate || lastUpdateTicks == 0)
+                                {
+                                    needsUpdate = true;
+                                    Dispatcher.Invoke(() => Feed.Text = $"Update detected on {Path.GetFileName(url)}.");
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                Dispatcher.Invoke(() => Feed.Text = $"Could not check {Path.GetFileName(url)}.");
+                            }
+                        }
+
+
+                    }
+                    if (needsUpdate)
+                    {
+
+                        using var httpClient = new HttpClient();
+                        Dispatcher.Invoke(() => Feed.Text = "Downloading latest hashes...");
+                        var content = await httpClient.GetStringAsync(DownloadUrl);
+                        await File.WriteAllTextAsync(HashesFilePath, content);
+                        await File.WriteAllTextAsync(CheckFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
+                        Dispatcher.Invoke(() => Feed.Text = "Hashes updated successfully.");
+                    }
+                    else
+                    {
+                        Dispatcher.Invoke(() => Feed.Text = "Hashes are up-to-date.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => Feed.Text = $"Error: {ex.Message}");
+                }
+                finally
+                {
+                    await Task.Delay(1000);
+                    if (_isLoaderRunning == false)
+                    {
+                        Dispatcher.Invoke(() => ToggleFeed(false));
+                    }
+                }
+            });
+        }
+
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            // This fires after window has closed
+            _currentRunner?.KillProcess();
+        }
         private void Internal_restart(int loc)
         {
             hierarchyById.Clear();
@@ -779,7 +970,7 @@ namespace ModManager
             InitializeProfiles();
             LoadWadFiles();
             ReadCurrentProfile();
-            RefreshModListPanel(loc);
+            RefreshModListPanel(loc, true);
         }
         public MainWindow()
         {
@@ -821,6 +1012,7 @@ namespace ModManager
             _trayIcon.ShowTrayIcon("Yamete, mitenai de yo, onii-san!", OnTrayIconDoubleClick, OnTrayIconRightClick, "animegurl.ico");
             this.StateChanged += MainWindow_StateChanged;
 
+            this.Closed += MainWindow_Closed;
 
             this.SizeChanged += MainWindow_SizeChanged;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
@@ -842,6 +1034,10 @@ namespace ModManager
                 };
                 hierarchyById[0] = root_folder;
 
+                if (settings.auto_update_hashes)
+                {
+                    StartHashUpdate();
+                }
                 LoadWadFiles();
                 LoadFolders();
                 LoadMods();
@@ -853,7 +1049,6 @@ namespace ModManager
                     Directory.CreateDirectory(ProfilesFolder);
                 }
                 InitializeProfiles();
-
                 if (Globals.StartMinimized)
                 {
                     this.Hide();
@@ -866,7 +1061,6 @@ namespace ModManager
                     True_Start_loader();
                 }
                 update_tile_contrains();
-
 
 
 
@@ -963,7 +1157,7 @@ namespace ModManager
 
             if (!Directory.Exists(strin_path))
             {
-                MessageBox.Show($"Game path does not exist: {strin_path}");
+                //MessageBox.Show($"Game path does not exist: {strin_path}");
                 return;
             }
 
@@ -1228,6 +1422,7 @@ namespace ModManager
                     }
 
                     RefreshModListPanel(Current_location_folder);
+                    RefreshAllCachedElementsDisplay();
                 }
                 else
                 {
@@ -1290,6 +1485,83 @@ namespace ModManager
             }
 
             }
+
+        public void Export_Mod(Mod ModElement)
+        {
+            string sourceFolder = Path.Combine("installed", ModElement.ModFolder);
+            string wadSource = Path.Combine(sourceFolder, "wad");
+            string metaSource = Path.Combine(sourceFolder, "meta");
+
+            var saveDialog = new SaveFileDialog
+            {
+                Title = "Export to .fantome",
+                Filter = "Fantome Files (*.fantome)|*.fantome",
+                FileName = $"{ModElement.Info.Name} by {ModElement.Info.Author}.fantome",
+                DefaultExt = ".fantome"
+            };
+
+            if (saveDialog.ShowDialog() != true)
+                return;
+
+            string targetPath = saveDialog.FileName;
+
+            string tempExportDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+
+            try
+            {
+                // Create temp export directory
+                Directory.CreateDirectory(tempExportDir);
+
+                // Copy wad/ folder
+                string wadTarget = Path.Combine(tempExportDir, "WAD");
+                if (Directory.Exists(wadSource))
+                    CopyDirectory(wadSource, wadTarget);
+
+                // Create meta folder
+                string metaTarget = Path.Combine(tempExportDir, "META");
+                Directory.CreateDirectory(metaTarget);
+                if (Directory.Exists(metaSource))
+                    CopyDirectory(metaSource, metaTarget);
+                
+                var exportDetails = new ModDetails
+                {
+                    Priority = ModElement.Details.Priority,
+                    override_ = ModElement.Details.override_,
+                    InnerPath = "",
+                    Random = false
+                };
+
+                string detailsJsonTarget = Path.Combine(metaTarget, "details.json");
+                File.WriteAllText(detailsJsonTarget, JsonSerializer.Serialize(exportDetails, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                }));
+
+                // Zip it
+                string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
+                ZipFile.CreateFromDirectory(tempExportDir, tempZip);
+
+                // Delete target .fantome if it exists
+                if (File.Exists(targetPath))
+                    File.Delete(targetPath);
+
+                // Rename .zip to .fantome
+                File.Move(tempZip, targetPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                // Cleanup
+                if (Directory.Exists(tempExportDir))
+                {
+                    try { Directory.Delete(tempExportDir, true); } catch { /* ignore */ }
+                }
+            }
+        }
+
 
         public void CloseSettingsOverlay()
         {
@@ -1505,7 +1777,15 @@ namespace ModManager
 
         private async Task Stop_loader_internal()
         {
-            ToggleOverlay(true);
+            try
+            {
+                CSLolManager.Stop(); // Properly stop the CSLol process
+            }
+            catch (Exception ex)
+            {
+                // Log or handle CSLol stop errors if needed
+                System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
+            }
             Load_check_box.IsEnabled = false;
             UpdateContextMenuLoaderState();
 
@@ -1534,15 +1814,6 @@ namespace ModManager
             }
             _currentRunner?.KillProcess();
             _currentRunner = null;
-            try
-            {
-                CSLolManager.Stop(); // Properly stop the CSLol process
-            }
-            catch (Exception ex)
-            {
-                // Log or handle CSLol stop errors if needed
-                System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
-            }
             Load_check_box.IsChecked = false;
             ToggleOverlay(false);
             ToggleFeed(false);
@@ -1644,6 +1915,19 @@ namespace ModManager
                     settings.gamepath = old_path;
                 }
                 save_settings();
+                LoadWadFiles();
+            }
+            else if (!EMPTY_WADS.ContainsKey("Common"))
+            {
+                string old_path = settings.gamepath;
+                settings.gamepath = "";
+                detectGamePath();
+                if (!IsValidGamePath(settings.gamepath))
+                {
+                    settings.gamepath = old_path;
+                }
+                save_settings();
+                LoadWadFiles();
             }
             WADS = CopyWadsDictionary(EMPTY_WADS);
             await ProcessFolderChildrenAsync(0, token);
@@ -1887,7 +2171,7 @@ namespace ModManager
         }
 
         // Utility function to trim .wad/.client/.locale suffixes
-        public string TrimWadName(string wad)
+        public string TrimWadName(string wad, bool trimm_locale = true)
         {
             string trimmed = wad;
 
@@ -1895,10 +2179,12 @@ namespace ModManager
                 trimmed = trimmed[..^7];
             if (trimmed.EndsWith(".wad"))
                 trimmed = trimmed[..^4];
-
-            var localeMatch = Regex.Match(trimmed, @"\.[a-zA-Z]{2}_[a-zA-Z]{2}$");
-            if (localeMatch.Success)
-                trimmed = trimmed[..^localeMatch.Length];
+            if (trimm_locale)
+            {
+                var localeMatch = Regex.Match(trimmed, @"\.[a-zA-Z]{2}_[a-zA-Z]{2}$");
+                if (localeMatch.Success)
+                    trimmed = trimmed[..^localeMatch.Length];
+            }
 
             return trimmed;
         }
@@ -1928,36 +2214,46 @@ namespace ModManager
             }
         }
 
-        public void RefreshModListPanel(int c_location)
+        private Dictionary<(bool isMod, string id), ModListEntry> cachedUIElements = new Dictionary<(bool, string), ModListEntry>();
+
+        public void RefreshModListPanel(int c_location, bool rebuild = false)
         {
             FolderListEntriesInDisplay.Clear();
             modListEntriesInDisplay.Clear();
-
             string searchString = Global_searchText;
+
             // Clear all existing UI entries
             ModListPanel.Children.Clear();
+
+            // If rebuild is true, clear the cache to force recreation
+            if (rebuild)
+            {
+                cachedUIElements.Clear();
+            }
+
             if (!hierarchyById.TryGetValue(c_location, out var root))
             {
                 if (!hierarchyById.TryGetValue(Current_location_folder, out var meow))
                 {
-                    RefreshModListPanel(0);
+                    RefreshModListPanel(0, rebuild);
                 }
                 else
                 {
-                    RefreshModListPanel(Current_location_folder);
+                    RefreshModListPanel(Current_location_folder, rebuild);
                 }
             }
+
             if (c_location != 0)
             {
                 AddParentFolderEntry(root);
             }
+
             if (c_location != Current_location_folder)
             {
                 Details_Panel.Text = "";
                 GlobalselectedEntries.Clear();
             }
             Current_location_folder = c_location;
-                       
 
             // Separate folders and mods, then sort each group alphabetically
             var folders = new List<(string childId, HierarchyElement element)>();
@@ -1990,7 +2286,6 @@ namespace ModManager
 
             // Sort folders alphabetically by name
             folders.Sort((a, b) => string.Compare(a.element.Name, b.element.Name, StringComparison.OrdinalIgnoreCase));
-
             // Sort mods alphabetically by name
             mods.Sort((a, b) => string.Compare(a.element.Info.Name, b.element.Info.Name, StringComparison.OrdinalIgnoreCase));
 
@@ -1998,28 +2293,74 @@ namespace ModManager
             foreach (var (childId, childElement) in folders)
             {
                 if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
-                var folderEntry = new ModListEntry(childElement.ID.ToString());
-                folderEntry.InitializeWithFolder(childElement);
-                folderEntry.FolderDoubleClicked += (folderId) => RefreshModListPanel(folderId);
+
+                var cacheKey = (false, childId); // isMod = false for folders
+                ModListEntry folderEntry;
+
+                // Check if element is already cached
+                if (cachedUIElements.TryGetValue(cacheKey, out var cachedEntry))
+                {
+                    // Load from cache
+                    folderEntry = cachedEntry;
+                }
+                else
+                {
+                    // Create new entry
+                    folderEntry = new ModListEntry(childElement.ID.ToString());
+                    folderEntry.InitializeWithFolder(childElement);
+                    folderEntry.FolderDoubleClicked += (folderId) => RefreshModListPanel(folderId, rebuild);
+
+                    // Add to cache
+                    cachedUIElements[cacheKey] = folderEntry;
+                }
+
                 FolderListEntriesInDisplay.Add(folderEntry);
                 ModListPanel.Children.Add(folderEntry);
-                if (GlobalselectedEntries.Contains(childElement.ID.ToString())) { folderEntry.SetSelection(true); folderEntry.RefreshDisplay(); }
+
+                if (GlobalselectedEntries.Contains(childElement.ID.ToString()))
+                {
+                    folderEntry.SetSelection(true);
+                    folderEntry.RefreshDisplay();
+                }
             }
 
             // Add mods second
             foreach (var (childId, childElement) in mods)
             {
                 if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
-                var modWads = childElement.Wads; // string list
-                var modAuthor = childElement.Info.Author; // string
 
-                var modEntry = new ModListEntry(childElement.ModFolder);
-                modEntry.InitializeWithMod(childElement);
+                var cacheKey = (true, childElement.ModFolder); // isMod = true for mods
+                ModListEntry modEntry;
+
+                // Check if element is already cached
+                if (cachedUIElements.TryGetValue(cacheKey, out var cachedEntry))
+                {
+                    // Load from cache
+                    modEntry = cachedEntry;
+                }
+                else
+                {
+                    // Create new entry
+                    var modWads = childElement.Wads; // string list
+                    var modAuthor = childElement.Info.Author; // string
+                    modEntry = new ModListEntry(childElement.ModFolder);
+                    modEntry.InitializeWithMod(childElement);
+
+                    // Add to cache
+                    cachedUIElements[cacheKey] = modEntry;
+                }
+
                 modListEntriesInDisplay.Add(modEntry);
                 ModListPanel.Children.Add(modEntry);
-                if (GlobalselectedEntries.Contains(childElement.ModFolder)) { modEntry.SetSelection(true); modEntry.RefreshDisplay(); }
+
+                if (GlobalselectedEntries.Contains(childElement.ModFolder))
+                {
+                    modEntry.SetSelection(true);
+                    modEntry.RefreshDisplay();
+                }
             }
         }
+
         private void set_active_only_disp(object sender, RoutedEventArgs e)
         {
             display_only_active = only_active_disp_checkbox.IsChecked == true;
@@ -2377,6 +2718,7 @@ namespace ModManager
                 }
             }
             RefreshModListPanel(Current_location_folder);
+            AdjustModListLayout();
         }
         public static void SaveOrUpdateHierarchyElement(
     HierarchyElement element,
@@ -2516,7 +2858,8 @@ namespace ModManager
             {
                 MessageBox.Show($"Error saving info.json for mod '{mod.ModFolder}': {ex.Message}");
             }
-            RefreshModListPanel(Current_location_folder);
+            if (cachedUIElements.TryGetValue((true, mod.ModFolder), out var modEntry))
+                modEntry.RefreshDisplay();
         }
 
         public void SaveModDetails(Mod mod, string basePath = null)
@@ -2540,9 +2883,10 @@ namespace ModManager
             {
                 MessageBox.Show($"Error saving details.json for mod '{mod.ModFolder}': {ex.Message}");
             }
-            RefreshModListPanel(Current_location_folder);
+            if (cachedUIElements.TryGetValue((true, mod.ModFolder), out var modEntry))
+                modEntry.RefreshDisplay();
         }
-
+        
         public void SaveFolder(HierarchyElement _folder)
         {
             if (hierarchyById.TryGetValue(_folder.ID, out var mod_element))
@@ -2551,6 +2895,19 @@ namespace ModManager
                 SaveOrUpdateHierarchyElement(_folder, hierarchyById);
             }
         }
+        public void RefreshCachedElementDisplay(bool isMod, string id)
+        {
+            if (cachedUIElements.TryGetValue((isMod, id), out var element))
+                element.RefreshDisplay();
+        }
+        public void RefreshAllCachedElementsDisplay()
+        {
+            foreach (var cachedElement in cachedUIElements.Values)
+            {
+                cachedElement.RefreshDisplay();
+            }
+        }
+
         public static void RemoveHierarchyElement(int id, Dictionary<int, HierarchyElement> hierarchyById, string filePath = null)
         {
             filePath ??= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "folders.json");
@@ -2626,7 +2983,6 @@ namespace ModManager
                     MessageBox.Show($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
                 }
             }
-
             ModInfo modInfo = new ModInfo();
             if (File.Exists(infoPath))
             {
@@ -2792,7 +3148,6 @@ namespace ModManager
                         if (IsAcceptedDropItem(path))
                         {
                             very = true;
-                            // Call your drop handler here
                             HandleDroppedItem(path);
                         }
                     }
@@ -2802,7 +3157,7 @@ namespace ModManager
                     }
                     else
                     {
-                        MessageBox.Show("no valid mods");
+                        // MessageBox.Show("no valid mods");
                     }
 
                 }
@@ -2822,7 +3177,7 @@ namespace ModManager
                 return true;
 
             string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".zip" || ext == ".fantome" || ext == ".wad.client" || ext == ".client";
+            return ext == ".zip" || ext == ".fantome" || ext == ".wad.client" || ext == ".client" || ext == ".wad";
         }
 
         private void HandleDroppedItem(string path)
@@ -2836,7 +3191,6 @@ namespace ModManager
                     string fileName = Path.GetFileNameWithoutExtension(path);
                     bool isValidZip = false;
 
-                    // Step 1: Validate zip content before extracting
                     try
                     {
                         using (var archive = ZipFile.OpenRead(path))
@@ -2867,9 +3221,45 @@ namespace ModManager
                     if (!isValidZip)
                         return;
 
-                    string extractTargetDir;
+                    string extractTargetDir = "";
+                    if (settings.catch_updated)
+                    {
+                        string? lowerVersionPath = HasLowerVersionInstalled(path, installedPath);
+                        if (lowerVersionPath != null)
+                        {
+                            extractTargetDir = Path.Combine(installedPath, fileName);
+                            using (var archive = ZipFile.OpenRead(path))
+                            {
+                                foreach (var entry in archive.Entries)
+                                {
+                                    string fullPath = Path.Combine(extractTargetDir, entry.FullName);
 
-                    if (modByFolder.TryGetValue(fileName, out var mod))
+                                    // Create directory if needed
+                                    if (string.IsNullOrEmpty(entry.Name))
+                                    {
+                                        Directory.CreateDirectory(fullPath);
+                                        continue;
+                                    }
+
+                                    // Ensure directory exists
+                                    Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+                                    // Overwrite the file
+                                    entry.ExtractToFile(fullPath, overwrite: true);
+                                }
+                            }
+                            File.Move(Path.Combine(installedPath, lowerVersionPath, "META", "details.json"), Path.Combine(extractTargetDir, "META", "details.json"), overwrite: true);
+                            DeleteMod(lowerVersionPath);
+                            ProfileEntries.Remove(lowerVersionPath);
+                            ProfileEntries[fileName] = 10;
+                            SaveProfileEntriesToFile();
+                            CreateModFromFolder(Path.Combine(installedPath, fileName));
+                            RefreshModListPanel(Current_location_folder);
+
+                            return;
+                        }
+                    }
+                    else if (modByFolder.TryGetValue(fileName, out var mod))
                     {
                         switch (settings.import_override)
                         {
@@ -2921,7 +3311,6 @@ namespace ModManager
                     // Step 3: Extract
                     try
                     {
-
                         using (var archive = ZipFile.OpenRead(path))
                         {
                             foreach (var entry in archive.Entries)
@@ -2948,7 +3337,6 @@ namespace ModManager
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Failed to extract mod:\n{ex.Message}", "Extraction Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         if (Directory.Exists(extractTargetDir))
                             Directory.Delete(extractTargetDir, true);
                     }
@@ -2964,10 +3352,76 @@ namespace ModManager
             }
             RefreshModListPanel(Current_location_folder);
         }
+        private static readonly Regex modRegex = new Regex(
+        @"^(?<name>.+?)_(?<version>\d+\.\d+\.\d+)(\(\d+\))?(\.fantome)?$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase
+    );
 
+        public static string? HasLowerVersionInstalled(string fantomeFilePath, string installedPath)
+        {
+            string fileName = Path.GetFileName(fantomeFilePath);
+            var match = modRegex.Match(fileName);
+            if (!match.Success)
+                return null;
+
+            string modName = match.Groups["name"].Value;
+            Version currentVersion = new Version(match.Groups["version"].Value);
+
+            string? lowerVersionFolder = null;
+
+            var directories = Directory.GetDirectories(installedPath);
+            foreach (var dir in directories)
+            {
+                string folderName = Path.GetFileName(dir);
+                var m = modRegex.Match(folderName);
+                if (!m.Success)
+                    continue;
+
+                if (m.Groups["name"].Value == modName)
+                {
+                    Version version = new Version(m.Groups["version"].Value);
+                    if (version >= currentVersion)
+                    {
+                        // A same or higher version exists — cancel
+                        return null;
+                    }
+                    else
+                    {
+                        // Keep track of the lower version folder
+                        lowerVersionFolder = folderName;
+                    }
+                }
+            }
+
+            return lowerVersionFolder;
+        }
         private void HandleWadImport(string path)
         {
-            string name = Path.GetFileNameWithoutExtension(path.TrimEnd(Path.DirectorySeparatorChar));
+            if (Directory.Exists(path))
+            {
+                string wadFolder = Path.Combine(path, "WAD");
+                string metaFolder = Path.Combine(path, "META");
+
+                if (Directory.Exists(wadFolder) && Directory.Exists(metaFolder))
+                {
+                    string installedPat = Path.Combine("installed", Path.GetFileName(path));
+
+                    // If target already exists, you might want to delete or skip copying
+                    if (Directory.Exists(installedPat))
+                    {
+                        // Optional: delete existing before copy
+                        Directory.Delete(installedPat, true);
+                    }
+
+                    // Copy directory recursively
+                    CopyDirectory(path, installedPat);
+                    CreateModFromFolder(installedPat);
+                    return;
+                }
+            }
+
+            string name = Path.GetFileName(path);
+            if (!EMPTY_WADS.ContainsKey(TrimWadName(name))) { return; };
             string tempFolder = Path.Combine(Path.GetTempPath(), $"modtemp_{Guid.NewGuid()}");
             string wadDir = Path.Combine(tempFolder, "WAD");
             string metaDir = Path.Combine(tempFolder, "META");
@@ -2977,15 +3431,14 @@ namespace ModManager
                 Directory.CreateDirectory(wadDir);
                 Directory.CreateDirectory(metaDir);
 
-                // Copy .wad.client file or folder into WAD/
                 if (File.Exists(path))
                 {
-                    string destFile = Path.Combine(wadDir, name + ".wad.client");
+                    string destFile = Path.Combine(wadDir, TrimWadName(name, false) + ".wad.client");
                     File.Copy(path, destFile, true);
                 }
                 else if (Directory.Exists(path))
                 {
-                    string destFolder = Path.Combine(wadDir, name);
+                    string destFolder = Path.Combine(wadDir, TrimWadName(name, false) + ".wad.client");
                     CopyDirectory(path, destFolder);
                 }
                 else
@@ -2994,22 +3447,20 @@ namespace ModManager
                     return;
                 }
 
-                // Create META/info.json
                 string infoJson = Path.Combine(metaDir, "info.json");
                 string json = $$"""
         {
-            "Author": "",
+            "Author": "{{settings.default_author}}",
             "Description": "",
-            "Heart": "",
-            "Home": "",
+            "Heart": "{{settings.default_Hearth}}",
+            "Home": "{{settings.default_home}}",
             "Name": "{{name}}",
             "Version": "1.0.0"
         }
         """;
                 File.WriteAllText(infoJson, json);
 
-                // Pack to zip
-                string tempZip = Path.Combine(Path.GetTempPath(), $"{name}_temp.zip");
+                string tempZip = Path.Combine(Path.GetTempPath(), $"{TrimWadName(name, false)}.zip");
                 if (File.Exists(tempZip))
                     File.Delete(tempZip);
 

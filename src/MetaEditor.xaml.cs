@@ -10,7 +10,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Xml.Linq;
 using Application = System.Windows.Application;
@@ -32,6 +34,7 @@ namespace ModManager
         private bool valid_Name = true;
         private bool valid_Folder = true;
         private string start_name = string.Empty;
+        public string image_path = "";
 
 
         public MetaEdior()
@@ -59,7 +62,60 @@ namespace ModManager
             }
         }
 
+        private static readonly HashSet<string> ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+{
+    ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".tif", ".ico"
+};
 
+        private bool IsImageFile(string filePath)
+        {
+            string extension = Path.GetExtension(filePath);
+            return ImageExtensions.Contains(extension);
+        }
+
+        private bool IsValidImage(string imagePath)
+        {
+            try
+            {
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.UriSource = new Uri(imagePath, UriKind.Absolute);
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.EndInit();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void UpdateBackgroundImage()
+        {
+            // Direct access to the named Image control
+            if (!string.IsNullOrEmpty(image_path) && File.Exists(image_path))
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(image_path, UriKind.Absolute);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bg_img_border.Source = bitmap;
+                }
+                catch
+                {
+                    // If loading fails, clear the image
+                    bg_img_border.Source = null;
+                    image_path = "";
+                }
+            }
+            else
+            {
+                bg_img_border.Source = null;
+            }
+        }
         public void InitializeWithMod(Mod modElement)
         {
             ModElement = modElement;
@@ -78,6 +134,17 @@ namespace ModManager
             Override.IsChecked = modElement.Details.override_;
             Random.IsChecked = modElement.Details.Random;
             dropPanelDisp.Visibility = Visibility.Visible;
+
+            var image = ImageLoader.GetModImage(ModElement.ModFolder);
+            if (image != null && Main.settings.show_thumbs)
+            {
+                bg_img_border.Source = image;
+            }
+            else
+            {
+                bg_img_border.Source = null;
+            }
+
             InitializeDropFiles();
         }
         public void InitializeWithFolder(HierarchyElement folderElement)
@@ -85,6 +152,7 @@ namespace ModManager
             MainVorder.Height = 200;
             nameGridd.Margin = new Thickness(0, 0, 0, 15);
             MYgrid.RowDefinitions[2].Height = new GridLength(0);
+            RevertButton.Visibility = Visibility.Collapsed;
             FolderElement = folderElement;
             ModElement = null;
             IsMod = false;
@@ -195,18 +263,33 @@ namespace ModManager
         {
             if (IsMod && valid_Folder)
             {
-                true_folder_name = true_folder_name.Trim().TrimEnd('.', ' ');
-                string source = Path.Combine("installed", ModElement.ModFolder);
-                string destination = Path.Combine("installed", true_folder_name);
-                Directory.Move(source, destination);
-                Main.DeleteMod(ModElement.ModFolder);
-                if (ModElement.isActive)
+                try
                 {
-                    MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
+                    true_folder_name = true_folder_name.Trim().TrimEnd('.', ' ');
+                    string source = Path.Combine("installed", ModElement.ModFolder);
+                    string destination = Path.Combine("installed", true_folder_name);
+                    Directory.Move(source, destination);
+                    Main.DeleteMod(ModElement.ModFolder);
+                    if (ModElement.isActive)
+                    {
+                        MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
+                    }
+                    start_name = true_folder_name;
+                    valid_Folder = false;
+                    Update_folder_name.IsEnabled = false;
+                    ModElement = Main.CreateModFromFolder(Path.Combine(installedPath, true_folder_name));
+                    ModElement.Info.Author = txtAuthor.Text;
+                    ModElement.Info.Description = txtDescription.Text;
+                    ModElement.Info.Version = txtVersion.Text;
+                    ModElement.Info.Name = txtName.Text;
+                    ModElement.Info.Heart = txtHeart.Text;
+                    ModElement.Info.Home = txtHome.Text;
+                    ModElement.Details.Priority = int.Parse(txtPriority.Text);
+                    ModElement.Details.override_ = Override.IsChecked == true;
+                    ModElement.Details.Random = Random.IsChecked == true;
+                    Main.RefreshModListPanel(Main.Current_location_folder);
                 }
-                ModElement = Main.CreateModFromFolder(true_folder_name);
-                start_name = true_folder_name;
-                Main.RefreshModListPanel(Main.Current_location_folder);
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
         }
         private void Author_Changed(object sender, EventArgs e)
@@ -338,10 +421,24 @@ namespace ModManager
         {
             if (!IsMod || ModElement == null) return;
 
+            foreach (var path in paths.Where(p => File.Exists(p) && IsImageFile(p)))
+            {
+                if (IsValidImage(path))
+                {
+                    image_path = path;
+                    UpdateBackgroundImage();
+                    break;
+                }
+                else
+                {
+                    image_path = "";
+                    UpdateBackgroundImage();
+                }
+            }
+
             string targetDir = Path.Combine(installedPath, ModElement.ModFolder, "WAD");
             Directory.CreateDirectory(targetDir);
 
-            // Store the files that will be animated
             var filesToAnimate = new List<string>();
 
             foreach (var path in paths)
@@ -349,19 +446,23 @@ namespace ModManager
                 if (File.Exists(path))
                 {
                     string trimmed = TrimWadName(Path.GetFileName(path));
+                    if (!Main.EMPTY_WADS.ContainsKey(trimmed)) { continue; }
                     DeleteConflictingFiles(targetDir, trimmed);
-                    string destPath = Path.Combine(targetDir, Path.GetFileName(path));
+                    string destPath = Path.Combine(targetDir, $"{trimmed}.wad.client");
                     File.Copy(path, destPath, overwrite: true);
-                    filesToAnimate.Add(Path.GetFileName(path)); // Store just the filename
+                    filesToAnimate.Add(Path.GetFileName(destPath));
                 }
                 else if (Directory.Exists(path))
                 {
-                    string trimmed = new DirectoryInfo(path).Name;
-                    DeleteConflictingFiles(targetDir, TrimWadName(trimmed));
-                    string destPath = Path.Combine(targetDir, trimmed);
+                    string name = new DirectoryInfo(path).Name;
+                    if (!Main.EMPTY_WADS.ContainsKey(TrimWadName(name))) {
+                        OnFilesDropped(Directory.EnumerateFileSystemEntries(path, "*", SearchOption.TopDirectoryOnly));
+                        continue;}
+                    DeleteConflictingFiles(targetDir, TrimWadName(name));
+                    string destPath = Path.Combine(targetDir, $"{TrimWadName(name)}.wad.client");
                     Directory.CreateDirectory(destPath);
                     CopyDirectory(path, destPath);
-                    filesToAnimate.Add($"{trimmed} (DIR)"); // Store the directory name
+                    filesToAnimate.Add($"{TrimWadName(name)}.wad.client (DIR)");
                 }
             }
 
@@ -381,7 +482,7 @@ namespace ModManager
             {
                 string name = Path.GetFileName(entry);
                 string trimmed = TrimWadName(name);
-                if (string.Equals(trimmed, trimmedName, StringComparison.OrdinalIgnoreCase))
+                if (trimmed == trimmedName)
                 {
                     try
                     {
@@ -478,12 +579,58 @@ namespace ModManager
         {
             if (IsMod)
             {
+                List<string> wads = new List<string>();
+                string wadPath = Path.Combine(installedPath, ModElement.ModFolder, "WAD");
+                if (Directory.Exists(wadPath))
+                {
+                    try
+                    {
+                        string[] wadEntries = Directory.GetFileSystemEntries(wadPath);
+                        foreach (string entry in wadEntries)
+                        {
+                            var lastPart = entry.Split('\\').Last();
+                            wads.Add(Path.GetFileName(lastPart));
+
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        
+                    }
+                }
+                ModElement.Wads = wads;
+                if (image_path != "") {
+                    try
+                    {
+                        using (var img = System.Drawing.Image.FromFile(image_path)) img.Save(Path.Combine(installedPath, ModElement.ModFolder, "META", "image.png"), System.Drawing.Imaging.ImageFormat.Png);
+                    }
+                    catch (Exception ex)
+                    {
+                        CustomMessageBox.Show(
+                            "Failed to change the image.\n\nError: " + ex.Message,
+                            new[] { "OK" },
+                            "Mod List"
+                        );
+                    }
+                }
+                
+
                 Main.SaveModDetails(ModElement);
                 Main.SaveModInfo(ModElement);
             }
             else
             {
                 Main.SaveFolder(FolderElement);
+            }
+            Main.OverlayHost.Children.Clear();
+        }
+
+        private void revert_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsMod)
+            {
+                Main.CreateModFromFolder(ModElement.ModFolder);
+                Main.RefreshModListPanel(Main.Current_location_folder);
             }
             Main.OverlayHost.Children.Clear();
         }

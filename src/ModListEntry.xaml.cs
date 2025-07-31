@@ -127,11 +127,13 @@ namespace ModManager
                     if (entry.IsMod && entry.ModElement != null)
                     {
                         entry.ModElement.isActive = true;
+                        entry.RefreshDisplay();
                         MainWindow.ProfileEntries[entry.ModElement.ModFolder] = entry.ModElement.Details.Priority;
                     }
                     else if (entry.FolderElement != null)
                     {
                         entry.FolderElement.isActive = true;
+                        entry.RefreshDisplay();
                         MainWindow.ProfileEntries[entry.FolderElement.ID.ToString()] = entry.FolderElement.Priority;
                     }
                 }
@@ -161,11 +163,13 @@ namespace ModManager
                     if (entry.IsMod && entry.ModElement != null)
                     {
                         entry.ModElement.isActive = false;
+                        entry.RefreshDisplay();
                         MainWindow.ProfileEntries.Remove(entry.ModElement.ModFolder);
                     }
                     else if (entry.FolderElement != null)
                     {
                         entry.FolderElement.isActive = false;
+                        entry.RefreshDisplay();
                         MainWindow.ProfileEntries.Remove(entry.FolderElement.ID.ToString());
                     }
                 }
@@ -284,39 +288,7 @@ namespace ModManager
         {
             if (IsMod)
             {
-                string export_dir = Path.Combine("installed", ModElement.ModFolder);
-
-                var saveDialog = new SaveFileDialog
-                {
-                    Title = "Export to .fantome",
-                    Filter = "Fantome Files (*.fantome)|*.fantome",
-                    FileName = $"{ModElement.Info.Name} by {ModElement.Info.Author}.fantome",
-                    DefaultExt = ".fantome"
-                };
-
-                if (saveDialog.ShowDialog() == true)
-                {
-                    string targetPath = saveDialog.FileName;
-
-                    try
-                    {
-                        // Temp zip path
-                        string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
-
-                        ZipFile.CreateFromDirectory(export_dir, tempZip);
-
-                        // Ensure previous .fantome file doesn't exist
-                        if (File.Exists(targetPath))
-                            File.Delete(targetPath);
-
-                        // Rename .zip to .fantome by moving
-                        File.Move(tempZip, targetPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
+                Main.Export_Mod(ModElement);
             }
         }
         private void Open_details_page(object sender, RoutedEventArgs e)
@@ -394,18 +366,40 @@ namespace ModManager
 
                 DetailsText.Text = details;
                 DetailsText.Visibility = Visibility.Visible;
+                det_grid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+                det_grid.ColumnDefinitions[0].MaxWidth = 250;
+                det_grid.ColumnDefinitions[2].MaxWidth = 250;
             }
             else
             {
-                det_grid.ColumnDefinitions[1].Width = new GridLength(0);
+                DetailsText.Visibility = Visibility.Collapsed;
+                det_grid.ColumnDefinitions[1].Width = new GridLength(0, GridUnitType.Pixel);
+                det_grid.ColumnDefinitions[0].MaxWidth = 1500;
+                det_grid.ColumnDefinitions[2].MaxWidth = 1500;
             }
-            
+
+            var image = ImageLoader.GetModImage(ModElement.ModFolder);
+            if (image != null && Main.settings.show_thumbs == true)
+            {
+                BackgroundBorder.Background = new ImageBrush(image)
+                {
+                    Stretch = Stretch.UniformToFill,
+                    Opacity = Main.settings.thumb_opacity
+                };
+            }
+            else
+            {
+                BackgroundBorder.Background = new SolidColorBrush(Colors.Transparent); // or default background
+            }
+
+
+
 
             // Set checkbox based on isActive property
             ActiveCheckbox.IsChecked = ModElement.isActive;
 
-            // Show all mod-specific icons
-            FixingIcon.Visibility = Visibility.Visible;
+            //FixingIcon.Visibility = Visibility.Visible; FIXER DISABLE
+
             ExportIcon.Visibility = Visibility.Visible;
             ModHandlingIcon.Visibility = Visibility.Visible;
             DeleteIcon.Visibility = Visibility.Visible;
@@ -432,13 +426,13 @@ namespace ModManager
                 {
                     border.BorderBrush = new SolidColorBrush(Colors.LightBlue);
                     border.BorderThickness = new Thickness(2);
-                    border.Background = new SolidColorBrush(Color.FromArgb(50, 173, 216, 230)); // Light blue with transparency
+                    BGBorder.Background = new SolidColorBrush(Color.FromArgb(50, 173, 216, 230)); // Light blue with transparency
                 }
                 else
                 {
                     border.BorderBrush = null;
                     border.BorderThickness = new Thickness(0);
-                    border.Background = new SolidColorBrush(Color.FromArgb(255, 42, 42, 42)); // Original background
+                    BGBorder.Background = new SolidColorBrush(Color.FromArgb(255, 42, 42, 42)); // Original background
                 }
             }
         }
