@@ -349,7 +349,7 @@ VerticalAlignment="Center"/>
                                             <Grid>
                                                 <!-- Placeholder text -->
                                                 <TextBlock x:Name="dropPlaceholder"
-                                Text="Drop .wad, .client, .wad.client files or folders here" 
+                                Text="Drop .wad, .client, .wad.client files or folders here&#10;You can also drop a thumbnail image"
                                 HorizontalAlignment="Center" 
                                 VerticalAlignment="Center"
                                 TextWrapping="Wrap"

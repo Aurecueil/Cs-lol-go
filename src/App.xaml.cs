@@ -273,7 +273,7 @@ namespace ModManager
         public void ShowAt(int x, int y)
         {
             this.Left = x;
-            this.Top = y;
+            this.Top = y - this.Height;
             this.Show();
             this.Activate();
         }

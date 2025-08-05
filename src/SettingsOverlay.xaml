@@ -219,7 +219,7 @@
 												  Margin="0,0,8,0"/>
 
                                         <TextBlock Grid.Column="1"
-												   Text="Start on startup"
+												   Text="Run on Startup"
 												   Foreground="White"
 												   FontSize="14"
 												   VerticalAlignment="Center"/>
@@ -646,6 +646,33 @@ Margin="0,0,8,0"/>
 
 
                                     </Grid>
+
+                                    <Grid Grid.Row="2" Grid.Column="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Left Image -->
+                                        <Button Grid.Column="0" Background="Transparent" BorderThickness="0" Click="LeftImage_Click"
+            ToolTip="'I once again ask for your financial support' - Berni i think? dunno">
+                                            <Image x:Name="LeftImage"
+               Stretch="UniformToFill"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"/>
+                                        </Button>
+
+                                        <!-- Right Image -->
+                                        <Button Grid.Column="1" Background="Transparent" BorderThickness="0" Click="RightImage_Click"
+            ToolTip="Discord with UPDATESSS YAYYY">
+                                            <Image x:Name="RightImage"
+               Stretch="UniformToFill"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+
+
 
 
 

@@ -15,11 +15,11 @@
 
             <Grid x:Name="det_grid">
             <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="190" MaxWidth="250"/>
+                    <ColumnDefinition Width="*" MinWidth="200" MaxWidth="250"/>
                 <!-- First column (more flexible) -->
                     <ColumnDefinition Width="*" />
-                <!-- Middle content with fixed width -->
-                    <ColumnDefinition Width="*"  MinWidth="155" MaxWidth="250" />
+                <!-- Middle content with fixed width       155              -->
+                    <ColumnDefinition Width="*"  MinWidth="130" MaxWidth="250" /> 
                     <!-- Last column (more flexible) -->
             </Grid.ColumnDefinitions>
 

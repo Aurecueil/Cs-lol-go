@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -71,6 +72,11 @@ namespace ModManager
         {
             string extension = Path.GetExtension(filePath);
             return ImageExtensions.Contains(extension);
+        }
+
+        private void CreateMod_Click(object sender, RoutedEventArgs e)
+        {
+            Process.Start("explorer.exe", Path.Combine(installedPath, ModElement.ModFolder));
         }
 
         private bool IsValidImage(string imagePath)
@@ -144,7 +150,6 @@ namespace ModManager
             {
                 bg_img_border.Source = null;
             }
-
             InitializeDropFiles();
         }
         public void InitializeWithFolder(HierarchyElement folderElement)
@@ -168,6 +173,7 @@ namespace ModManager
 
             txtName.Text = folderElement.Name;
             txtPriority.Text = folderElement.Priority.ToString();
+            folderButtonBorder.Visibility = Visibility.Collapsed;
         }
         private void Override_Checked(object sender, RoutedEventArgs e)
         {
@@ -297,7 +303,7 @@ namespace ModManager
             if (IsMod)
             {
                 ModElement.Info.Author = txtAuthor.Text;
-                CallerModListEntry?.RefreshDisplay();
+                CallerModListEntry?.RefreshDisplay(true);
             }
         }
         private void Version_Changed(object sender, EventArgs e)
@@ -305,7 +311,7 @@ namespace ModManager
             if (IsMod)
             {
                 ModElement.Info.Version = txtVersion.Text;
-                CallerModListEntry?.RefreshDisplay();
+                CallerModListEntry?.RefreshDisplay(true);
             }
         }
         private void Home_changed(object sender, EventArgs e)
@@ -353,7 +359,7 @@ namespace ModManager
                 {
                     FolderElement.Name = txtName.Text;
                 }
-                CallerModListEntry?.RefreshDisplay();
+                CallerModListEntry?.RefreshDisplay(true);
 
             }
         }
@@ -613,10 +619,10 @@ namespace ModManager
                         );
                     }
                 }
-                
 
-                Main.SaveModDetails(ModElement);
+
                 Main.SaveModInfo(ModElement);
+                Main.SaveModDetails(ModElement, null, true);
             }
             else
             {
@@ -653,7 +659,7 @@ namespace ModManager
             if (IsMod)
             {
                 ModElement.Info.Description = txtDescription.Text;
-                CallerModListEntry?.RefreshDisplay();
+                CallerModListEntry?.RefreshDisplay(true);
             }
         }
 

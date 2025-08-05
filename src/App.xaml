@@ -514,8 +514,18 @@
                                 <Setter TargetName="DropDown" Property="MinHeight" Value="95"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="false">
-                                <Setter Property="Foreground" Value="Gray"/>
+                                <Setter TargetName="Border" Property="Background" Value="#FF1A1A1A"/>
+                                <!-- Dim background -->
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#FF444444"/>
+                                <!-- Softer border -->
+                                <Setter Property="Foreground" Value="#FF888888"/>
+                                <!-- Lighter gray for text -->
+                                <Setter Property="Opacity" Value="0.6"/>
+                                <!-- Adds a disabled feel -->
+                                <Setter Property="Cursor" Value="Arrow"/>
+                                <!-- Prevents pointer on hover -->
                             </Trigger>
+
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>

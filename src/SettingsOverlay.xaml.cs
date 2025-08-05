@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.IO;
+using System.Windows.Media.Imaging;
 
 namespace ModLoader
 {
@@ -40,6 +41,8 @@ namespace ModLoader
                 MessageBox.Show("Settings object is null!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
+            DetachEventHandlers();
+
             // Load values from MainWindow.settings into UI controls
             AutoDetectPathToggle.IsChecked = mainWindow.settings.autodetect_game_path;
             DetailsDeisplay.IsChecked = mainWindow.settings.details_displ;
@@ -68,6 +71,96 @@ namespace ModLoader
             defhearth.Text = mainWindow.settings.default_Hearth;
             defhome.Text = mainWindow.settings.default_home;
             defAuthor.Text = mainWindow.settings.default_author;
+
+            AttachEventHandlers();
+            LoadImagesAsync();
+
+        }
+        private void DetachEventHandlers()
+        {
+            AutoDetectPathToggle.Checked -= AutoDetectPath_Changed;
+            AutoDetectPathToggle.Unchecked -= AutoDetectPath_Changed;
+
+            ThumbDisp.Checked -= ThumbDisp_Changed;
+            ThumbDisp.Unchecked -= ThumbDisp_Changed;
+
+            DetailsDeisplay.Checked -= DetailsDeisplay_Changed;
+            DetailsDeisplay.Unchecked -= DetailsDeisplay_Changed;
+
+            path_reload.Checked -= path_reload_Changed;
+            path_reload.Unchecked -= path_reload_Changed;
+
+            Details_columns_state.Checked -= Details_columns_state_Changed;
+            Details_columns_state.Unchecked -= Details_columns_state_Changed;
+
+            HashesUpdatesToggle.Checked -= HashUpdates_Changed;
+            HashesUpdatesToggle.Unchecked -= HashUpdates_Changed;
+
+            ImportOverrideComboBox.SelectionChanged -= ImportOverride_Changed;
+            Startup_Choice.SelectionChanged -= Startup_Choice_Changed;
+            Start_Normal.SelectionChanged -= Start_Normal_Changed;
+
+            StartOnStartupToggle.Checked -= StartOnStartup_Changed;
+            StartOnStartupToggle.Unchecked -= StartOnStartup_Changed;
+
+            reinitialized.Checked -= reinitialized_Changed;
+            reinitialized.Unchecked -= reinitialized_Changed;
+
+            no_tft.Checked -= no_tft_Changed;
+            no_tft.Unchecked -= no_tft_Changed;
+
+            supress_install.Checked -= supress_install_Changed;
+            supress_install.Unchecked -= supress_install_Changed;
+
+            defAuthor.TextChanged -= Author_Changed;
+            defhearth.TextChanged -= hearth_Changed;
+            defhome.TextChanged -= home_Changed;
+
+            TilesHeights.TextChanged -= TilesHeight;
+            TilesWidths.TextChanged -= Tileswidth;
+        }
+        private void AttachEventHandlers()
+        {
+            AutoDetectPathToggle.Checked += AutoDetectPath_Changed;
+            AutoDetectPathToggle.Unchecked += AutoDetectPath_Changed;
+
+            ThumbDisp.Checked += ThumbDisp_Changed;
+            ThumbDisp.Unchecked += ThumbDisp_Changed;
+
+            DetailsDeisplay.Checked += DetailsDeisplay_Changed;
+            DetailsDeisplay.Unchecked += DetailsDeisplay_Changed;
+
+            path_reload.Checked += path_reload_Changed;
+            path_reload.Unchecked += path_reload_Changed;
+
+            Details_columns_state.Checked += Details_columns_state_Changed;
+            Details_columns_state.Unchecked += Details_columns_state_Changed;
+
+            HashesUpdatesToggle.Checked += HashUpdates_Changed;
+            HashesUpdatesToggle.Unchecked += HashUpdates_Changed;
+
+            ImportOverrideComboBox.SelectionChanged += ImportOverride_Changed;
+            Startup_Choice.SelectionChanged += Startup_Choice_Changed;
+            Start_Normal.SelectionChanged += Start_Normal_Changed;
+
+            StartOnStartupToggle.Checked += StartOnStartup_Changed;
+            StartOnStartupToggle.Unchecked += StartOnStartup_Changed;
+
+            reinitialized.Checked += reinitialized_Changed;
+            reinitialized.Unchecked += reinitialized_Changed;
+
+            no_tft.Checked += no_tft_Changed;
+            no_tft.Unchecked += no_tft_Changed;
+
+            supress_install.Checked += supress_install_Changed;
+            supress_install.Unchecked += supress_install_Changed;
+
+            defAuthor.TextChanged += Author_Changed;
+            defhearth.TextChanged += hearth_Changed;
+            defhome.TextChanged += home_Changed;
+
+            TilesHeights.TextChanged += TilesHeight;
+            TilesWidths.TextChanged += Tileswidth;
         }
 
         #region Event Handlers
@@ -85,14 +178,45 @@ namespace ModLoader
             mainWindow.settings.not_tft = no_tft.IsChecked ?? false;
             mainWindow.save_settings();
         }
+        private void LeftImage_Click(object sender, RoutedEventArgs e)
+        {
+            OpenLink("https://ko-fi.com/aurecueil");
+        }
 
+        private void RightImage_Click(object sender, RoutedEventArgs e)
+        {
+            OpenLink("https://discord.gg/GETA29vZEK");
+        }
+        private async void LoadImagesAsync()
+        {
+            string leftImagePath = Path.Combine("runtimes", "verycoolcat.png");
+            string rightImagePath = Path.Combine("runtimes", "ISTHATHATACAT.png");
+
+            LeftImage.Source = new BitmapImage(new Uri(Path.GetFullPath(leftImagePath)));
+            RightImage.Source = new BitmapImage(new Uri(Path.GetFullPath(rightImagePath)));
+        }
+        private void OpenLink(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
+            }
+            catch
+            {
+                MessageBox.Show("Failed to open the link.");
+            }
+        }
         private void ThumbDisp_Changed(object sender, RoutedEventArgs e)
         {
             if (mainWindow?.settings == null) return;
 
             mainWindow.settings.show_thumbs = ThumbDisp.IsChecked ?? false;
             mainWindow.save_settings();
-            mainWindow.RefreshAllCachedElementsDisplay();
+            mainWindow.RefreshAllCachedElementsDisplay(false, false, true);
         }
         private void HashUpdates_Changed(object sender, RoutedEventArgs e)
         {
@@ -100,7 +224,6 @@ namespace ModLoader
 
             mainWindow.settings.auto_update_hashes = HashesUpdatesToggle.IsChecked ?? false;
             mainWindow.save_settings();
-            mainWindow.RefreshAllCachedElementsDisplay();
         }
         private void DetailsDeisplay_Changed(object sender, RoutedEventArgs e)
         {
@@ -108,7 +231,7 @@ namespace ModLoader
 
             mainWindow.settings.details_displ = DetailsDeisplay.IsChecked ?? false;
             mainWindow.save_settings();
-            mainWindow.RefreshAllCachedElementsDisplay();
+            mainWindow.RefreshAllCachedElementsDisplay(true);
         }
         private void Tileswidth(object sender, TextChangedEventArgs e)
         {

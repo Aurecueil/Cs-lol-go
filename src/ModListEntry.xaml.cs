@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
 
@@ -71,7 +72,7 @@ namespace ModManager
             ModElement = null;
             IsMod = false;
 
-            UpdateUIForFolder();
+            UpdateUIForFolder(true, true, true);
         }
 
         // Initialize as parent folder entry (..)
@@ -91,7 +92,7 @@ namespace ModManager
             FolderElement = null;
             IsMod = true;
 
-            UpdateUIForMod();
+            UpdateUIForMod(true, true, true, true);
         }
 
         private void UpdateUIForParentFolder(int parentId)
@@ -127,13 +128,13 @@ namespace ModManager
                     if (entry.IsMod && entry.ModElement != null)
                     {
                         entry.ModElement.isActive = true;
-                        entry.RefreshDisplay();
+                        entry.RefreshDisplay(false, true);
                         MainWindow.ProfileEntries[entry.ModElement.ModFolder] = entry.ModElement.Details.Priority;
                     }
                     else if (entry.FolderElement != null)
                     {
                         entry.FolderElement.isActive = true;
-                        entry.RefreshDisplay();
+                        entry.RefreshDisplay(false, true);
                         MainWindow.ProfileEntries[entry.FolderElement.ID.ToString()] = entry.FolderElement.Priority;
                     }
                 }
@@ -163,13 +164,13 @@ namespace ModManager
                     if (entry.IsMod && entry.ModElement != null)
                     {
                         entry.ModElement.isActive = false;
-                        entry.RefreshDisplay();
+                        entry.RefreshDisplay(false, true);
                         MainWindow.ProfileEntries.Remove(entry.ModElement.ModFolder);
                     }
                     else if (entry.FolderElement != null)
                     {
                         entry.FolderElement.isActive = false;
-                        entry.RefreshDisplay();
+                        entry.RefreshDisplay(false, true);
                         MainWindow.ProfileEntries.Remove(entry.FolderElement.ID.ToString());
                     }
                 }
@@ -323,100 +324,110 @@ namespace ModManager
             }
         }
 
-        private void UpdateUIForFolder()
+        private void UpdateUIForFolder(bool info, bool basee, bool first)
         {
-            IsParentFolder = false;
+            if (basee)
+            {
+                ActiveCheckbox.IsChecked = FolderElement.isActive;
+            }
+            if (info)
+            {
+                EntryName.Text = FolderElement.Name;
 
-            EntryName.Text = FolderElement.Name;
+                // Set details (collapsed for folders)
+                DetailsText.Visibility = Visibility.Collapsed;
+            }
+            if (first)
+            {
 
-            // Set details (collapsed for folders)
-            DetailsText.Visibility = Visibility.Collapsed;
+                IsParentFolder = false;
+                // Hide mod-specific icons
+                FixingIcon.Visibility = Visibility.Collapsed;
+                ExportIcon.Visibility = Visibility.Collapsed;
 
-            // Set checkbox based on isActive property
-            ActiveCheckbox.IsChecked = FolderElement.isActive;
-            ActiveCheckbox.Visibility = Visibility.Visible;
-
-            // Hide mod-specific icons
-            FixingIcon.Visibility = Visibility.Collapsed;
-            ExportIcon.Visibility = Visibility.Collapsed;
-
-            // Show common icons
-            ModHandlingIcon.Visibility = Visibility.Visible;
-            DeleteIcon.Visibility = Visibility.Visible;
+                // Show common icons
+                ModHandlingIcon.Visibility = Visibility.Visible;
+                DeleteIcon.Visibility = Visibility.Visible;
+                ModHandlingIcon.ToolTip = "Folder Settings";
+                DeleteIcon.ToolTip = "Delete Folder";
+            }
+            
 
             // Update tooltips for folder context
-            ModHandlingIcon.ToolTip = "Folder Settings";
-            DeleteIcon.ToolTip = "Delete Folder";
 
             UpdateSelectionVisual();
         }
 
-        private void UpdateUIForMod()
+        private void UpdateUIForMod(bool info, bool basee, bool image3, bool first)
         {
-            // Set name
-            EntryName.Text = ModElement.Info.Name;
-
-            if (Main.settings.details_displ)
+            if (first)
             {
-                string details = $"{ModElement.Info.Version} by {ModElement.Info.Author}";
-                if (!string.IsNullOrWhiteSpace(ModElement.Info.Description))
+                ExportIcon.Visibility = Visibility.Visible;
+                ModHandlingIcon.Visibility = Visibility.Visible;
+                DeleteIcon.Visibility = Visibility.Visible;
+
+                // Update tooltips for mod context
+                ModHandlingIcon.ToolTip = "Mod Settings";
+                DeleteIcon.ToolTip = "Delete Mod";
+                bg_image = ImageLoader.GetModImage(ModElement.ModFolder);
+            }
+            if (info)
+            {
+                EntryName.Text = ModElement.Info.Name;
+
+                if (Main.settings.details_displ)
                 {
-                    details += $"\n{ModElement.Info.Description}";
+                    string details = $"{ModElement.Info.Version} by {ModElement.Info.Author}";
+                    if (!string.IsNullOrWhiteSpace(ModElement.Info.Description))
+                    {
+                        details += $"\n{ModElement.Info.Description}";
+                    }
+
+                    DetailsText.Text = details;
+                    DetailsText.Visibility = Visibility.Visible;
+                    det_grid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+                    det_grid.ColumnDefinitions[0].MaxWidth = 250;
+                    det_grid.ColumnDefinitions[2].MaxWidth = 250;
                 }
-
-                DetailsText.Text = details;
-                DetailsText.Visibility = Visibility.Visible;
-                det_grid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
-                det_grid.ColumnDefinitions[0].MaxWidth = 250;
-                det_grid.ColumnDefinitions[2].MaxWidth = 250;
-            }
-            else
-            {
-                DetailsText.Visibility = Visibility.Collapsed;
-                det_grid.ColumnDefinitions[1].Width = new GridLength(0, GridUnitType.Pixel);
-                det_grid.ColumnDefinitions[0].MaxWidth = 1500;
-                det_grid.ColumnDefinitions[2].MaxWidth = 1500;
-            }
-
-            var image = ImageLoader.GetModImage(ModElement.ModFolder);
-            if (image != null && Main.settings.show_thumbs == true)
-            {
-                BackgroundBorder.Background = new ImageBrush(image)
+                else
                 {
-                    Stretch = Stretch.UniformToFill,
-                    Opacity = Main.settings.thumb_opacity
-                };
+                    DetailsText.Visibility = Visibility.Collapsed;
+                    det_grid.ColumnDefinitions[1].Width = new GridLength(0, GridUnitType.Pixel);
+                    det_grid.ColumnDefinitions[0].MaxWidth = 1500;
+                    det_grid.ColumnDefinitions[2].MaxWidth = 1500;
+                }
             }
-            else
+            if (image3)
             {
-                BackgroundBorder.Background = new SolidColorBrush(Colors.Transparent); // or default background
+                if (bg_image != null && Main.settings.show_thumbs == true)
+                {
+                    BackgroundBorder.Background = new ImageBrush(bg_image)
+                    {
+                        Stretch = Stretch.UniformToFill,
+                        Opacity = Main.settings.thumb_opacity
+                    };
+                }
+                else
+                {
+                    BackgroundBorder.Background = new SolidColorBrush(Colors.Transparent); // or default background
+                }
             }
 
-
-
-
-            // Set checkbox based on isActive property
-            ActiveCheckbox.IsChecked = ModElement.isActive;
-
-            //FixingIcon.Visibility = Visibility.Visible; FIXER DISABLE
-
-            ExportIcon.Visibility = Visibility.Visible;
-            ModHandlingIcon.Visibility = Visibility.Visible;
-            DeleteIcon.Visibility = Visibility.Visible;
-
-            // Update tooltips for mod context
-            ModHandlingIcon.ToolTip = "Mod Settings";
-            DeleteIcon.ToolTip = "Delete Mod";
+            
+            if (basee)
+            {
+                ActiveCheckbox.IsChecked = ModElement.isActive;
+            }
+            
 
             UpdateSelectionVisual();
         }
-
+        private BitmapImage bg_image;
         private void UpdateSelectionVisual()
         {
             var border = this.FindName("EntryBorder") as Border;
             if (border == null)
             {
-                // If border doesn't have a name, find it by type
                 border = this.GetVisualChild<Border>();
             }
 
@@ -718,19 +729,22 @@ namespace ModManager
         }
         
 
-        public void RefreshDisplay()
+        public void RefreshDisplay(bool info = false, bool basee = false, bool image = false, bool first = false)
         {
+            // check status
+            // name details image
+            // base
             if (IsParentFolder)
             {
                 UpdateUIForParentFolder(ParentId);
             }
             else if (IsMod && ModElement != null)
             {
-                UpdateUIForMod();
+                UpdateUIForMod(info, basee, image, first);
             }
             else if (!IsMod && FolderElement != null)
             {
-                UpdateUIForFolder();
+                UpdateUIForFolder(info, basee, first);
             }
         }
 

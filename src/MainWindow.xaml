@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077 - 0.0.9"
+        Title="LoL for GlobalOffensive 2077 - 0.1.0"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
@@ -16,11 +16,11 @@
     
     <Grid x:Name="MainGrid">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="3*" MinWidth="350"/>
             <!-- ScrollViewer area -->
             <ColumnDefinition Width="3" />
             <!-- GridSplitter -->
-            <ColumnDefinition Width="0"  MaxWidth="200"/>
+            <ColumnDefinition Width="0"  MaxWidth="400"/>
             <!-- Right panel -->
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -68,8 +68,6 @@
         Click="DeleteProfile_Click">
                 <TextBlock Text="🗑️" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
-
-
             
             <Button DockPanel.Dock="Right" x:Name="create_folder"
                     Style="{StaticResource IconButtonStyle}" 
@@ -285,11 +283,13 @@ Unchecked="Stop_loader"
         BorderThickness="2" 
         CornerRadius="5" 
         Margin="5">
-            <TextBlock Text="" x:Name="Details_Panel"
-               Foreground="White" 
-               HorizontalAlignment="Center" 
-               VerticalAlignment="Center" 
+            <ScrollViewer>
+                <TextBlock Text="" x:Name="Details_Panel"
+               Foreground="White" Margin="10"
+               HorizontalAlignment="Left" 
+               VerticalAlignment="Top" 
                FontSize="14"/>
+            </ScrollViewer>
         </Border>
 
         <Grid x:Name="ToggleOverlayRow" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,0">

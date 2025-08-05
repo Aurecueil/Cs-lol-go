@@ -164,7 +164,6 @@ namespace ModManager
         public string default_author { get; set; } = "Unknown";
         public string default_Hearth { get; set; } = "";
         public string default_home { get; set; } = "";
-        public bool reinitialize_mods_before_each_write { get; set; } = true;
 
         public bool show_thumbs { get; set; } = true;
         public float thumb_opacity { get; set; } = 0.4f;
@@ -373,7 +372,7 @@ namespace ModManager
 
                         }
                         SaveModInfo(mod);
-                        SaveModDetails(mod);
+                        SaveModDetails(mod, null, true);
                     }
                     
 
@@ -561,12 +560,12 @@ namespace ModManager
             foreach (var mod in modListEntriesInDisplay)
             {
                 mod.SetSelection(check);
-                mod.RefreshDisplay();
+                mod.RefreshDisplay(false, true);
             }
             foreach (var folder in FolderListEntriesInDisplay)
             {
                 folder.SetSelection(check);
-                folder.RefreshDisplay();
+                folder.RefreshDisplay(false, true);
             }
         }
 
@@ -768,13 +767,15 @@ namespace ModManager
             base.OnClosed(e);
         }
 
-        public void details_colums_change(bool active)
+        public async void details_colums_change(bool active)
         {
             if (active)
             {
                 var width = new GridLength(settings.details_column, GridUnitType.Pixel);
                 MainGrid.ColumnDefinitions[2].Width = width;
                 MySplitter.IsEnabled = true;
+                await Task.Delay(10);
+                AdjustModListLayout();
             }
             else
             {
@@ -782,6 +783,8 @@ namespace ModManager
                 MainGrid.ColumnDefinitions[2].Width = width;
                 MySplitter.IsEnabled = false;
                 save_settings();
+                await Task.Delay(10);
+                AdjustModListLayout();
             }
         }
         private void restart_button(object sender, EventArgs e)
@@ -1061,7 +1064,7 @@ namespace ModManager
                     True_Start_loader();
                 }
                 update_tile_contrains();
-
+                PreCacheAllUIElements();
 
 
             }
@@ -1422,7 +1425,7 @@ namespace ModManager
                     }
 
                     RefreshModListPanel(Current_location_folder);
-                    RefreshAllCachedElementsDisplay();
+                    RefreshAllCachedElementsDisplay(false, true);
                 }
                 else
                 {
@@ -1468,16 +1471,19 @@ namespace ModManager
         private async void MySplitter_DragCompleted(object sender, DragCompletedEventArgs e)
         {
             await Task.Delay(1);
-            AdjustModListLayout();
             var column = MainGrid.ColumnDefinitions[2];
             settings.details_column = column.Width.Value;
             save_settings();
+            AdjustModListLayout();
         }
 
         public void UpdateDetailsPanel(string details, bool update = true) {
             if (update)
             {
-                Details_Panel.Text = GetDetails(details);
+                if (settings.detials_column_active)
+                {
+                    Details_Panel.Text = GetDetails(details);
+                }
             }
             else
             {
@@ -1736,6 +1742,8 @@ namespace ModManager
 
         public async void True_Start_loader()
         {
+            ToggleOverlay(true);
+            ProfileComboBox.IsEnabled = false;
             lock (_loaderLock)
             {
                 if (_modLoadCts != null || _isLoaderRunning)
@@ -1750,12 +1758,6 @@ namespace ModManager
             UpdateContextMenuLoaderState();
             try
             {
-                if (settings.reinitialize_mods_before_each_write)
-                {
-                    LoadMods();
-                    ReadCurrentProfile();
-                }
-                ToggleOverlay(true);
                 ToggleFeed(true);
                 Load_Mods();
             }
@@ -1772,20 +1774,22 @@ namespace ModManager
 
         public async void Stop_loader(object sender, RoutedEventArgs e)
         {
-            await Stop_loader_internal();        
+            Stop_loader_internal();        
         }
 
         private async Task Stop_loader_internal()
         {
             try
             {
-                CSLolManager.Stop(); // Properly stop the CSLol process
+                await Task.Run(() => CSLolManager.Stop()); // Move heavy sync work off UI thread
             }
             catch (Exception ex)
             {
-                // Log or handle CSLol stop errors if needed
                 System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
             }
+
+            ProfileComboBox.IsEnabled = true;
+
             Load_check_box.IsEnabled = false;
             UpdateContextMenuLoaderState();
 
@@ -1804,16 +1808,16 @@ namespace ModManager
             if (ctsToCancel != null)
             {
                 ctsToCancel.Cancel();
-
-                // Wait a bit for cancellation to propagate
                 await Task.Delay(100);
-
                 ctsToCancel.Dispose();
-
-                
             }
-            _currentRunner?.KillProcess();
-            _currentRunner = null;
+
+            if (_currentRunner != null)
+            {
+                await Task.Run(() => _currentRunner.KillProcess()); // Also offload this
+                _currentRunner = null;
+            }
+
             Load_check_box.IsChecked = false;
             ToggleOverlay(false);
             ToggleFeed(false);
@@ -1934,6 +1938,7 @@ namespace ModManager
             await WriteWads(token);
             ToggleOverlay(false);
         }
+
 
         private void StartCSLol(CancellationToken token)
         {
@@ -2243,10 +2248,106 @@ namespace ModManager
                 }
             }
 
-            if (c_location != 0)
+            
+            var folders = new List<(string childId, HierarchyElement element)>();
+            var mods = new List<(string childId, Mod element)>();
+
+            bool isEmptySearch = string.IsNullOrWhiteSpace(searchString);
+            bool isFullModSearch = searchString == "-f";
+            bool isFilteredModSearch = searchString.StartsWith("-f ");
+            bool isRecursiveModSearch = searchString == "-l";
+            bool isFilteredRecursiveModSearch = searchString.StartsWith("-l ");
+            string filteredSearchString = isFilteredModSearch ? searchString.Substring(3) :
+                                         isFilteredRecursiveModSearch ? searchString.Substring(3) : searchString;
+
+            if (isEmptySearch)
             {
-                AddParentFolderEntry(root);
+                if (c_location != 0)
+                {
+                    AddParentFolderEntry(root);
+                }
+                foreach (var childTuple in root.Children)
+                {
+                    string childId = childTuple.Item1;
+                    if (childTuple.Item2 == false) // folder
+                    {
+                        if (hierarchyById.TryGetValue(int.Parse(childTuple.Item1), out var childElement))
+                        {
+                            folders.Add((childId, childElement));
+                        }
+                    }
+                    else // mod
+                    {
+                        if (modByFolder.TryGetValue(childId, out var childElement))
+                        {
+                            mods.Add((childId, childElement));
+                        }
+                    }
+                }
             }
+            else if (isFullModSearch)
+            {
+                // Add all mods from Dictionary, no folders
+                foreach (var modKvp in modByFolder)
+                {
+                    mods.Add((modKvp.Key, modKvp.Value));
+                }
+            }
+            else if (isFilteredModSearch)
+            {
+                foreach (var modKvp in modByFolder)
+                {
+                    if (MatchesSearchCriteria(null, modKvp.Value, filteredSearchString))
+                    {
+                        mods.Add((modKvp.Key, modKvp.Value));
+                    }
+                }
+            }
+            else if (isRecursiveModSearch)
+            {
+                CollectAllModsRecursively(root, mods);
+            }
+            else if (isFilteredRecursiveModSearch)
+            {
+                CollectAllModsRecursively(root, mods, filteredSearchString);
+            }
+            else
+            {
+                if (c_location != 0)
+                {
+                    AddParentFolderEntry(root);
+                }
+                foreach (var childTuple in root.Children)
+                {
+                    string childId = childTuple.Item1;
+                    if (childTuple.Item2 == false) // folder
+                    {
+                        if (hierarchyById.TryGetValue(int.Parse(childTuple.Item1), out var childElement))
+                        {
+                            if (MatchesSearchCriteria(childElement, null, searchString))
+                            {
+                                folders.Add((childId, childElement));
+                            }
+                        }
+                    }
+                    else // mod
+                    {
+                        if (modByFolder.TryGetValue(childId, out var childElement))
+                        {
+                            if (MatchesSearchCriteria(null, childElement, searchString))
+                            {
+                                mods.Add((childId, childElement));
+                            }
+                        }
+                    }
+                }
+            }
+
+
+
+            folders.Sort((a, b) => string.Compare(a.element.Name, b.element.Name, StringComparison.OrdinalIgnoreCase));
+            mods.Sort((a, b) => string.Compare(a.element.Info.Name, b.element.Info.Name, StringComparison.OrdinalIgnoreCase));
+
 
             if (c_location != Current_location_folder)
             {
@@ -2255,41 +2356,7 @@ namespace ModManager
             }
             Current_location_folder = c_location;
 
-            // Separate folders and mods, then sort each group alphabetically
-            var folders = new List<(string childId, HierarchyElement element)>();
-            var mods = new List<(string childId, Mod element)>();
 
-            foreach (var childTuple in root.Children)
-            {
-                string childId = childTuple.Item1;
-                if (childTuple.Item2 == false) // folder
-                {
-                    if (hierarchyById.TryGetValue(int.Parse(childTuple.Item1), out var childElement))
-                    {
-                        if (MatchesSearchCriteria(childElement, null, searchString))
-                        {
-                            folders.Add((childId, childElement));
-                        }
-                    }
-                }
-                else // mod
-                {
-                    if (modByFolder.TryGetValue(childId, out var childElement))
-                    {
-                        if (MatchesSearchCriteria(null, childElement, searchString))
-                        {
-                            mods.Add((childId, childElement));
-                        }
-                    }
-                }
-            }
-
-            // Sort folders alphabetically by name
-            folders.Sort((a, b) => string.Compare(a.element.Name, b.element.Name, StringComparison.OrdinalIgnoreCase));
-            // Sort mods alphabetically by name
-            mods.Sort((a, b) => string.Compare(a.element.Info.Name, b.element.Info.Name, StringComparison.OrdinalIgnoreCase));
-
-            // Add folders first
             foreach (var (childId, childElement) in folders)
             {
                 if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
@@ -2320,7 +2387,7 @@ namespace ModManager
                 if (GlobalselectedEntries.Contains(childElement.ID.ToString()))
                 {
                     folderEntry.SetSelection(true);
-                    folderEntry.RefreshDisplay();
+                    folderEntry.RefreshDisplay(false, true);
                 }
             }
 
@@ -2356,9 +2423,90 @@ namespace ModManager
                 if (GlobalselectedEntries.Contains(childElement.ModFolder))
                 {
                     modEntry.SetSelection(true);
-                    modEntry.RefreshDisplay();
+                    modEntry.RefreshDisplay(false, true);
                 }
             }
+            DelayedAdjustModListLayout();
+            if (rebuild)
+            {
+                PreCacheAllUIElements();
+            }
+        }
+
+        private async void PreCacheAllUIElements()
+        {
+            // Cache all folder entries
+            foreach (var kvp in hierarchyById)
+            {
+                int folderId = kvp.Key;
+                HierarchyElement folderElement = kvp.Value;
+
+                var cacheKey = (false, folderId.ToString()); // isMod = false for folders
+
+                // Check if element is already cached
+                if (!cachedUIElements.ContainsKey(cacheKey))
+                {
+                    // Create new folder entry
+                    var folderEntry = new ModListEntry(folderId.ToString());
+                    folderEntry.InitializeWithFolder(folderElement);
+                    folderEntry.FolderDoubleClicked += (id) => RefreshModListPanel(id, false);
+
+                    // Add to cache
+                    cachedUIElements[cacheKey] = folderEntry;
+                }
+            }
+
+            // Cache all mod entries
+            foreach (var kvp in modByFolder)
+            {
+                string modId = kvp.Key;
+                Mod modElement = kvp.Value;
+
+                var cacheKey = (true, modId); // isMod = true for mods
+
+                // Check if element is already cached
+                if (!cachedUIElements.ContainsKey(cacheKey))
+                {
+                    // Create new mod entry
+                    var modEntry = new ModListEntry(modId);
+                    modEntry.InitializeWithMod(modElement);
+                    // Add any mod-specific event handlers here if needed
+
+                    // Add to cache
+                    cachedUIElements[cacheKey] = modEntry;
+                }
+            }
+        }
+        private void CollectAllModsRecursively(HierarchyElement currentFolder, List<(string childId, Mod element)> mods, string searchFilter = null)
+        {
+            foreach (var childTuple in currentFolder.Children)
+            {
+                string childId = childTuple.Item1;
+                if (childTuple.Item2 == false) // folder
+                {
+                    if (hierarchyById.TryGetValue(int.Parse(childTuple.Item1), out var childFolder))
+                    {
+                        // Recursively call for this folder
+                        CollectAllModsRecursively(childFolder, mods, searchFilter);
+                    }
+                }
+                else // mod
+                {
+                    if (modByFolder.TryGetValue(childId, out var childMod))
+                    {
+                        // If no search filter, add all mods; otherwise check criteria
+                        if (string.IsNullOrEmpty(searchFilter) || MatchesSearchCriteria(null, childMod, searchFilter))
+                        {
+                            mods.Add((childId, childMod));
+                        }
+                    }
+                }
+            }
+        }
+        private async void DelayedAdjustModListLayout()
+        {
+            await Task.Delay(10);
+            AdjustModListLayout();
         }
 
         private void set_active_only_disp(object sender, RoutedEventArgs e)
@@ -2576,45 +2724,87 @@ namespace ModManager
 
             if (int.TryParse(new_id, out int id) && hierarchyById.TryGetValue(id, out var folder))
             {
-                foreach (var item in folder.Children)
-                {
-                    if (!item.Item2) // Folder
-                    {
-                        if (int.TryParse(item.Item1, out int childId) && hierarchyById.TryGetValue(childId, out var childFolder))
-                        {
-                            sb.AppendLine(childFolder.Name);
-                        }
+                // Folder header
+                sb.AppendLine($"📂 Folder: {folder.Name}");
+                sb.AppendLine(new string('=', 10));
 
-                        string nested = GetDetails(item.Item1).Trim();
-                        if (!string.IsNullOrEmpty(nested))
-                        {
-                            // Indent nested lines with a dash
-                            foreach (var line in nested.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                sb.AppendLine($"-- {line.Trim()}");
-                            }
-                        }
-                    }
-                }
+                // List Mods
+                var mods = folder.Children.Where(c => c.Item2).ToList();
+                var subfolders = folder.Children.Where(c => !c.Item2).ToList();
 
-                foreach (var item in folder.Children)
+                if (mods.Count > 0)
                 {
-                    if (item.Item2) // Mod
+                    sb.AppendLine("Mods in this folder:");
+                    foreach (var item in mods)
                     {
                         if (modByFolder.TryGetValue(item.Item1, out var mod))
                         {
-                            sb.AppendLine(mod.Info.Name.Trim());
+                            sb.AppendLine($"- {mod.Info.Name} (v{mod.Info.Version}) {(mod.isActive ? "[Active]" : "[Inactive]")}");
+                        }
+                    }
+                    sb.AppendLine();
+                }
+
+                // Recursively list subfolders
+                if (subfolders.Count > 0)
+                {
+                    sb.AppendLine("Subfolders:");
+                    foreach (var sub in subfolders)
+                    {
+                        if (int.TryParse(sub.Item1, out int childId) && hierarchyById.TryGetValue(childId, out var childFolder))
+                        {
+                            sb.AppendLine($"- {childFolder.Name}");
+                        }
+
+                        string nested = GetDetails(sub.Item1).Trim();
+                        if (!string.IsNullOrEmpty(nested))
+                        {
+                            foreach (var line in nested.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                sb.AppendLine($"    {line.Trim()}");
+                            }
                         }
                     }
                 }
             }
             else if (modByFolder.TryGetValue(new_id, out var mod))
             {
-                return $"{mod.Info.Name}\n{mod.ModFolder}".Trim();
+                // Detailed Mod Info
+                sb.AppendLine($"Mod: {mod.Info.Name}");
+                sb.AppendLine();
+                sb.AppendLine($"Author: {mod.Info.Author}");
+                sb.AppendLine($"Version: {mod.Info.Version}");
+                sb.AppendLine($"Heart: {mod.Info.Heart}");
+                sb.AppendLine($"Home: {mod.Info.Home}");
+                sb.AppendLine();
+                sb.AppendLine("Description:");
+                sb.AppendLine();
+                sb.AppendLine($"Status: {(mod.isActive ? ":white_check_mark: Active" : ":x: Inactive")}");
+                sb.AppendLine($"Priority: {mod.Details.Priority}");
+                sb.AppendLine($"Overrides: {(mod.Details.override_ ? "Yes" : "No")}");
+                sb.AppendLine($"Random Enabled: {(mod.Details.Random ? "Yes" : "No")}");
+                sb.AppendLine($"Inner Path: {mod.Details.InnerPath}");
+                sb.AppendLine(string.IsNullOrWhiteSpace(mod.Info.Description) ? "No description provided." : mod.Info.Description);
+                sb.AppendLine();
+                sb.AppendLine("Mod Folder:");
+                sb.AppendLine(mod.ModFolder);
+                sb.AppendLine();
+
+                if (mod.Wads.Count > 0)
+                {
+                    sb.AppendLine("Included WAD Files:");
+                    foreach (var wad in mod.Wads)
+                    {
+                        sb.AppendLine($"- {wad}");
+                    }
+                }
+
+                // Image info
             }
 
             return sb.ToString().TrimEnd('\n', '\r');
         }
+
 
 
 
@@ -2718,7 +2908,6 @@ namespace ModManager
                 }
             }
             RefreshModListPanel(Current_location_folder);
-            AdjustModListLayout();
         }
         public static void SaveOrUpdateHierarchyElement(
     HierarchyElement element,
@@ -2859,10 +3048,10 @@ namespace ModManager
                 MessageBox.Show($"Error saving info.json for mod '{mod.ModFolder}': {ex.Message}");
             }
             if (cachedUIElements.TryGetValue((true, mod.ModFolder), out var modEntry))
-                modEntry.RefreshDisplay();
+                modEntry.RefreshDisplay(true);
         }
 
-        public void SaveModDetails(Mod mod, string basePath = null)
+        public void SaveModDetails(Mod mod, string basePath = null, bool update_mod_image = false)
         {
             if (modByFolder.TryGetValue(mod.ModFolder, out var mod_element))
             {
@@ -2884,7 +3073,7 @@ namespace ModManager
                 MessageBox.Show($"Error saving details.json for mod '{mod.ModFolder}': {ex.Message}");
             }
             if (cachedUIElements.TryGetValue((true, mod.ModFolder), out var modEntry))
-                modEntry.RefreshDisplay();
+                modEntry.RefreshDisplay(true, false, update_mod_image, update_mod_image);
         }
         
         public void SaveFolder(HierarchyElement _folder)
@@ -2898,13 +3087,13 @@ namespace ModManager
         public void RefreshCachedElementDisplay(bool isMod, string id)
         {
             if (cachedUIElements.TryGetValue((isMod, id), out var element))
-                element.RefreshDisplay();
+                element.RefreshDisplay(true, true, true);
         }
-        public void RefreshAllCachedElementsDisplay()
+        public void RefreshAllCachedElementsDisplay(bool info = false, bool basee = false, bool image = false)
         {
             foreach (var cachedElement in cachedUIElements.Values)
             {
-                cachedElement.RefreshDisplay();
+                cachedElement.RefreshDisplay(info, basee, image);
             }
         }
 
