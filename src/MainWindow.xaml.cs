@@ -37,7 +37,7 @@ using DataFormats = System.Windows.DataFormats;
 using File = System.IO.File;
 using Path = System.IO.Path;
 using System.Net.Http.Headers;
-
+using ModManager;
 
 namespace ModManager
 {
@@ -137,6 +137,7 @@ namespace ModManager
     }
     public class Settings
     {
+        public bool hide_on_minimize { get; set; } = false;
         public bool autodetect_game_path { get; set; } = true;
         public string gamepath { get; set; } = "";
         public bool startup_start { get; set; } = false;
@@ -390,7 +391,7 @@ namespace ModManager
                 OverlayHost.Children.Clear();
                 OverlayHost2.Children.Clear();
             }
-            else if (e.Key == Key.F5 && !ShouldBlockShortcuts())
+            else if (e.Key == Key.F5 && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
             {
                 Internal_restart(Current_location_folder);
             }
@@ -571,7 +572,7 @@ namespace ModManager
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (this.WindowState == WindowState.Minimized)
+            if (this.WindowState == WindowState.Minimized && settings.hide_on_minimize)
             {
                 this.Hide();
                 this.ShowInTaskbar = false;
@@ -857,10 +858,10 @@ namespace ModManager
         {
             Task.Run(async () =>
             {
-                Dispatcher.Invoke(() => ToggleFeed(true));
+                Dispatcher.Invoke(() => ToggleFeed(true, 2));
                 try
                 {
-                    Dispatcher.Invoke(() => Feed.Text = "Checking for hash updates...");
+                    Dispatcher.Invoke(() => Feed2.Text = "Checking for hash updates...");
 
                     Directory.CreateDirectory(BasePath);
 
@@ -874,7 +875,7 @@ namespace ModManager
 
                         foreach (var url in GitHubUrls)
                         {
-                            Dispatcher.Invoke(() => Feed.Text = $"Checking {Path.GetFileName(url)}...");
+                            Dispatcher.Invoke(() => Feed2.Text = $"Checking {Path.GetFileName(url)}...");
 
                             var curlOutput = await RunCurlCommandAsync(url);
 
@@ -900,13 +901,13 @@ namespace ModManager
                                 if (remoteModified.Value > lastUpdate || lastUpdateTicks == 0)
                                 {
                                     needsUpdate = true;
-                                    Dispatcher.Invoke(() => Feed.Text = $"Update detected on {Path.GetFileName(url)}.");
+                                    Dispatcher.Invoke(() => Feed2.Text = $"Update detected on {Path.GetFileName(url)}.");
                                     break;
                                 }
                             }
                             else
                             {
-                                Dispatcher.Invoke(() => Feed.Text = $"Could not check {Path.GetFileName(url)}.");
+                                Dispatcher.Invoke(() => Feed2.Text = $"Could not check {Path.GetFileName(url)}.");
                             }
                         }
 
@@ -916,28 +917,25 @@ namespace ModManager
                     {
 
                         using var httpClient = new HttpClient();
-                        Dispatcher.Invoke(() => Feed.Text = "Downloading latest hashes...");
+                        Dispatcher.Invoke(() => Feed2.Text = "Downloading latest hashes...");
                         var content = await httpClient.GetStringAsync(DownloadUrl);
                         await File.WriteAllTextAsync(HashesFilePath, content);
                         await File.WriteAllTextAsync(CheckFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
-                        Dispatcher.Invoke(() => Feed.Text = "Hashes updated successfully.");
+                        Dispatcher.Invoke(() => Feed2.Text = "Hashes updated successfully.");
                     }
                     else
                     {
-                        Dispatcher.Invoke(() => Feed.Text = "Hashes are up-to-date.");
+                        Dispatcher.Invoke(() => Feed2.Text = "Hashes are up-to-date.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Dispatcher.Invoke(() => Feed.Text = $"Error: {ex.Message}");
+                    Dispatcher.Invoke(() => Feed2.Text = $"Error: {ex.Message}");
                 }
                 finally
                 {
                     await Task.Delay(1000);
-                    if (_isLoaderRunning == false)
-                    {
-                        Dispatcher.Invoke(() => ToggleFeed(false));
-                    }
+                    Dispatcher.Invoke(() => ToggleFeed(false, 2));
                 }
             });
         }
@@ -1065,7 +1063,7 @@ namespace ModManager
                 }
                 update_tile_contrains();
                 PreCacheAllUIElements();
-
+                ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
 
             }
             catch (Exception ex)
@@ -1094,6 +1092,12 @@ namespace ModManager
             {
                 MessageBox.Show($"Failed to save profile file:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+        private double currentProgress = 0;
+        public void SetProgress()
+        {
+            double totalWidth = ToggleOverlayRow.ActualWidth;
+            ProgressBarFill.Width = totalWidth * currentProgress;
         }
 
 
@@ -1193,6 +1197,9 @@ namespace ModManager
             {
                 Console.WriteLine($"Error loading WAD files: {ex.Message}");
             }
+            EMPTY_WADS = EMPTY_WADS
+    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+    .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
         }
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1619,6 +1626,10 @@ namespace ModManager
                         }
                     }
             }
+            else
+            {
+                CreateStartMenuShortcut();
+            }
 
             save_settings();
         }
@@ -1731,6 +1742,40 @@ namespace ModManager
             }
 
         }
+
+
+        private async void YasuoButtons_click(object sender, EventArgs e)
+        {
+            string exePath = @"cslol-tools\cslol-diag.exe";
+            string modListDisp;
+
+            try
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    CreateNoWindow = true,
+                };
+
+                using (var process = new Process())
+                {
+                    process.StartInfo = startInfo;
+                    process.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                modListDisp = $"Failed to run diagnostic tool.\n\nError: {ex.Message}";
+            }
+        }
+    
+
+
+
+
+
+
+
         private CancellationTokenSource _modLoadCts;
         private bool _isLoaderRunning = false;
         private readonly object _loaderLock = new object();
@@ -1743,7 +1788,12 @@ namespace ModManager
         public async void True_Start_loader()
         {
             ToggleOverlay(true);
+            currentProgress = 0;
+            SetProgress();
             ProfileComboBox.IsEnabled = false;
+            refreshButton.IsEnabled = false;
+            CreateProfile.IsEnabled = false;
+            deleteteProfile.IsEnabled = false;
             lock (_loaderLock)
             {
                 if (_modLoadCts != null || _isLoaderRunning)
@@ -1788,8 +1838,6 @@ namespace ModManager
                 System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
             }
 
-            ProfileComboBox.IsEnabled = true;
-
             Load_check_box.IsEnabled = false;
             UpdateContextMenuLoaderState();
 
@@ -1817,6 +1865,11 @@ namespace ModManager
                 await Task.Run(() => _currentRunner.KillProcess()); // Also offload this
                 _currentRunner = null;
             }
+
+            ProfileComboBox.IsEnabled = true;
+            refreshButton.IsEnabled = true;
+            CreateProfile.IsEnabled = true;
+            deleteteProfile.IsEnabled = true;
 
             Load_check_box.IsChecked = false;
             ToggleOverlay(false);
@@ -2044,7 +2097,24 @@ namespace ModManager
                     outputLines.Add(line);
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        Feed.Text = line; // update your UI with output line
+                        Feed.Text = line;
+                        string lastPart = line.Split('/').Last();
+                        string trimmedWad = lastPart.Replace(".wad.client", "");
+                        if (EMPTY_WADS.TryGetValue(trimmedWad, out var wadInfo))
+                        {
+                            int position = EMPTY_WADS.Keys
+                                .Select((key, index) => new { key, index })
+                                .FirstOrDefault(x => x.key.Equals(trimmedWad, StringComparison.OrdinalIgnoreCase))?.index ?? -1;
+
+                            if (position >= 0)
+                            {
+                                int total = EMPTY_WADS.Count;
+                                currentProgress = (double)(position + 1) / total;
+                                SetProgress();
+
+
+                            }
+                        }
                     });
                 },
                 onError: line =>
@@ -2076,6 +2146,8 @@ namespace ModManager
                     CustomMessageBox.Show(err_catch, new[] { "OK" }, "Error");
                 }
             }
+            currentProgress = 1;
+            SetProgress();
             _currentRunner = null;
         }
 
@@ -2210,13 +2282,10 @@ namespace ModManager
             }
         }
 
-        public void ToggleFeed(bool show)
+        public void ToggleFeed(bool show, int id = 0)
         {
-            if (MainGrid.RowDefinitions.Count > 3)
-            {
-                ToggleOverlayRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-
-            }
+            if (id == 0) { ToggleOverlayRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed; } else if (id == 2) { ToggleOverlayRow2.Visibility = show ? Visibility.Visible : Visibility.Collapsed; }
+            
         }
 
         private Dictionary<(bool isMod, string id), ModListEntry> cachedUIElements = new Dictionary<(bool, string), ModListEntry>();
@@ -3360,6 +3429,75 @@ namespace ModManager
                    (OverlayHost2.Visibility == Visibility.Visible && OverlayHost2.Children.Count > 0);
         }
 
+
+        public void CreateStartMenuShortcut()
+        {
+            string startMenuProgramsPath = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu) + @"\Programs";
+            string shortcutPath = Path.Combine(startMenuProgramsPath, "ModLoader-cslolgo.url");
+            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+
+            string shortcutContent =
+                "[InternetShortcut]\n" +
+                $"URL=file:///{exePath.Replace('\\', '/')}\n" +
+                "IconIndex=0\n" +
+                $"IconFile={exePath}\n";
+
+            File.WriteAllText(shortcutPath, shortcutContent);
+        }
+
+
+
+        public async void handle_rf_install(string id, string release, string path)
+        {
+            string extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", $".rf---{id}");
+            Directory.CreateDirectory(extractTargetDir);
+
+
+            // Step 3: Extract
+            try
+            {
+                using (var archive = ZipFile.OpenRead(path))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        string fullPath = Path.Combine(extractTargetDir, entry.FullName);
+
+                        // Create directory if needed
+                        if (string.IsNullOrEmpty(entry.Name))
+                        {
+                            Directory.CreateDirectory(fullPath);
+                            continue;
+                        }
+
+                        // Ensure directory exists
+                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+                        // Overwrite the file
+                        entry.ExtractToFile(fullPath, overwrite: true);
+                    }
+                }
+                string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
+                Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                RefreshModListPanel(Current_location_folder);
+                string metaDir = Path.Combine(extractTargetDir, "meta");
+                Directory.CreateDirectory(metaDir);
+
+                string releaseFile = Path.Combine(metaDir, "release.txt");
+                await File.WriteAllTextAsync(releaseFile, release);
+
+                // Delete the original zip file
+                File.Delete(path);
+            }
+            catch (Exception ex) { }
+        }
+
+
+
+
+
+
+
+
         private bool IsAcceptedDropItem(string path)
         {
             if (Directory.Exists(path))
@@ -3369,7 +3507,7 @@ namespace ModManager
             return ext == ".zip" || ext == ".fantome" || ext == ".wad.client" || ext == ".client" || ext == ".wad";
         }
 
-        private void HandleDroppedItem(string path)
+        public async void HandleDroppedItem(string path)
         {
             try
             {
@@ -3691,7 +3829,7 @@ namespace ModManager
         public double MinColumnWidth = 620;
         public double RowHeight = 60;
 
-
+        
 
     }
 
@@ -3715,5 +3853,7 @@ namespace ModManager
             writer.WriteStringValue(colorString);
         }
     }
+
+
 
 }

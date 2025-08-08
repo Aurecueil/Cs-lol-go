@@ -19,6 +19,9 @@ using Cursors = System.Windows.Input.Cursors;
 using System.Windows.Media.Imaging;
 using System.Drawing.Imaging;
 using Image = System.Drawing.Image;
+using System.Net;
+using System.Text.Json;
+using System.Text;
 
 namespace ModManager
 {
@@ -63,6 +66,8 @@ namespace ModManager
 
             base.OnStartup(e);
 
+            StartHttpServer();
+
             Task.Run(() =>
             {
                 while (true)
@@ -89,6 +94,140 @@ namespace ModManager
                 }
             });
         }
+
+        private HttpListener _listener;
+
+        private void StartHttpServer()
+        {
+            _listener = new HttpListener();
+            _listener.Prefixes.Add("http://localhost:7345/");
+            _listener.Start();
+
+            Task.Run(async () =>
+            {
+                while (_listener.IsListening)
+                {
+                    try
+                    {
+                        var context = await _listener.GetContextAsync();
+                        _ = Task.Run(() => HandleRequest(context));
+                    }
+                    catch (Exception ex)
+                    {
+                        File.AppendAllText("http_server_error.log", ex.ToString());
+                    }
+                }
+            });
+        }
+
+        private async void HandleRequest(HttpListenerContext context)
+        {
+            context.Response.AddHeader("Access-Control-Allow-Origin", "*");
+            context.Response.AddHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+            context.Response.AddHeader("Access-Control-Allow-Headers", "Content-Type");
+
+            if (context.Request.HttpMethod == "OPTIONS")
+            {
+                context.Response.StatusCode = 200;
+                context.Response.Close();
+                return;
+            }
+
+            if (context.Request.HttpMethod == "GET" && context.Request.Url.AbsolutePath == "/fetch-mods")
+            {
+                var savedMods = new List<ModStatus>();
+
+                // Path to your /installed folder (relative or absolute)
+                string installedPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed");
+
+                if (Directory.Exists(installedPath))
+                {
+                    var modFolders = Directory.GetDirectories(installedPath)
+                        .Where(dir => Path.GetFileName(dir).StartsWith(".rf---"));
+
+                    foreach (var folder in modFolders)
+                    {
+                        string folderName = Path.GetFileName(folder);
+                        string modId = folderName.Substring(".rf---".Length); // Remove prefix
+
+                        string releaseFile = Path.Combine(folder, "meta", "release.txt");
+                        string release = "";
+
+                        if (File.Exists(releaseFile))
+                        {
+                            try
+                            {
+                                release = File.ReadAllText(releaseFile).Trim();
+                            }
+                            catch
+                            {
+                                release = "";
+                            }
+                        }
+
+                        savedMods.Add(new ModStatus
+                        {
+                            Id = modId,
+                            Release = release,
+                            Status = ""
+                        });
+                    }
+                }
+
+                var jsonResponse = JsonSerializer.Serialize(new { Mods = savedMods });
+
+                var buffer = Encoding.UTF8.GetBytes(jsonResponse);
+                context.Response.ContentType = "application/json";
+                context.Response.ContentLength64 = buffer.Length;
+                await context.Response.OutputStream.WriteAsync(buffer);
+                context.Response.Close();
+                return;
+            }
+
+            else if (context.Request.Url.AbsolutePath == "/install-mod")
+                {
+                    using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
+                    var body = await reader.ReadToEndAsync();
+
+                    var installRequest = JsonSerializer.Deserialize<InstallModRequest>(body);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    var mainWindow = (MainWindow)Application.Current.MainWindow;
+
+                    
+                    mainWindow.handle_rf_install(
+                        installRequest.Id,
+                        installRequest.Release,
+                        installRequest.Extra
+                    );
+                });
+
+                // No need to wait or send detailed response
+                context.Response.StatusCode = 200;
+                    context.Response.Close();
+                    return;
+                }
+
+            context.Response.StatusCode = 404;
+            context.Response.Close();
+        }
+
+        public class InstallModRequest
+        {
+            public string Id { get; set; }
+            public string Release { get; set; }
+            public string Extra { get; set; }
+        }
+
+        
+        public class ModStatus
+        {
+            public string Id { get; set; }
+            public string Release { get; set; }
+            public string Status { get; set; }
+        }
+
 
         void HandleArguments(string args)
         {
@@ -128,7 +267,7 @@ namespace ModManager
                 {
                     mainWindow.WindowState = WindowState.Normal;
                 }
-
+                mainWindow.ShowInTaskbar = true;
                 // Bring it to foreground
                 mainWindow.Activate(); // Better than SetForegroundWindow in WPF
                 mainWindow.Topmost = true;  // Force z-order

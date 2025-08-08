@@ -263,6 +263,27 @@
                                         </ComboBox>
                                     </Grid>
                                 </Grid>
+                                <Grid Margin="0,0,0,0" ToolTip="Minimize to tray on minimize">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.Column="0"
+              x:Name="minimize"
+              Style="{StaticResource CustomCheckBoxStyle}"
+              IsChecked="False"
+              Checked="minimize_Changed"
+              Unchecked="minimize_Changed"
+              Margin="0,0,8,0"/>
+
+                                    <TextBlock Grid.Column="1"
+               Text="Minimize App to tray on minimize"
+               Foreground="White"
+               FontSize="14"
+               VerticalAlignment="Center"/>
+                                </Grid>
+                                
                                 <!-- Load mods on start -->
                                 <Grid Margin="0,0,0,0" ToolTip="Reloads mods between games">
                                     <Grid.ColumnDefinitions>

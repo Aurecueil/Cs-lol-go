@@ -7,13 +7,13 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077 - 0.1.0"
+        Title="LoL for GlobalOffensive 2077 - 0.1.1"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
         MinHeight="300"
     WindowStartupLocation="CenterScreen">
-    
+
     <Grid x:Name="MainGrid">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="3*" MinWidth="350"/>
@@ -61,14 +61,25 @@
         Click="CreateProfile_Click">
                 <TextBlock Text="➕" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
+
+
             <Button DockPanel.Dock="Left" 
         Style="{StaticResource IconButtonStyle}" 
-        ToolTip="Delete Profile"
+        ToolTip="Delete Profile" x:Name="deleteteProfile"
         Margin="5,5,10,5"
         Click="DeleteProfile_Click">
                 <TextBlock Text="🗑️" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
-            
+
+            <Button DockPanel.Dock="Left" 
+Style="{StaticResource IconButtonStyle}" 
+ToolTip="Yasuo Button" x:Name="yasuoButton"
+Margin="25,5,10,5"
+Click="YasuoButtons_click">
+                <TextBlock Text="♿" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+            </Button>
+
+
             <Button DockPanel.Dock="Right" x:Name="create_folder"
                     Style="{StaticResource IconButtonStyle}" 
                     ToolTip="Create Folder" Click="show_profile"
@@ -133,7 +144,11 @@
             <Grid PreviewMouseDown="Grid_PreviewMouseDown"
       VerticalAlignment="Stretch"
       Background="Transparent">
-                <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="852*"/>
+                    <ColumnDefinition Width="145*"/>
+                </Grid.ColumnDefinitions>
+                <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10,10,10,0" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown" Grid.ColumnSpan="2"/>
             </Grid>
 
         </ScrollViewer>
@@ -152,7 +167,7 @@
             <StackPanel DockPanel.Dock="Right" 
                 Orientation="Horizontal" 
                 Margin="0,0,20,0">
-                <Button Content="🔄" Width="50" Height="50" Margin="5" Click="restart_button" ToolTip="Refresh Mods"
+                <Button Content="🔄" Width="50" Height="50" Margin="5" Click="restart_button" ToolTip="Refresh Mods" x:Name="refreshButton"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
                 <Button Content="➕" Width="50" Height="50" Margin="5" Click="AddMod_diag" ToolTip="Create Mod"
                 Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
@@ -292,9 +307,26 @@ Unchecked="Stop_loader"
             </ScrollViewer>
         </Border>
 
-        <Grid x:Name="ToggleOverlayRow" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,0">
-            <TextBlock Margin="5,0,0,2" x:Name="Feed" Text="Feed" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        <Grid x:Name="ToggleOverlayRow2" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,0">
+            <TextBlock Margin="5,0,0,2" x:Name="Feed2" Text="Feed2" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         </Grid>
+
+        <Grid x:Name="ToggleOverlayRow" Grid.Row="3" Visibility="Collapsed" Grid.ColumnSpan="3" Margin="0,0,0,0">
+            <!-- Background Layer (unfilled part) -->
+            <Rectangle Fill="Gray" />
+
+            <!-- Progress Layer (filled part) -->
+            <Rectangle x:Name="ProgressBarFill" Fill="{DynamicResource AccentBrush}" HorizontalAlignment="Left" />
+
+            <!-- Content -->
+            <TextBlock Margin="5,0,0,2"
+               x:Name="Feed"
+               Text="Feed"
+               Foreground="White"
+               VerticalAlignment="Center"
+               HorizontalAlignment="Left"/>
+        </Grid>
+
 
         <Grid x:Name="OverlayHost"  Panel.ZIndex="12" IsHitTestVisible="True" Grid.RowSpan="3" Grid.ColumnSpan="3"/>
         <Grid x:Name="OverlayHost2" IsHitTestVisible="True" Grid.RowSpan="2" Grid.ColumnSpan="3" Visibility="Collapsed"/>

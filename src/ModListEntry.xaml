@@ -6,8 +6,6 @@
         <Grid>
             <!-- Background color -->
             <Border x:Name="BGBorder" Background="#FF2A2A2A" CornerRadius="6" />
-
-            <!-- Background image fills entire Border -->
             <Border x:Name="BackgroundBorder"
         CornerRadius="6"
         ClipToBounds="True"/>

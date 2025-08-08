@@ -61,6 +61,8 @@ namespace ModLoader
             Startup_Choice.SelectedIndex = mainWindow.settings.startup_index;
             Startup_Choice.IsEnabled = mainWindow.settings.startup_start;
 
+            minimize.IsChecked = mainWindow.settings.hide_on_minimize;
+
             StartOnStartupToggle.IsChecked = mainWindow.settings.startup_start;
 
             Start_Normal.SelectedIndex = mainWindow.settings.start_mode;
@@ -230,6 +232,15 @@ namespace ModLoader
             if (mainWindow?.settings == null) return;
 
             mainWindow.settings.details_displ = DetailsDeisplay.IsChecked ?? false;
+            mainWindow.save_settings();
+            mainWindow.RefreshAllCachedElementsDisplay(true);
+        }
+
+        private void minimize_Changed(object sender, RoutedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
+
+            mainWindow.settings.hide_on_minimize = minimize.IsChecked ?? false;
             mainWindow.save_settings();
             mainWindow.RefreshAllCachedElementsDisplay(true);
         }

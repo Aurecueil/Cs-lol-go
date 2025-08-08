@@ -332,7 +332,7 @@ namespace ModManager
             }
             if (info)
             {
-                EntryName.Text = FolderElement.Name;
+                EntryName.Text = $"➡️  {FolderElement.Name}";
 
                 // Set details (collapsed for folders)
                 DetailsText.Visibility = Visibility.Collapsed;
@@ -348,10 +348,9 @@ namespace ModManager
                 // Show common icons
                 ModHandlingIcon.Visibility = Visibility.Visible;
                 DeleteIcon.Visibility = Visibility.Visible;
-                ModHandlingIcon.ToolTip = "Folder Settings";
-                DeleteIcon.ToolTip = "Delete Folder";
+                BGBorder.Background = (SolidColorBrush)(new BrushConverter().ConvertFrom("#FF3C322A"));
             }
-            
+
 
             // Update tooltips for folder context
 
