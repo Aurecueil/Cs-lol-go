@@ -38,6 +38,10 @@ using File = System.IO.File;
 using Path = System.IO.Path;
 using System.Net.Http.Headers;
 using ModManager;
+using Brushes = System.Windows.Media.Brushes;
+using Brush = System.Windows.Media.Brush;
+using SystemColors = System.Windows.SystemColors;
+using System.Runtime.InteropServices.JavaScript;
 
 namespace ModManager
 {
@@ -138,6 +142,7 @@ namespace ModManager
     public class Settings
     {
         public bool hide_on_minimize { get; set; } = false;
+        public bool show_path_window { get; set; } = true;
         public bool autodetect_game_path { get; set; } = true;
         public string gamepath { get; set; } = "";
         public bool startup_start { get; set; } = false;
@@ -257,7 +262,11 @@ namespace ModManager
             control.SetPlaceholderText("New Folder Name");
             control.OnProfileCreated += newProfileName =>
             {
-                int key = Enumerable.Range(1, int.MaxValue - 1).First(k => !hierarchyById.ContainsKey(k));
+                int key = new Random().Next(1, int.MaxValue);
+                while (hierarchyById.ContainsKey(key))
+                    key = new Random().Next(1, int.MaxValue);
+
+
                 string inner_path = "";
                 int temporary_cur_loca = Current_location_folder;
                 if (temporary_cur_loca != 0)
@@ -997,7 +1006,12 @@ namespace ModManager
                         break;
                 }
             }
-               
+
+            if (!settings.show_path_window)
+            {
+                MainGrid.RowDefinitions[1].Height = new GridLength(0);
+                ModListPanel.Margin = new Thickness(10, 10, 10, 0);
+            }
 
             Application.Current.Resources["AccentColor"] = settings.theme_color;
 
@@ -1064,7 +1078,7 @@ namespace ModManager
                 update_tile_contrains();
                 PreCacheAllUIElements();
                 ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
-
+                ShowBreadcrumb(0);
             }
             catch (Exception ex)
             {
@@ -1214,25 +1228,32 @@ namespace ModManager
         {
             if (modByFolder.TryGetValue(mod_folder, out var old_entry))
             {
-                int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
-                if (hierarchyById.TryGetValue(parent, out var old_parent))
+                try
                 {
-                    old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
-                }
-                modByFolder.Remove(mod_folder);
+                    int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
+                    if (hierarchyById.TryGetValue(parent, out var old_parent))
+                    {
+                        old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
+                    }
+                    modByFolder.Remove(mod_folder);
 
+                    cachedUIElements.Remove((true, mod_folder));
 
-                string relativePath = Path.Combine("installed", mod_folder);
+                    string relativePath = Path.Combine("installed", mod_folder);
 
-                string fullPath = Path.GetFullPath(relativePath);
-                if (Directory.Exists(fullPath))
+                    string fullPath = Path.GetFullPath(relativePath);
+                    if (Directory.Exists(fullPath))
+                    {
+                        Directory.Delete(fullPath, true); // true = recursive delete
+                    }
+
+                    MainWindow.ProfileEntries.Remove(old_entry.ModFolder);
+
+                    RefreshModListPanel(Current_location_folder);
+                } catch (Exception ex)
                 {
-                    Directory.Delete(fullPath, true); // true = recursive delete
+                    Logger.LogError("Error while deleting mod: -->   ", ex);
                 }
-
-                MainWindow.ProfileEntries.Remove(old_entry.ModFolder);
-
-                RefreshModListPanel(Current_location_folder);
             }
         }
 
@@ -1269,6 +1290,8 @@ namespace ModManager
                     parentElement.Children.RemoveAll(t => t.Item1 == id_of_folder_to_del.ToString() && t.Item2 == false);
                 }
 
+                cachedUIElements.Remove((false, id_of_folder_to_del.ToString()));
+
                 RemoveHierarchyElement(id_of_folder_to_del, hierarchyById);
 
                 hierarchyById.Remove(id_of_folder_to_del);
@@ -1304,6 +1327,8 @@ namespace ModManager
                         }
                     }
                 }
+                cachedUIElements.Remove((false, id_of_folder_to_del.ToString()));
+
                 RemoveHierarchyElement(id_of_folder_to_del, hierarchyById);
 
                 hierarchyById.Remove(id_of_folder_to_del);
@@ -1798,11 +1823,11 @@ namespace ModManager
             {
                 if (_modLoadCts != null || _isLoaderRunning)
                 {
-                    return; // Already running or not properly stopped
+                    return;
                 }
 
                 _isLoaderRunning = true;
-                Load_check_box.IsEnabled = false; // Disable during startup
+                Load_check_box.IsEnabled = false;
             }
             Load_check_box.IsChecked = true;
             UpdateContextMenuLoaderState();
@@ -1870,7 +1895,7 @@ namespace ModManager
             refreshButton.IsEnabled = true;
             CreateProfile.IsEnabled = true;
             deleteteProfile.IsEnabled = true;
-
+            ClearPaintActiveMods();
             Load_check_box.IsChecked = false;
             ToggleOverlay(false);
             ToggleFeed(false);
@@ -1987,6 +2012,8 @@ namespace ModManager
                 LoadWadFiles();
             }
             WADS = CopyWadsDictionary(EMPTY_WADS);
+            mods_loaded_in.Clear();
+            folders_loaded_in.Clear();
             await ProcessFolderChildrenAsync(0, token);
             await WriteWads(token);
             ToggleOverlay(false);
@@ -1996,8 +2023,11 @@ namespace ModManager
         private void StartCSLol(CancellationToken token)
         {
             CSLolManager.Initialize(
-                Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile),
-                token,
+    Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
+        + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
+            ? "‗PBE‗profile"
+            : ""),
+    token,
                 text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
                 () => Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -2037,43 +2067,59 @@ namespace ModManager
                 })
             );
         }
+        private async void PaintActiveMods()
+        {
+            foreach(string mod in mods_loaded_in)
+            {
+                if (cachedUIElements.TryGetValue((true, mod), out var entry))
+                {
+                    entry.SetStatus(1);
+                }
+            }
+            foreach (int folder in folders_loaded_in)
+            {
+                if (cachedUIElements.TryGetValue((false, folder.ToString()), out var entry))
+                {
+                    entry.SetStatus(1);
+                }
+            }
+        }
+
+        private async void ClearPaintActiveMods()
+        {
+            foreach ((string s, Mod modd) in modByFolder)
+            {
+                if (cachedUIElements.TryGetValue((true, modd.ModFolder), out var entry))
+                {
+                    entry.SetStatus(0);
+                }
+            }
+            foreach ((int s, HierarchyElement fold) in hierarchyById)
+            {
+                if (cachedUIElements.TryGetValue((false, fold.ID.ToString()), out var entry))
+                {
+                    entry.SetStatus(0);
+                }
+            }
+        }
         private ModToolsRunner _currentRunner;
+
+        List<string> mods_loaded_in = new List<string>(); 
+        List<int> folders_loaded_in = new List<int>();
+
         public async Task WriteWads(CancellationToken token)
         {
-            List<string> MODS = new List<string>();
-            foreach (string cWAD in WADS.Keys)
-            {
-                if (WADS[cWAD].Item2.Keys.Count < 1)
-                {
-                    continue;
-                }
-
-                // Otherwise, process
-                foreach (var modEntry in WADS[cWAD].Item2)
-                {
-                    MODS.Add(modEntry.Key);
-
-                }
-
-            }
-
-            for (int i = 0; i < MODS.Count; i++)
-            {
-                string current = MODS[i];
-                int lastIndex = MODS.LastIndexOf(current);
-                if (lastIndex != i)
-                {
-                    MODS.RemoveAt(i);
-                    i--; // Adjust index after removal
-                }
-            }
-            string mod_list = $"\"{string.Join("\"/\"", MODS)}\"";
-            string mod_list_disp = $"{string.Join("\n", MODS)}"; 
-            //CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
+            string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
+            string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
+            // CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
+            Logger.Log("-- WRITING MODS --");
+            Logger.Log(mod_list_disp);
+            Logger.Log("-- ------------ --");
             var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
             _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
-            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)}\" --game:\"{game_path}\" --mods:{mod_list}";
+            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
+
 
             if (settings.not_tft) 
             {
@@ -2122,6 +2168,7 @@ namespace ModManager
                     errorLines.Add(line);  // just collect errors, no immediate display
                 }
             );
+                PaintActiveMods();
 
                 // After RunAsync completes, display all error lines if any
                 if (errorLines.Count > 0)
@@ -2151,6 +2198,8 @@ namespace ModManager
             _currentRunner = null;
         }
 
+
+
         public async Task ProcessFolderChildrenAsync(int folderId, CancellationToken token, bool isRandomElement = false, bool overrride = false)
         {
             if (!hierarchyById.TryGetValue(folderId, out var folder))
@@ -2158,7 +2207,7 @@ namespace ModManager
 
             var rng = new Random(); // Shared random instance
             var workingList = new List<(string Id, int Priority, bool IsMod)>();
-            var skipMap = new Dictionary<string, bool>(); // Track which items to skip (by Id)
+            var skipMap = new Dictionary<string, bool>();
 
             foreach (var (childId, isMod) in folder.Children)
             {
@@ -2191,9 +2240,11 @@ namespace ModManager
                 skipMap[id] = skip;
             }
 
+            workingList.Sort((a, b) => a.Priority.CompareTo(b.Priority));
+
             if (overrride)
             {
-                foreach (var (id, priority, isMod) in workingList.OrderBy(x => x.Priority))
+                foreach (var (id, priority, isMod) in workingList)
                 {
                     if (skipMap.TryGetValue(id, out var skip) && skip)
                         continue;
@@ -2208,7 +2259,11 @@ namespace ModManager
 
                                 if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                                 {
+                                    var clearedFolders = modsTuple.Item2.Keys.ToList();
+                                    mods_loaded_in.RemoveAll(m => clearedFolders.Contains(m));
+
                                     modsTuple.Item2.Clear();
+
                                 }
                             }
                         }
@@ -2216,7 +2271,7 @@ namespace ModManager
                 }
             }
 
-            foreach (var (id, priority, isMod) in workingList.OrderBy(x => x.Priority))
+            foreach (var (id, priority, isMod) in workingList)
             {
                 token.ThrowIfCancellationRequested();
 
@@ -2233,15 +2288,21 @@ namespace ModManager
                             if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                             {
                                 if (mod.Details.override_)
+                                {
+                                    var clearedFolders = modsTuple.Item2.Keys.ToList();
+                                    mods_loaded_in.RemoveAll(m => clearedFolders.Contains(m));
                                     modsTuple.Item2.Clear();
+                                }
 
                                 modsTuple.Item2[mod.ModFolder] = mod.has_changed;
                             }
+                            mods_loaded_in.Add(mod.ModFolder);
                         }
                     }
                 }
                 else if (hierarchyById.TryGetValue(int.Parse(id), out var folderr))
                 {
+                    folders_loaded_in.Add(int.Parse(id));
                     await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.override_);
                 }
             }
@@ -2284,9 +2345,94 @@ namespace ModManager
 
         public void ToggleFeed(bool show, int id = 0)
         {
-            if (id == 0) { ToggleOverlayRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed; } else if (id == 2) { ToggleOverlayRow2.Visibility = show ? Visibility.Visible : Visibility.Collapsed; }
-            
+            if (id == 0)
+            {
+                ToggleOverlayRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else if (id == 2)
+            {
+                ToggleOverlayRow2.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else if (id == 3)
+            {
+                ToggleOverlayRow3.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
+
+        public void ShowBreadcrumb(int currentFolderId)
+        {
+            BreadcrumbPanel.Children.Clear();
+
+            // Always include root
+            List<HierarchyElement> path = new();
+
+            if (currentFolderId == 0 || !hierarchyById.ContainsKey(currentFolderId))
+            {
+                path.Add(new HierarchyElement { ID = 0, Name = "Root" });
+            }
+            else
+            {
+                int id = currentFolderId;
+                while (id != 0 && hierarchyById.TryGetValue(id, out var element))
+                {
+                    path.Add(element);
+                    id = element.parent;
+                }
+                path.Reverse();
+                path.Insert(0, new HierarchyElement { ID = 0, Name = "Root" });
+            }
+
+            // Add buttons and separators
+            for (int i = 0; i < path.Count; i++)
+            {
+                var folder = path[i];
+
+                // Folder button adjusted for 25px panel height
+                var btn = new Button
+                {
+                    Content = folder.Name,
+                    Background = Brushes.Transparent,
+                    Foreground = (Brush)Application.Current.Resources[SystemColors.ControlTextBrushKey],
+                    BorderBrush = (Brush)Application.Current.Resources["AccentBrush"],
+                    BorderThickness = new Thickness(1.5),
+                    FontSize = 12,
+                    Height = 19, // slightly smaller than panel height to fit
+                    Padding = new Thickness(5, 0, 5, 0),
+                    Margin = new Thickness(2, 1, 2, 1),
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Cursor = Cursors.Hand,
+                    Style = (Style)Application.Current.Resources["diagwindow_highlight"]
+                };
+
+                // Rounded corners for the button
+                var borderStyle = new Style(typeof(Border));
+                borderStyle.Setters.Add(new Setter(Border.CornerRadiusProperty, new CornerRadius(4)));
+                btn.Resources.Add(typeof(Border), borderStyle);
+
+                int folderId = folder.ID; // capture for lambda
+                btn.Click += (s, e) => RefreshModListPanel(folderId);
+
+                BreadcrumbPanel.Children.Add(btn);
+
+                // "/" separator (not clickable)
+                if (i < path.Count - 1)
+                {
+                    var slash = new TextBlock
+                    {
+                        Text = "/",
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(2, 0, 2, 0),
+                        FontSize = 12
+                    };
+                    BreadcrumbPanel.Children.Add(slash);
+                }
+            }
+        }
+
+
+
+
 
         private Dictionary<(bool isMod, string id), ModListEntry> cachedUIElements = new Dictionary<(bool, string), ModListEntry>();
 
@@ -2420,6 +2566,7 @@ namespace ModManager
 
             if (c_location != Current_location_folder)
             {
+                ShowBreadcrumb(c_location);
                 Details_Panel.Text = "";
                 GlobalselectedEntries.Clear();
             }
@@ -3580,7 +3727,7 @@ namespace ModManager
                             ProfileEntries.Remove(lowerVersionPath);
                             ProfileEntries[fileName] = 10;
                             SaveProfileEntriesToFile();
-                            CreateModFromFolder(Path.Combine(installedPath, fileName));
+                            SaveModDetails(CreateModFromFolder(Path.Combine(installedPath, fileName), true));
                             RefreshModListPanel(Current_location_folder);
 
                             return;
@@ -3659,7 +3806,7 @@ namespace ModManager
                             }
                         }
                         string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                        Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                        SaveModDetails(CreateModFromFolder(extractTargetDir, true));
                         RefreshModListPanel(Current_location_folder);
                     }
                     catch (Exception ex)
@@ -3742,7 +3889,7 @@ namespace ModManager
 
                     // Copy directory recursively
                     CopyDirectory(path, installedPat);
-                    CreateModFromFolder(installedPat);
+                    CreateModFromFolder(installedPat, true);
                     return;
                 }
             }
@@ -3853,7 +4000,4 @@ namespace ModManager
             writer.WriteStringValue(colorString);
         }
     }
-
-
-
 }

@@ -58,6 +58,8 @@ namespace ModLoader
             TilesHeights.Text = mainWindow.settings.Tile_height.ToString();
             TilesWidths.Text = mainWindow.settings.Tile_width.ToString();
 
+            Show_Path.IsChecked = mainWindow.settings.show_path_window;
+
             Startup_Choice.SelectedIndex = mainWindow.settings.startup_index;
             Startup_Choice.IsEnabled = mainWindow.settings.startup_start;
 
@@ -191,11 +193,26 @@ namespace ModLoader
         }
         private async void LoadImagesAsync()
         {
-            string leftImagePath = Path.Combine("runtimes", "verycoolcat.png");
-            string rightImagePath = Path.Combine("runtimes", "ISTHATHATACAT.png");
+            try
+            {
+                string leftImagePath = Path.Combine("runtimes", "verycoolcat.png");
+                string rightImagePath = Path.Combine("runtimes", "ISTHATHATACAT.png");
 
-            LeftImage.Source = new BitmapImage(new Uri(Path.GetFullPath(leftImagePath)));
-            RightImage.Source = new BitmapImage(new Uri(Path.GetFullPath(rightImagePath)));
+                // Wait for templates to be applied
+                LeftButton.ApplyTemplate();
+                RightButton.ApplyTemplate();
+
+                // Find the ImageBrush elements in the templates
+                var leftImageBrush = LeftButton.Template.FindName("LeftImageBrush", LeftButton) as ImageBrush;
+                var rightImageBrush = RightButton.Template.FindName("RightImageBrush", RightButton) as ImageBrush;
+
+                if (leftImageBrush != null)
+                    leftImageBrush.ImageSource = new BitmapImage(new Uri(Path.GetFullPath(leftImagePath)));
+
+                if (rightImageBrush != null)
+                    rightImageBrush.ImageSource = new BitmapImage(new Uri(Path.GetFullPath(rightImagePath)));
+            }
+            catch (Exception ex) { Logger.LogError("Didn found cat images: ", ex); }
         }
         private void OpenLink(string url)
         {
@@ -220,6 +237,25 @@ namespace ModLoader
             mainWindow.save_settings();
             mainWindow.RefreshAllCachedElementsDisplay(false, false, true);
         }
+
+        private void Display_Path_Changed(object sender, RoutedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
+
+            bool showPath = Show_Path.IsChecked ?? false;
+            mainWindow.settings.show_path_window = showPath;
+            mainWindow.save_settings();
+
+            mainWindow.MainGrid.RowDefinitions[1].Height = showPath
+                ? new GridLength(30)
+                : new GridLength(0);
+
+            mainWindow.ModListPanel.Margin = showPath
+                ? new Thickness(10, 3, 10, 0)
+                : new Thickness(10, 10, 10, 0);
+        }
+
+
         private void HashUpdates_Changed(object sender, RoutedEventArgs e)
         {
             if (mainWindow?.settings == null) return;

@@ -76,7 +76,15 @@ namespace ModManager
 
         private void CreateMod_Click(object sender, RoutedEventArgs e)
         {
-            Process.Start("explorer.exe", Path.Combine(installedPath, ModElement.ModFolder));
+            var path = Path.Combine(installedPath, ModElement.ModFolder);
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{path}\"", // quote it explicitly
+                UseShellExecute = true
+            });
+
         }
 
         private bool IsValidImage(string imagePath)
@@ -675,6 +683,11 @@ namespace ModManager
                 if (ModElement?.Details == null) return;
 
                 ModElement.Details.Priority = int.Parse(txtPriority.Text);
+                if (MainWindow.ProfileEntries.ContainsKey(ModElement.ModFolder))
+                {
+                    MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
+                }
+
             }
             else
             {
@@ -682,6 +695,11 @@ namespace ModManager
 
                 int prio = int.Parse(txtPriority.Text);
                 FolderElement.Priority = prio;
+                if (MainWindow.ProfileEntries.ContainsKey(FolderElement.ID.ToString()))
+                {
+                    MainWindow.ProfileEntries[FolderElement.ID.ToString()] = FolderElement.Priority;
+                }
+
             }
         }
 

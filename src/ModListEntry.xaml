@@ -6,10 +6,13 @@
         <Grid>
             <!-- Background color -->
             <Border x:Name="BGBorder" Background="#FF2A2A2A" CornerRadius="6" />
+            
             <Border x:Name="BackgroundBorder"
         CornerRadius="6"
         ClipToBounds="True"/>
 
+            <Border x:Name="StatusBorder" Background="Transparent" CornerRadius="6" Opacity="0.15"/>
+            <Border x:Name="StatusBorderBorder" BorderBrush="Transparent" BorderThickness="2" CornerRadius="3" Opacity="0.8"/>
 
             <Grid x:Name="det_grid">
             <Grid.ColumnDefinitions>

@@ -357,6 +357,22 @@ namespace ModManager
             UpdateSelectionVisual();
         }
 
+        public void SetStatus(int status)
+        {
+            switch (status)
+            {
+                case 0:
+                    StatusBorder.Background = Brushes.Transparent;
+                    StatusBorderBorder.BorderBrush = Brushes.Transparent;
+                    break;
+                case 1:
+                    StatusBorder.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
+                    StatusBorderBorder.SetResourceReference(Border.BorderBrushProperty, "AccentBrush");
+                    break;
+            }
+        }
+
+
         private void UpdateUIForMod(bool info, bool basee, bool image3, bool first)
         {
             if (first)

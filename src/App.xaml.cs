@@ -25,6 +25,35 @@ using System.Text;
 
 namespace ModManager
 {
+    public static class Logger
+    {
+        private static readonly string logFilePath = "Simple_logs.txt";
+        public static void Log(string message)
+        {
+            try
+            {
+                // Split by newlines so each line gets a timestamp
+                var lines = message.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                using (StreamWriter sw = new StreamWriter(logFilePath, true))
+                {
+                    foreach (var line in lines)
+                    {
+                        string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {line}";
+                        sw.WriteLine(logEntry);
+                    }
+                }
+            }
+            catch
+            {
+                // silently ignore logging errors to prevent crashes
+            }
+        }
+        public static void LogError(string message, Exception ex)
+        {
+            Log($"ERROR: {message}\nException: {ex}");
+        }
+    }
+
     public static class Globals
     {
         public static bool StartWithLoaded = false;
@@ -40,7 +69,6 @@ namespace ModManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
-            File.AppendAllText("startup.log", DateTime.Now + " - App launched\n");
             bool isNewInstance;
             _mutex = new Mutex(true, @"Global\ModdoLoudaDA", out isNewInstance);
 

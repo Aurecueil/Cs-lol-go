@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077 - 0.1.1"
+        Title="LoL for GlobalOffensive 2077 - 0.1.3"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
@@ -26,6 +26,8 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <!-- Top bar -->
+            <RowDefinition Height="30"/>
+            
             <RowDefinition Height="*"/>
             <!-- Mod list -->
             <RowDefinition Height="Auto"/>
@@ -90,7 +92,27 @@ Click="YasuoButtons_click">
             
         </DockPanel>
 
-        <ScrollViewer Grid.Row="1" Grid.ColumnSpan="1"
+        <Border 
+    Grid.Row="1"
+    BorderBrush="{DynamicResource AccentBrush}" 
+    BorderThickness="2"
+    CornerRadius="4"
+    Background="Transparent"
+    Padding="1"
+    Margin="5,2,5,2">
+
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel 
+            x:Name="BreadcrumbPanel" 
+            Orientation="Horizontal" 
+            VerticalAlignment="Center" 
+            Height="25" />
+                <!-- Panel height fixed -->
+            </ScrollViewer>
+        </Border>
+
+
+        <ScrollViewer Grid.Row="2" Grid.ColumnSpan="1"
               Background="Transparent"
               VerticalScrollBarVisibility="Auto" AllowDrop="True"
               Drop="DropScrollViewer_Drop"
@@ -148,14 +170,14 @@ Click="YasuoButtons_click">
                     <ColumnDefinition Width="852*"/>
                     <ColumnDefinition Width="145*"/>
                 </Grid.ColumnDefinitions>
-                <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10,10,10,0" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown" Grid.ColumnSpan="2"/>
+                <UniformGrid x:Name="ModListPanel" Columns="1" Margin="10,3,10,0" Background="Transparent" VerticalAlignment="Top" PreviewMouseDown="ModListPanel_PreviewMouseDown" Grid.ColumnSpan="2"/>
             </Grid>
 
         </ScrollViewer>
 
 
         <!-- Search bar and floating actions -->
-        <DockPanel Grid.Row="2" Background="#222" Height="70" Grid.ColumnSpan="3"
+        <DockPanel Grid.Row="3" Background="#222" Height="70" Grid.ColumnSpan="3"
            VerticalAlignment="Center" LastChildFill="True">
             <!-- Left Button -->
 
@@ -283,7 +305,7 @@ Unchecked="Stop_loader"
         </CheckBox>
 
         <GridSplitter Grid.Column="1"
-      Grid.Row="1" 
+      Grid.Row="2" 
       Width="5" x:Name="MySplitter"
       HorizontalAlignment="Center"
       VerticalAlignment="Stretch"
@@ -292,7 +314,7 @@ Unchecked="Stop_loader"
       DragCompleted="MySplitter_DragCompleted"
       ShowsPreview="True"/>
 
-        <Border Grid.Column="2" Grid.Row="1" 
+        <Border Grid.Column="2" Grid.Row="2" 
         Background="#FF1E1E1E" 
         BorderBrush="{DynamicResource AccentBrush}" 
         BorderThickness="2" 
@@ -307,11 +329,15 @@ Unchecked="Stop_loader"
             </ScrollViewer>
         </Border>
 
-        <Grid x:Name="ToggleOverlayRow2" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,0,0,0">
+        <Grid x:Name="ToggleOverlayRow2" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="4" Grid.ColumnSpan="3" Margin="0,0,0,0">
             <TextBlock Margin="5,0,0,2" x:Name="Feed2" Text="Feed2" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         </Grid>
 
-        <Grid x:Name="ToggleOverlayRow" Grid.Row="3" Visibility="Collapsed" Grid.ColumnSpan="3" Margin="0,0,0,0">
+        <Grid x:Name="ToggleOverlayRow3" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="4" Grid.ColumnSpan="3" Margin="0,0,0,0">
+            <TextBlock Margin="5,0,0,2" x:Name="Feed3" Text="Feed3" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+        </Grid>
+
+        <Grid x:Name="ToggleOverlayRow" Grid.Row="4" Visibility="Collapsed" Grid.ColumnSpan="3" Margin="0,0,0,0">
             <!-- Background Layer (unfilled part) -->
             <Rectangle Fill="Gray" />
 
@@ -328,7 +354,7 @@ Unchecked="Stop_loader"
         </Grid>
 
 
-        <Grid x:Name="OverlayHost"  Panel.ZIndex="12" IsHitTestVisible="True" Grid.RowSpan="3" Grid.ColumnSpan="3"/>
-        <Grid x:Name="OverlayHost2" IsHitTestVisible="True" Grid.RowSpan="2" Grid.ColumnSpan="3" Visibility="Collapsed"/>
+        <Grid x:Name="OverlayHost"  Panel.ZIndex="12" IsHitTestVisible="True" Grid.RowSpan="4" Grid.ColumnSpan="3"/>
+        <Grid x:Name="OverlayHost2" IsHitTestVisible="True" Grid.RowSpan="3" Grid.ColumnSpan="3" Visibility="Collapsed"/>
     </Grid>
 </Window>

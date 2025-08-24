@@ -462,7 +462,7 @@ namespace ModManager
                     MessageBox.Show($"Failed to copy '{file.Name}': {ex.Message}");
                 }
             }
-            Main.CreateModFromFolder(Path.Combine(installedPath, true_folder_name), true);
+            Main.SaveModDetails(Main.CreateModFromFolder(Path.Combine(installedPath, true_folder_name), true));
             Main.RefreshModListPanel(Main.Current_location_folder);
             Main.OverlayHost.Children.Clear();
         }

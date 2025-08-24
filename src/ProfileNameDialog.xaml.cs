@@ -48,9 +48,16 @@ namespace ModManager
             var name = ProfileNameBox.Text.Trim();
             if (!string.IsNullOrWhiteSpace(name))
             {
+                // Replace non-standard PBE suffix with standard one
+                if (name.EndsWith("‗PBE‗profile", StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name.Substring(0, name.Length - "‗PBE‗profile".Length) + "_PBE_profile";
+                }
+
                 OnProfileCreated?.Invoke(name);
             }
         }
+
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
