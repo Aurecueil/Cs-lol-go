@@ -75,6 +75,7 @@ namespace ModLoader
             defhearth.Text = mainWindow.settings.default_Hearth;
             defhome.Text = mainWindow.settings.default_home;
             defAuthor.Text = mainWindow.settings.default_author;
+            Orientation_selectioon.SelectedIndex = mainWindow.settings.Ailgment;
 
             AttachEventHandlers();
             LoadImagesAsync();
@@ -122,6 +123,8 @@ namespace ModLoader
 
             TilesHeights.TextChanged -= TilesHeight;
             TilesWidths.TextChanged -= Tileswidth;
+
+            Orientation_selectioon.SelectionChanged -= Orientation_selectioon_Changed;
         }
         private void AttachEventHandlers()
         {
@@ -165,6 +168,8 @@ namespace ModLoader
 
             TilesHeights.TextChanged += TilesHeight;
             TilesWidths.TextChanged += Tileswidth;
+
+            Orientation_selectioon.SelectionChanged += Orientation_selectioon_Changed;
         }
 
         #region Event Handlers
@@ -254,8 +259,15 @@ namespace ModLoader
                 ? new Thickness(10, 3, 10, 0)
                 : new Thickness(10, 10, 10, 0);
         }
+        
+        private void Orientation_selectioon_Changed(object sender, RoutedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
 
-
+            mainWindow.settings.Ailgment = Orientation_selectioon.SelectedIndex;
+            mainWindow.save_settings();
+            mainWindow.RefreshAllCachedElementsDisplay();
+        }
         private void HashUpdates_Changed(object sender, RoutedEventArgs e)
         {
             if (mainWindow?.settings == null) return;
@@ -297,10 +309,10 @@ namespace ModLoader
         {
             if (int.TryParse(TilesWidths.Text, out int value))
             {
-                if (value < 150)
-                    value = 150;
-                else if (value > 1200)
-                    value = 1200;
+                if (value < 350)
+                    value = 350;
+                else if (value > 2500)
+                    value = 2500;
 
                 TilesWidths.Text = value.ToString();
                 mainWindow.settings.Tile_width = value;
@@ -332,10 +344,10 @@ namespace ModLoader
         {
             if (int.TryParse(TilesHeights.Text, out int value))
             {
-                if (value < 30)
+                if (value < 25)
                     value = 30;
-                else if (value > 99)
-                    value = 99;
+                else if (value > 2000)
+                    value = 2000;
 
                 TilesHeights.Text = value.ToString();
                 mainWindow.settings.Tile_height = (double)value;

@@ -117,8 +117,10 @@ namespace ModManager
             ModHandlingIcon.Visibility = Visibility.Collapsed;
             DeleteIcon.Visibility = Visibility.Collapsed;
 
+            ApplyAlignmentSettings(); // Apply alignment settings for parent folder
             UpdateSelectionVisual();
         }
+
         private void ActiveCheckbox_Checked(object sender, RoutedEventArgs e)
         {
             if (IsSelected)
@@ -175,7 +177,8 @@ namespace ModManager
                     }
                 }
             }
-            else {
+            else
+            {
                 if (IsMod && ModElement != null)
                 {
                     ModElement.isActive = false;
@@ -187,7 +190,7 @@ namespace ModManager
                     MainWindow.ProfileEntries.Remove(FolderElement.ID.ToString());
                 }
             }
-            
+
 
             MainWindow.SaveProfileEntriesToFile(); // Save immediately
         }
@@ -196,7 +199,7 @@ namespace ModManager
         {
             if (IsSelected)
             {
-                List < (string,int, bool) > meow = new List<(string,int, bool)>();
+                List<(string, int, bool)> meow = new List<(string, int, bool)>();
                 int has_folder = 0;
                 foreach (var entry in selectedEntries)
                 {
@@ -281,8 +284,8 @@ namespace ModManager
                     }
                 }
             }
-            
-            
+
+
         }
 
         private void Export_Item(object sender, RoutedEventArgs e)
@@ -353,7 +356,7 @@ namespace ModManager
 
 
             // Update tooltips for folder context
-
+            ApplyAlignmentSettings(); // Apply alignment settings for regular folder
             UpdateSelectionVisual();
         }
 
@@ -371,6 +374,130 @@ namespace ModManager
                     break;
             }
         }
+        private bool _isInitializingCombo = true;
+
+        public void UpdateLayerComboBox()
+        {
+            ImportOverrideComboBox.Items.Clear();
+
+            // Always include default options
+            ImportOverrideComboBox.Items.Add(new ComboBoxItem { Content = "None" });
+            ImportOverrideComboBox.Items.Add(new ComboBoxItem { Content = "Random" });
+
+            // Add layers except "base"
+            var extraLayers = ModElement.Details.Layers
+                .Where(l => !string.Equals(l.Name, "base", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var layer in extraLayers)
+            {
+                ImportOverrideComboBox.Items.Add(new ComboBoxItem { Content = layer.Name });
+            }
+
+            // Show or hide combo box
+            ImportOverrideComboBox.Visibility = extraLayers.Any() ? Visibility.Visible : Visibility.Collapsed;
+
+            // Try to restore previous selection if it exists
+            string savedSelection = ModElement.Details.layerss;
+            if (!string.IsNullOrEmpty(savedSelection))
+            {
+                foreach (ComboBoxItem item in ImportOverrideComboBox.Items)
+                {
+                    if (string.Equals(item.Content.ToString(), savedSelection, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ImportOverrideComboBox.SelectedItem = item;
+                        _isInitializingCombo = false;
+                        return;
+                    }
+                }
+            }
+            Main.SaveModDetails(ModElement);
+            ImportOverrideComboBox.SelectedIndex = 0;
+            _isInitializingCombo = false;
+        }
+
+        public void ShowSelectedLayerSetting(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializingCombo)
+                return; // skip updates during initialization
+            if (ImportOverrideComboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                string selectedText = selectedItem.Content.ToString();
+                ModElement.Details.layerss = selectedText;
+                Main.SaveModDetails(ModElement);
+            }
+        }
+
+        // NEW HELPER METHOD FOR ALIGNMENT
+        private void ApplyAlignmentSettings()
+        {
+            switch (Main.settings.Ailgment)
+            {
+                case 0: // Top
+                    elements1.VerticalAlignment = VerticalAlignment.Top;
+                    elements2.VerticalAlignment = VerticalAlignment.Top;
+                    elements2.Margin = new Thickness(6);
+                    elements3.VerticalAlignment = VerticalAlignment.Top;
+                    elements3.Margin = new Thickness(6);
+                    break;
+                case 1: // Center
+                    elements1.VerticalAlignment = VerticalAlignment.Center;
+                    elements2.VerticalAlignment = VerticalAlignment.Center;
+                    elements2.Margin = new Thickness(8, 0, 0, 0);
+                    elements3.VerticalAlignment = VerticalAlignment.Center;
+                    elements3.Margin = new Thickness(8, 0, 8, 0);
+                    break;
+                case 2: // Bottom
+                    elements1.VerticalAlignment = VerticalAlignment.Bottom;
+                    elements2.VerticalAlignment = VerticalAlignment.Bottom;
+                    elements2.Margin = new Thickness(6);
+                    elements3.VerticalAlignment = VerticalAlignment.Bottom;
+                    elements3.Margin = new Thickness(6);
+                    break;
+                default:
+                    break;
+            }
+        }
+        private async void LoadBackgroundImageAsync(bool update)
+        {
+            try
+            {
+                // background thread: IO + decode
+                var image = await Task.Run(() =>
+                    ImageLoader.GetModImage(ModElement.ModFolder)
+                );
+
+                if (image == null)
+                    return;
+
+                // UI thread: assign + update visuals
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    bg_image = image;
+                    if (update) { UpdateBackgroundUI(); }
+                }, DispatcherPriority.Background);
+            }
+            catch
+            {
+                // optional logging — never crash UI
+            }
+        }
+
+        private async void UpdateBackgroundUI()
+        {
+            if (bg_image != null && Main.settings.show_thumbs == true)
+            {
+                BackgroundBorder.Background = new ImageBrush(bg_image)
+                {
+                    Stretch = Stretch.UniformToFill,
+                    Opacity = Main.settings.thumb_opacity
+                };
+            }
+            else
+            {
+                BackgroundBorder.Background = new SolidColorBrush(Colors.Transparent);
+            }
+        }
 
 
         private void UpdateUIForMod(bool info, bool basee, bool image3, bool first)
@@ -384,7 +511,8 @@ namespace ModManager
                 // Update tooltips for mod context
                 ModHandlingIcon.ToolTip = "Mod Settings";
                 DeleteIcon.ToolTip = "Delete Mod";
-                bg_image = ImageLoader.GetModImage(ModElement.ModFolder);
+                LoadBackgroundImageAsync(image3);
+                //  UpdateLayerComboBox();
             }
             if (info)
             {
@@ -414,26 +542,20 @@ namespace ModManager
             }
             if (image3)
             {
-                if (bg_image != null && Main.settings.show_thumbs == true)
+                if (!first)
                 {
-                    BackgroundBorder.Background = new ImageBrush(bg_image)
-                    {
-                        Stretch = Stretch.UniformToFill,
-                        Opacity = Main.settings.thumb_opacity
-                    };
-                }
-                else
-                {
-                    BackgroundBorder.Background = new SolidColorBrush(Colors.Transparent); // or default background
+                    UpdateBackgroundUI();
                 }
             }
 
-            
+
             if (basee)
             {
                 ActiveCheckbox.IsChecked = ModElement.isActive;
             }
-            
+
+            // Calls the new helper method instead of the local switch statement
+            ApplyAlignmentSettings();
 
             UpdateSelectionVisual();
         }
@@ -742,7 +864,7 @@ namespace ModManager
                 FolderDoubleClicked?.Invoke(FolderElement.ID);
             }
         }
-        
+
 
         public void RefreshDisplay(bool info = false, bool basee = false, bool image = false, bool first = false)
         {

@@ -7,8 +7,8 @@
     <Application.Resources>
 
         <System:Double x:Key="ModListEntryHeight">60</System:Double>
-		<Thickness x:Key="ModListEntryPadding">5,2,5,2</Thickness>
-		<Thickness x:Key="ModListEntryMargin">4,4,4,4</Thickness>
+        <Thickness x:Key="ModListEntryPadding">5,2,5,2</Thickness>
+        <Thickness x:Key="ModListEntryMargin">4,4,4,4</Thickness>
 
         <Color x:Key="AccentColor">#D16002</Color>
         <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
@@ -233,7 +233,7 @@
                                 </Canvas>
                             </Border>
 
-                           
+
                         </Grid>
 
                         <ControlTemplate.Triggers>
@@ -352,7 +352,7 @@
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        
+
         <!-- Path TextBox Style -->
         <Style x:Key="PathTextBoxStyle" TargetType="TextBox">
             <Setter Property="Background" Value="#FF333333"/>
@@ -364,7 +364,7 @@
             <Setter Property="IsReadOnly" Value="False"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        
+
         <!-- Section Header Style -->
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="White"/>
@@ -373,7 +373,7 @@
             <Setter Property="Margin" Value="0,15,0,8"/>
         </Style>
 
-        
+
 
         <!-- Browse Button Style -->
         <Style x:Key="BrowseButtonStyle" TargetType="Button">
@@ -434,7 +434,7 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
-        
+
         <Style TargetType="ComboBox" x:Key="StyledComboBox">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="#FF252525"/>
@@ -538,7 +538,7 @@
             </Setter>
         </Style>
 
-        
+
 
 
         <Style TargetType="TextBlock">

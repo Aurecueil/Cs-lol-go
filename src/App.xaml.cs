@@ -92,6 +92,14 @@ namespace ModManager
                 Globals.is_startup = true;
             }
 
+            foreach (var arg in e.Args)
+            {
+                if (arg.StartsWith("runeforge-mod://"))
+                {
+                    HandleArguments(arg);
+                }
+            }
+
             base.OnStartup(e);
 
             StartHttpServer();
@@ -121,6 +129,8 @@ namespace ModManager
                     }
                 }
             });
+
+
         }
 
         private HttpListener _listener;
@@ -211,31 +221,6 @@ namespace ModManager
                 context.Response.Close();
                 return;
             }
-
-            else if (context.Request.Url.AbsolutePath == "/install-mod")
-                {
-                    using var reader = new StreamReader(context.Request.InputStream, context.Request.ContentEncoding);
-                    var body = await reader.ReadToEndAsync();
-
-                    var installRequest = JsonSerializer.Deserialize<InstallModRequest>(body);
-
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    var mainWindow = (MainWindow)Application.Current.MainWindow;
-
-                    
-                    mainWindow.handle_rf_install(
-                        installRequest.Id,
-                        installRequest.Release,
-                        installRequest.Extra
-                    );
-                });
-
-                // No need to wait or send detailed response
-                context.Response.StatusCode = 200;
-                    context.Response.Close();
-                    return;
-                }
 
             context.Response.StatusCode = 404;
             context.Response.Close();

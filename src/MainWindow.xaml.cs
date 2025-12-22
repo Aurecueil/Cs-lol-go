@@ -1,25 +1,34 @@
 ﻿using Microsoft.Win32;
 using Microsoft.Windows.Themes;
 using ModLoader;
+using ModManager;
+using ModPkgLibSpace;
+using SharpCompress.Archives;
 using System;
 using System.ComponentModel;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.JavaScript;
 using System.Security.Cryptography;
 using System.Security.Policy;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Web;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -31,17 +40,14 @@ using static System.Net.Mime.MediaTypeNames;
 using static System.Net.WebRequestMethods;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using Application = System.Windows.Application;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using DataFormats = System.Windows.DataFormats;
 using File = System.IO.File;
 using Path = System.IO.Path;
-using System.Net.Http.Headers;
-using ModManager;
-using Brushes = System.Windows.Media.Brushes;
-using Brush = System.Windows.Media.Brush;
 using SystemColors = System.Windows.SystemColors;
-using System.Runtime.InteropServices.JavaScript;
 
 namespace ModManager
 {
@@ -174,6 +180,7 @@ namespace ModManager
         public bool show_thumbs { get; set; } = true;
         public float thumb_opacity { get; set; } = 0.4f;
         public bool auto_update_hashes { get; set; } = true;
+        public int Ailgment { get; set; } = 1;
     }
     public class Folder
     {
@@ -194,6 +201,9 @@ namespace ModManager
         public bool isActive { get; set; }
         public bool has_changed { get; set; } = false;
         public List<string> Wads { get; set; } = new List<string>();
+        public string rf_ID { get; set; }
+        public string rf_RE { get; set; }
+
     }
     public class ModInfo
     {
@@ -211,6 +221,8 @@ namespace ModManager
         public string InnerPath { get; set; } = "";
 
         public bool Random { get; set; } = false;
+        public List<LayerInfo> Layers { get; set; } = new();
+        public string layerss { get; set; } = "None";
     }
 
     
@@ -252,6 +264,129 @@ namespace ModManager
             {
                 Console.WriteLine($"Parent ID {parentId} not found.");
             }
+        }
+
+        public void EnsureRuneforgeProtocolRegistered()
+
+        {
+
+            const string protocol = "runeforge-mod";
+
+            string exePath = Process.GetCurrentProcess().MainModule.FileName;
+
+
+            // Check if already registered
+
+            using (var key = Registry.ClassesRoot.OpenSubKey(protocol))
+
+            {
+
+                if (key != null)
+
+                {
+
+                    Rf_Button.ToolTip = "Open Runeforge ^^";
+
+                    Rf_Button.Click -= Runeforge_protocol_add;
+
+                    Rf_Button.Click += (sender, e) => { open_rf(); };
+
+                    return; // Already set up
+
+                }
+
+            }
+
+
+
+
+        }
+
+        public static async void open_rf()
+
+        {
+
+            try
+
+            {
+
+                // Open website in default browser
+
+                Process.Start(new ProcessStartInfo
+
+                {
+
+                    FileName = "https://runeforge.dev",
+
+                    UseShellExecute = true
+
+                });
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Failed to open Runeforge website: " + ex.Message);
+
+            }
+
+        }
+
+
+        private void Runeforge_protocol_add(object sender, RoutedEventArgs e)
+
+        {
+
+            var exePath = Process.GetCurrentProcess().MainModule.FileName;
+
+            string regCommands = $@"reg add HKCR\runeforge-mod /ve /d ""URL:Runeforge Mod Protocol"" /f & " +
+
+                        $@"reg add HKCR\runeforge-mod /v ""URL Protocol"" /d """" /f & " +
+
+                        $@"reg add HKCR\runeforge-mod\shell\open\command /ve /d ""\""{exePath}\"" \""%1\"""" /f";
+
+
+            var psi = new ProcessStartInfo
+
+            {
+
+                FileName = "cmd.exe",
+
+                Arguments = $"/c {regCommands}",
+
+                UseShellExecute = true,
+
+                Verb = "runas",   // triggers UAC
+
+            };
+
+
+            try
+
+            {
+
+                Process.Start(psi);
+
+                Rf_Button.ToolTip = "Open Runeforge ^^";
+
+                Rf_Button.Click -= Runeforge_protocol_add;
+
+                Rf_Button.Click += (sender, e) => { open_rf(); };
+
+                open_rf();
+
+            }
+
+            catch (System.ComponentModel.Win32Exception)
+
+            {
+
+                MessageBox.Show("Admin rights required to register protocol.");
+
+            }
+
         }
 
 
@@ -534,12 +669,26 @@ namespace ModManager
             
             if (TryFindResource("ModListEntryHeight") is double height)
                 Resources["ModListEntryHeight"] = settings.Tile_height;
-            
+
             if (TryFindResource("ModListEntryPadding") is Thickness padding)
-                Resources["ModListEntryPadding"] = new Thickness(RowHeight/10, RowHeight / 10, RowHeight / 10, RowHeight / 10);
-            
+            {
+                // Compute new padding
+                double value = RowHeight / 10;
+
+                // Clamp top and bottom
+                double constrainted = Math.Min(Math.Max(value, 1), 20);
+
+                Resources["ModListEntryPadding"] = new Thickness(constrainted, constrainted, constrainted, constrainted);
+            }
+
             if (TryFindResource("ModListEntryMargin") is Thickness margin)
-                Resources["ModListEntryMargin"] = new Thickness(RowHeight / 20);
+            {
+                double value = RowHeight / 20;
+
+                double constrainted = Math.Min(Math.Max(value, 2), 5);
+
+                Resources["ModListEntryMargin"] = new Thickness(constrainted, constrainted, constrainted, constrainted);
+            }
             AdjustModListLayout();
         }
 
@@ -612,6 +761,10 @@ namespace ModManager
                 {
                     hasStop = true;
                 }
+                else if (arg.StartsWith("runeforge-mod://"))
+                {
+                    HandleRuneforgeProtocol(arg);
+                }
             }
 
             if (hasStop)
@@ -633,6 +786,121 @@ namespace ModManager
             if (hasStart)
             {
                 True_Start_loader();
+            }
+        }
+
+        private async Task HandleRuneforgeProtocol(string url)
+        {
+            try
+            {
+                var uri = new Uri(url);
+                var segments = uri.AbsolutePath.Trim('/').Split('/');
+
+                string modId = segments[0];
+                string releaseId = segments[1];
+
+                DownloadAndInstallMod(modId, releaseId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to handle Runeforge protocol: " + ex.Message);
+                Logger.LogError("Failed to handle Runeforge protocol", ex);
+            }
+        }
+
+        private async Task DownloadAndInstallMod(string modId, string releaseId)
+        {
+            try
+            {
+                string apiUrl = $"https://runeforge.dev/api/mods/{modId}/releases/{releaseId}/download-url";
+                using var client = new HttpClient();
+
+                // Get JSON response
+                string json = await client.GetStringAsync(apiUrl);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("downloadUrl", out JsonElement urlElement))
+                {
+                    MessageBox.Show("Download URL not found in response.");
+                    return;
+                }
+
+                string downloadUrl = urlElement.GetString();
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    MessageBox.Show("Download URL is empty.");
+                    return;
+                }
+
+                // Determine filename from API or fallback
+                string fileName = null;
+                if (root.TryGetProperty("filename", out JsonElement filenameElement))
+                {
+                    fileName = filenameElement.GetString();
+                }
+
+                if (string.IsNullOrWhiteSpace(fileName))
+                {
+                    // Fallback: get filename from URL
+                    fileName = Path.GetFileName(new Uri(downloadUrl).AbsolutePath);
+                }
+
+                fileName = fileName.Split(new string[] { "%2F" }, StringSplitOptions.None).Last();
+
+                // Create temporary directory for Runeforge mods
+                string tempDir = Path.Combine(Path.GetTempPath(), "cslolgo");
+                Directory.CreateDirectory(tempDir);
+
+                // Full path to target file
+                string tempFile = Path.Combine(tempDir, fileName);
+
+                // Download mod
+                var bytes = await client.GetByteArrayAsync(downloadUrl);
+                await File.WriteAllBytesAsync(tempFile, bytes);
+
+                handle_rf_install(tempFile);
+
+                try
+                {
+                    File.Delete(tempFile);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to delete temp file when installing from rf", ex);
+                }
+
+                // Get the file name without extension
+                string fileNameWithoutExt = Path.GetFileNameWithoutExtension(tempFile);
+
+                // Build the installed mod folder path
+                string installedFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileNameWithoutExt);
+                try
+                {
+                    string metaFile = Path.Combine(installedFolder, "META", "rf.json");
+
+                    var meta = new
+                    {
+                        modId = modId,
+                        releaseId = releaseId
+                    };
+
+                    string jsones = System.Text.Json.JsonSerializer.Serialize(
+                        meta,
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                    );
+
+                    File.WriteAllText(metaFile, jsones);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to write rf.json when installing from rf", ex);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to Download mod from Runeforge API", ex);
+                MessageBox.Show("Failed to download/install mod:\n" + ex.Message);
             }
         }
 
@@ -985,55 +1253,62 @@ namespace ModManager
         public MainWindow()
         {
             InitializeComponent();
-            load_settings();
-            colorManager = new Color_menager(settings);
-            detectGamePath();
-            if (!Globals.is_startup)
-            {
-                switch (settings.start_mode)
-                {
-                    case 1:
-                        Globals.StartMinimized = true;
-                        break;
-                    case 2:
-                        Globals.StartWithLoaded = true;
-                        break;
-                    case 3:
-                        Globals.StartMinimized = true;
-                        Globals.StartWithLoaded = true;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            if (!settings.show_path_window)
-            {
-                MainGrid.RowDefinitions[1].Height = new GridLength(0);
-                ModListPanel.Margin = new Thickness(10, 10, 10, 0);
-            }
-
-            Application.Current.Resources["AccentColor"] = settings.theme_color;
-
-
-            Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            string relativePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "animegurl.ico");
-            if (File.Exists(relativePath))
-            {
-                this.Icon = BitmapFrame.Create(new Uri(relativePath, UriKind.Absolute));
-            }
-
             _trayIcon = new TrayIcon();
             _trayIcon.ShowTrayIcon("Yamete, mitenai de yo, onii-san!", OnTrayIconDoubleClick, OnTrayIconRightClick, "animegurl.ico");
             this.StateChanged += MainWindow_StateChanged;
 
             this.Closed += MainWindow_Closed;
-
             this.SizeChanged += MainWindow_SizeChanged;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
+
             ModListEntry.MainWindowInstance = this;
+
+            SetLoading("Settings", 1, 0.17);
+            load_settings();
+            colorManager = new Color_menager(settings);
+            Application.Current.Resources["AccentColor"] = settings.theme_color;
+
+            Loaded += MainWindow_Loaded;
+        }
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            await Dispatcher.Yield(); // forces first render
+
             try
             {
+                if (!Globals.is_startup)
+                {
+                    switch (settings.start_mode)
+                    {
+                        case 1:
+                            Globals.StartMinimized = true;
+                            break;
+                        case 2:
+                            Globals.StartWithLoaded = true;
+                            break;
+                        case 3:
+                            Globals.StartMinimized = true;
+                            Globals.StartWithLoaded = true;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                if (!settings.show_path_window)
+                {
+                    MainGrid.RowDefinitions[1].Height = new GridLength(0);
+                    ModListPanel.Margin = new Thickness(10, 10, 10, 0);
+                }
+                Environment.CurrentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                string relativePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "animegurl.ico");
+                if (File.Exists(relativePath))
+                {
+                    this.Icon = BitmapFrame.Create(new Uri(relativePath, UriKind.Absolute));
+                }
+
+                SetLoading("Leagus Path", 1, 0.34);
+                detectGamePath();
+
                 var root_folder = new HierarchyElement
                 {
                     Name = "root",
@@ -1053,9 +1328,12 @@ namespace ModManager
                 {
                     StartHashUpdate();
                 }
-                LoadWadFiles();
-                LoadFolders();
-                LoadMods();
+                SetLoading("WAD Index", 1, 0.51);
+                await Task.Run(() => LoadWadFiles());
+                SetLoading("Folder Index", 1, 0.68);
+                await Task.Run(() => LoadFolders());
+                SetLoading("Mods Index", 1, 0.85);
+                await Task.Run(() => LoadMods());
                 details_colums_change(settings.detials_column_active);
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
@@ -1063,6 +1341,7 @@ namespace ModManager
                 {
                     Directory.CreateDirectory(ProfilesFolder);
                 }
+                SetLoading("Profiles", 1, 1);
                 InitializeProfiles();
                 if (Globals.StartMinimized)
                 {
@@ -1076,15 +1355,41 @@ namespace ModManager
                     True_Start_loader();
                 }
                 update_tile_contrains();
-                PreCacheAllUIElements();
+
+                await PreCacheAllUIElements();
                 ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
+
+                string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "runtimes", "RuneforgeFont.ttf");
+                var fontFamily = new System.Windows.Media.FontFamily(new Uri(fontPath), "./#Untitled1");
+
+                Rf_Button_Icon.FontFamily = fontFamily;
+                deleteteProfileFont.FontFamily = fontFamily;
+                SettingsFont.FontFamily = fontFamily;
+
                 ShowBreadcrumb(0);
+                EnsureRuneforgeProtocolRegistered();
+
+                OverlayHost3.Visibility = Visibility.Collapsed;
+                OverlayHost3.IsHitTestVisible = false;
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error loading mods:\n" + ex.Message);
             }
         }
+        private void SetLoading(string text, int progress, double stage)
+        {
+            LoadingText.Text = text;
+
+            switch (progress)
+            {
+                case 1: Stage1.Width = 300 * stage; Stage1_b.Width = 300 * stage; break;
+                case 2: Stage2.Width = 300 * stage; Stage2_b.Width = 300 * stage; break;
+                case 3: Stage3.Width = 300 * stage; break;
+            }
+            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+        }
+
         private List<string> GetAllProfiles()
         {
             var profileFiles = Directory.GetFiles(ProfilesFolder, "*.profile");
@@ -1230,6 +1535,19 @@ namespace ModManager
             {
                 try
                 {
+                    string basePath = Path.GetFullPath("installed");
+                    string fullPath = Path.GetFullPath(Path.Combine(basePath, mod_folder));
+
+                    // Get the relative path from basePath to fullPath
+                    string relativeToBase = Path.GetRelativePath(basePath, fullPath);
+
+                    // If relative path goes outside (e.g., contains '..'), it's not inside installed
+                    if (!relativeToBase.StartsWith("..") && Directory.Exists(fullPath))
+                    {
+                        Directory.Delete(fullPath, true); // true = recursive delete
+                    }
+
+
                     int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
                     if (hierarchyById.TryGetValue(parent, out var old_parent))
                     {
@@ -1238,14 +1556,6 @@ namespace ModManager
                     modByFolder.Remove(mod_folder);
 
                     cachedUIElements.Remove((true, mod_folder));
-
-                    string relativePath = Path.Combine("installed", mod_folder);
-
-                    string fullPath = Path.GetFullPath(relativePath);
-                    if (Directory.Exists(fullPath))
-                    {
-                        Directory.Delete(fullPath, true); // true = recursive delete
-                    }
 
                     MainWindow.ProfileEntries.Remove(old_entry.ModFolder);
 
@@ -1372,7 +1682,7 @@ namespace ModManager
             OverlayHost.Children.Clear(); // Clear previous overlay if any
             OverlayHost.Children.Add(control);
         }
-
+        
 
         private void DeleteProfile_Click(object sender, RoutedEventArgs e)
         {
@@ -1414,6 +1724,43 @@ namespace ModManager
             }
         }
 
+        private static string NormalizeVersion(string versionString)
+        {
+            if (string.IsNullOrEmpty(versionString))
+            {
+                return "0.0.0";
+            }
+
+            // 1. Delete all characters other than 0-9 and dot
+            // The pattern [^0-9.] matches any character that is NOT a digit or a dot.
+            string cleanedString = Regex.Replace(versionString, @"[^0-9.]", "");
+
+            // Split at the dot, then filter out any empty strings that might result 
+            // from multiple consecutive dots (e.g., "1..2.3" -> ["1", "", "2", "3"])
+            var parts = cleanedString
+                .Split(new char[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+
+            // If no parts remain after cleaning, return a default version
+            if (!parts.Any())
+            {
+                return "0.0.0";
+            }
+
+            // 2. Trim to just 3 parts
+            // Use Take(3) to get the first three elements.
+            var finalParts = parts.Take(3).ToList();
+
+            // 3. Add ".0" to make it enough parts (if less than 3)
+            // This is your robust padding logic!
+            while (finalParts.Count < 3)
+            {
+                finalParts.Add("0");
+            }
+
+            // 4. Join the parts back together with a dot separator
+            return string.Join(".", finalParts);
+        }
         // Method to read current profile (shows message box as requested)
         private void ReadCurrentProfile()
         {
@@ -1524,17 +1871,22 @@ namespace ModManager
 
             }
 
-        public void Export_Mod(Mod ModElement)
+        public async Task Export_Mod(Mod ModElement)
         {
-            string sourceFolder = Path.Combine("installed", ModElement.ModFolder);
-            string wadSource = Path.Combine(sourceFolder, "wad");
-            string metaSource = Path.Combine(sourceFolder, "meta");
+            string rawName = string.IsNullOrWhiteSpace(ModElement.Info.Author)
+                ? ModElement.Info.Name
+                : $"{ModElement.Info.Name} by {ModElement.Info.Author}";
+
+            string sanitized = new string(rawName
+                .Where(c => !Path.GetInvalidFileNameChars().Contains(c))
+                .ToArray())
+                .Trim();
 
             var saveDialog = new SaveFileDialog
             {
-                Title = "Export to .fantome",
-                Filter = "Fantome Files (*.fantome)|*.fantome",
-                FileName = $"{ModElement.Info.Name} by {ModElement.Info.Author}.fantome",
+                Title = "Export Mod",
+                Filter = "Fantome Files (*.fantome)|*.fantome|Mod Package (*.modpkg)|*.modpkg",
+                FileName = $"{sanitized}.fantome",
                 DefaultExt = ".fantome"
             };
 
@@ -1542,61 +1894,148 @@ namespace ModManager
                 return;
 
             string targetPath = saveDialog.FileName;
+            bool isFantome = Path.GetExtension(targetPath).Equals(".fantome", StringComparison.OrdinalIgnoreCase);
 
-            string tempExportDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string sourceFolder = Path.Combine("installed", ModElement.ModFolder);
+            string wadSource = Path.Combine(sourceFolder, "wad");
+            string metaSource = Path.Combine(sourceFolder, "meta");
+
 
             try
             {
-                // Create temp export directory
-                Directory.CreateDirectory(tempExportDir);
-
-                // Copy wad/ folder
-                string wadTarget = Path.Combine(tempExportDir, "WAD");
-                if (Directory.Exists(wadSource))
-                    CopyDirectory(wadSource, wadTarget);
-
-                // Create meta folder
-                string metaTarget = Path.Combine(tempExportDir, "META");
-                Directory.CreateDirectory(metaTarget);
-                if (Directory.Exists(metaSource))
-                    CopyDirectory(metaSource, metaTarget);
-                
-                var exportDetails = new ModDetails
+                if (isFantome)
                 {
-                    Priority = ModElement.Details.Priority,
-                    override_ = ModElement.Details.override_,
-                    InnerPath = "",
-                    Random = false
-                };
 
-                string detailsJsonTarget = Path.Combine(metaTarget, "details.json");
-                File.WriteAllText(detailsJsonTarget, JsonSerializer.Serialize(exportDetails, new JsonSerializerOptions
+                    string tempExportDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(tempExportDir);
+
+                    // 1️⃣ META folder (always copied)
+                    string metaTarget = Path.Combine(tempExportDir, "META");
+                    Directory.CreateDirectory(metaTarget);
+                    if (Directory.Exists(metaSource))
+                        CopyDirectory(metaSource, metaTarget);
+
+                    string wadTarget = Path.Combine(tempExportDir, "WAD");
+                    Directory.CreateDirectory(wadTarget);
+
+                    string? copiedBaseFolder = null;
+
+                    if (Directory.Exists(wadSource))
+                    {
+                        CopyDirectory(wadSource, wadTarget);
+                    }
+                    else
+                    {
+                        copiedBaseFolder = Directory.GetDirectories(sourceFolder, "WAD_base")
+                            .OrderBy(d => d)
+                            .FirstOrDefault();
+
+                        if (copiedBaseFolder != null)
+                        {
+                            CopyDirectory(copiedBaseFolder, wadTarget);
+                        }
+                    }
+
+                    foreach (var layer in ModElement.Details.Layers)
+                    {
+                        if (layer.Name == "base") continue; 
+
+                        string dir = Path.Combine(sourceFolder, layer.folder_name);
+                        string dest = Path.Combine(tempExportDir, layer.folder_name);
+                        CopyDirectory(dir, dest);
+                    }
+
+                    var exportDetails = new ModDetails();
+                    exportDetails.Layers = ModElement.Details.Layers;
+                    exportDetails.Priority = ModElement.Details.Priority;
+                    exportDetails.override_ = false;
+                    exportDetails.InnerPath = "";
+                    exportDetails.Random = false;
+
+                    string detailsJsonTarget = Path.Combine(metaTarget, "details.json");
+                    File.WriteAllText(detailsJsonTarget, JsonSerializer.Serialize(exportDetails, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }));
+
+                    string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
+                    ZipFile.CreateFromDirectory(tempExportDir, tempZip);
+
+                    if (File.Exists(targetPath))
+                        File.Delete(targetPath);
+
+                    File.Move(tempZip, targetPath);
+
+                    if (Directory.Exists(tempExportDir))
+                    {
+                        try { Directory.Delete(tempExportDir, true); } catch (Exception ex) { Logger.LogError("Error while exporting mod: -->   ", ex); }
+                    }
+                }
+                else
                 {
-                    WriteIndented = true
-                }));
+                    // .modpkg export
+                    var layers = new List<(string relativePath, string folderName, int number)>();
 
-                // Zip it
-                string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
-                ZipFile.CreateFromDirectory(tempExportDir, tempZip);
+                    foreach (var layer in ModElement.Details.Layers)
+                    {
+                        layers.Add(($"installed/{ModElement.ModFolder}/{layer.folder_name}", layer.Name, layer.Priority));
+                    }
 
-                // Delete target .fantome if it exists
-                if (File.Exists(targetPath))
-                    File.Delete(targetPath);
+                    var metadata = new ModpkgMetadata
+                    {
+                        Name = ModElement.ModFolder,
+                        DisplayName = ModElement.Info.Name,
+                        Description = ModElement.Info.Description,
+                        Version = NormalizeVersion(ModElement.Info.Version),
+                    };
 
-                // Rename .zip to .fantome
-                File.Move(tempZip, targetPath);
+                    if (!string.IsNullOrWhiteSpace(ModElement.Info.Author))
+                    {
+                        var authorNames = ModElement.Info.Author.Split(',')
+                            .Select(a => a.Trim())
+                            .Where(a => !string.IsNullOrEmpty(a));
+
+                        foreach (var name in authorNames)
+                        {
+                            metadata.Authors.Add(new ModpkgAuthor(name));
+                        }
+                    }
+                    string thumb_path = Path.GetFullPath(Path.Combine(metaSource, "image.png"));
+
+                    var dyustry = new DistributorInfo
+                    {
+                        SiteId = "cslol-go",
+                        SiteName = "cslol-go manager",
+                        SiteUrl = "https://github.com/Aurecueil/Cs-lol-go/releases/latest",
+                        ModId = "0",
+                        ReleaseId = "0",
+                    };
+                    string rf_path = Path.Combine(metaSource, "rf.json");
+                    if (File.Exists(rf_path))
+                    {
+                        string json = File.ReadAllText(rf_path);
+
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        JsonElement root = doc.RootElement;
+
+                        dyustry.ModId = root.GetProperty("modId").GetString();
+                        dyustry.ReleaseId = root.GetProperty("releaseId").GetString();
+                        dyustry.SiteName = "RuneForge";
+                        dyustry.SiteUrl = "https://runeforge.dev/mods/";
+                        dyustry.SiteId = "runeforge";
+                    }
+
+
+
+                    ModPkgLib.Pack(layers, metadata, targetPath, thumb_path, dyustry);
+
+                }
+
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                // Cleanup
-                if (Directory.Exists(tempExportDir))
-                {
-                    try { Directory.Delete(tempExportDir, true); } catch { /* ignore */ }
-                }
+                Logger.LogError("Export Fail: -->   ", ex);
             }
         }
 
@@ -1839,6 +2278,7 @@ namespace ModManager
             catch (Exception ex)
             {
                 MessageBox.Show($"Error starting loader: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Logger.LogError("Error starting loader: -->   ", ex);
                 await Stop_loader_internal();
             }
             finally
@@ -1860,7 +2300,7 @@ namespace ModManager
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error stopping CSLol: {ex.Message}");
+                Logger.LogError("Error stopping cslol: -->   ", ex);
             }
 
             Load_check_box.IsEnabled = false;
@@ -2045,6 +2485,7 @@ namespace ModManager
                             {
                                 Feed.Text = "Reinitializing mods...";
                                 ToggleOverlay(true);
+                                ClearPaintActiveMods();
                                 await InitializeModsAsync(token);
                                 Feed.Text = "Mods reinitialized. Waiting for game to start...";
                             }
@@ -2121,19 +2562,19 @@ namespace ModManager
             var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
 
 
-            if (settings.not_tft) 
+            if (settings.not_tft)
             {
                 args += " --noTFT";
             }
 
-            if (settings.supress_install_confilcts) 
+            if (settings.supress_install_confilcts)
             {
                 args += " --ignoreConflict";
             }
 
 
             string err_catch = "";
-            var outputLines = new List<string>();https://www.facebook.com/messages/t/100010163408225
+            var outputLines = new List<string>();
             var errorLines = new List<string>();
             try
             {
@@ -2197,6 +2638,7 @@ namespace ModManager
             SetProgress();
             _currentRunner = null;
         }
+
 
 
 
@@ -2649,11 +3091,16 @@ namespace ModManager
             }
         }
 
-        private async void PreCacheAllUIElements()
+        private async Task PreCacheAllUIElements()
         {
+            double current = 1;
+            double max = hierarchyById.Count;
             // Cache all folder entries
             foreach (var kvp in hierarchyById)
             {
+
+                SetLoading(kvp.Value.Name, 2, current/max);
+                current += 1;
                 int folderId = kvp.Key;
                 HierarchyElement folderElement = kvp.Value;
 
@@ -2670,12 +3117,17 @@ namespace ModManager
                     // Add to cache
                     cachedUIElements[cacheKey] = folderEntry;
                 }
-            }
 
-            // Cache all mod entries
+                await Dispatcher.Yield(DispatcherPriority.Background);
+            }
+            current = 1;
+            max = modByFolder.Count;
+
             foreach (var kvp in modByFolder)
             {
                 string modId = kvp.Key;
+                SetLoading(kvp.Value.Info.Name, 3, current / max);
+                current += 1;
                 Mod modElement = kvp.Value;
 
                 var cacheKey = (true, modId); // isMod = true for mods
@@ -2691,6 +3143,8 @@ namespace ModManager
                     // Add to cache
                     cachedUIElements[cacheKey] = modEntry;
                 }
+
+                await Dispatcher.Yield(DispatcherPriority.Background);
             }
         }
         private void CollectAllModsRecursively(HierarchyElement currentFolder, List<(string childId, Mod element)> mods, string searchFilter = null)
@@ -3370,6 +3824,110 @@ namespace ModManager
                 Directory.CreateDirectory(metaPath);
             }
 
+            
+
+            ModDetails modDetails = new ModDetails(); // Default values
+            if (File.Exists(detailsPath))
+            {
+                try
+                {
+                    string detailsJson = File.ReadAllText(detailsPath);
+                    modDetails = JsonSerializer.Deserialize<ModDetails>(detailsJson) ?? new ModDetails();
+                    if (override_inner_path)
+                    {
+                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
+                    }
+                }
+                catch (Exception)
+                {
+                    if (override_inner_path)
+                    {
+                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
+                    }
+                    string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(detailsPath, defaultDetailsJson);
+                }
+            }
+            else
+            {
+                if (override_inner_path)
+                {
+                    modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
+                }
+                string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(detailsPath, defaultDetailsJson);
+            }
+
+            string wadFolder = Path.Combine(modFolderPath, "WAD_base");
+            string wadBaseFolder = Path.Combine(modFolderPath, "WAD");
+
+            // If folder "WAD_base" exists and "WAD" does not → rename
+            if (Directory.Exists(wadFolder))
+            {
+                if (!Directory.Exists(wadBaseFolder))
+                {
+                    Directory.Move(wadFolder, wadBaseFolder);
+                }
+                else
+                {
+                    // If both exist, merge contents of WAD into WAD_base and delete WAD
+                    foreach (string file in Directory.GetFiles(wadFolder, "*", SearchOption.AllDirectories))
+                    {
+                        string relative = Path.GetRelativePath(wadFolder, file);
+                        string target = Path.Combine(wadBaseFolder, relative);
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        File.Move(file, target, true);
+                    }
+                    Directory.Delete(wadFolder, true);
+                }
+            }
+
+            // Collect all folders that start with WAD_
+            var wadFolders = Directory.GetDirectories(modFolderPath, "WAD_*", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName)
+                .ToList();
+
+            // Remove non-existent layers
+            modDetails.Layers.RemoveAll(l =>
+            {
+                return !wadFolders.Contains(l.folder_name);
+            });
+
+            string layerName = "base";
+            modDetails.Layers.Add(new LayerInfo
+            {
+                Name = layerName,
+                Priority = modDetails.Layers.Count + 1,
+                folder_name = "WAD"
+            });
+
+            foreach (var wadDir in wadFolders)
+            {
+                layerName = wadDir.Substring(4);
+                if (!modDetails.Layers.Any(l => l.Name.Equals(layerName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    modDetails.Layers.Add(new LayerInfo
+                    {
+                        Name = layerName,
+                        Priority = modDetails.Layers.Count + 1,
+                        folder_name = wadDir
+                    });
+                }
+                else
+                {
+                    modDetails.Layers.Add(new LayerInfo
+                    {
+                        Name = $"{layerName}_2",
+                        Priority = modDetails.Layers.Count + 1,
+                        folder_name = wadDir
+                    });
+                }
+            }
+
+            
+
+            File.WriteAllText(detailsPath, JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true }));
+
             List<string> wads = new List<string>();
             if (Directory.Exists(wadPath))
             {
@@ -3414,39 +3972,7 @@ namespace ModManager
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
 
-            ModDetails modDetails = new ModDetails(); // Default values
-            if (File.Exists(detailsPath))
-            {
-                try
-                {
-                    string detailsJson = File.ReadAllText(detailsPath);
-                    modDetails = JsonSerializer.Deserialize<ModDetails>(detailsJson) ?? new ModDetails();
-                    if(override_inner_path){
-                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (override_inner_path)
-                    {
-                        modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
-                    }
-                    string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
-                    File.WriteAllText(detailsPath, defaultDetailsJson);
-                    
-                }
-            }
-            else
-            {
-                if (override_inner_path)
-                {
-                    modDetails.InnerPath = BuildInnerPath(Current_location_folder, hierarchyById);
-                }
-                string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(detailsPath, defaultDetailsJson);
-            }
 
-            
             // Create and return Mod object
             Mod new_mod_netyr = new Mod
             {
@@ -3455,7 +3981,7 @@ namespace ModManager
                 ModFolder = modFolderName,
                 Wads = wads
             };
-
+               
             if (modByFolder.TryGetValue(modFolderName, out var old_entry))
             {
                 int parent = get_parent_from_innerPath(old_entry.Details.InnerPath);
@@ -3579,70 +4105,72 @@ namespace ModManager
 
         public void CreateStartMenuShortcut()
         {
-            string startMenuProgramsPath = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu) + @"\Programs";
-            string shortcutPath = Path.Combine(startMenuProgramsPath, "ModLoader-cslolgo.url");
-            string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-
-            string shortcutContent =
-                "[InternetShortcut]\n" +
-                $"URL=file:///{exePath.Replace('\\', '/')}\n" +
-                "IconIndex=0\n" +
-                $"IconFile={exePath}\n";
-
-            File.WriteAllText(shortcutPath, shortcutContent);
+            // string startMenuProgramsPath = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu) + @"\Programs";
+            // string shortcutPath = Path.Combine(startMenuProgramsPath, "ModLoader-cslolgo.url");
+            // string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            // 
+            // string shortcutContent =
+            //     "[InternetShortcut]\n" +
+            //     $"URL=file:///{exePath.Replace('\\', '/')}\n" +
+            //     "IconIndex=0\n" +
+            //     $"IconFile={exePath}\n";
+            // 
+            // File.WriteAllText(shortcutPath, shortcutContent);
         }
 
 
 
-        public async void handle_rf_install(string id, string release, string path)
+        public async void handle_rf_install(string path)
         {
-            string extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", $".rf---{id}");
+            string fileNameWithoutExt = Path.GetFileNameWithoutExtension(path);
+            string extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileNameWithoutExt);
             Directory.CreateDirectory(extractTargetDir);
 
-
-            // Step 3: Extract
-            try
+            if(Path.GetExtension(path) == ".fantome")
             {
-                using (var archive = ZipFile.OpenRead(path))
+                try
                 {
-                    foreach (var entry in archive.Entries)
+                    using (var archive = ZipFile.OpenRead(path))
                     {
-                        string fullPath = Path.Combine(extractTargetDir, entry.FullName);
-
-                        // Create directory if needed
-                        if (string.IsNullOrEmpty(entry.Name))
+                        foreach (var entry in archive.Entries)
                         {
-                            Directory.CreateDirectory(fullPath);
-                            continue;
+                            string fullPath = Path.Combine(extractTargetDir, entry.FullName);
+
+                            // Create directory if needed
+                            if (string.IsNullOrEmpty(entry.Name))
+                            {
+                                Directory.CreateDirectory(fullPath);
+                                continue;
+                            }
+
+                            // Ensure directory exists
+                            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+                            // Overwrite the file
+                            entry.ExtractToFile(fullPath, overwrite: true);
                         }
-
-                        // Ensure directory exists
-                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-
-                        // Overwrite the file
-                        entry.ExtractToFile(fullPath, overwrite: true);
                     }
+                    string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
+                    Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                    RefreshModListPanel(Current_location_folder);
+                    string metaDir = Path.Combine(extractTargetDir, "meta");
+                    Directory.CreateDirectory(metaDir);
+
+                    File.Delete(path);
                 }
-                string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                Mod new_mod = CreateModFromFolder(extractTargetDir, true);
-                RefreshModListPanel(Current_location_folder);
-                string metaDir = Path.Combine(extractTargetDir, "meta");
-                Directory.CreateDirectory(metaDir);
-
-                string releaseFile = Path.Combine(metaDir, "release.txt");
-                await File.WriteAllTextAsync(releaseFile, release);
-
-                // Delete the original zip file
-                File.Delete(path);
+                catch (Exception ex) { Logger.LogError("Error RF importing (extract): -->   ", ex); }
             }
-            catch (Exception ex) { }
+            else if (Path.GetExtension(path) == ".modpkg")
+            {
+                install_modpkg(path, true);
+            }
+            else
+            {
+                MessageBox.Show($"{Path.GetExtension(path)} is not a currently supported file format");
+            }
+
+                
         }
-
-
-
-
-
-
 
 
         private bool IsAcceptedDropItem(string path)
@@ -3651,8 +4179,9 @@ namespace ModManager
                 return true;
 
             string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".zip" || ext == ".fantome" || ext == ".wad.client" || ext == ".client" || ext == ".wad";
+            return ext == ".zip" || ext == ".fantome" || ext == ".7fantome" || ext == ".wad.client" || ext == ".client" || ext == ".wad" || ext == ".7z" || ext == ".rar" || ext == ".modpkg";
         }
+
 
         public async void HandleDroppedItem(string path)
         {
@@ -3826,6 +4355,7 @@ namespace ModManager
             }
             RefreshModListPanel(Current_location_folder);
         }
+
         private static readonly Regex modRegex = new Regex(
         @"^(?<name>.+?)_(?<version>\d+\.\d+\.\d+)(\(\d+\))?(\.fantome)?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase
@@ -3869,6 +4399,105 @@ namespace ModManager
 
             return lowerVersionFolder;
         }
+
+        private void install_modpkg(string path, bool override_ = false)
+        {
+            var info = ModPkgLib.GetMetadata(path);
+
+            string installPath = Path.Combine("installed", info.Metadata.Name);
+
+            if (Directory.Exists(installPath) && !override_)
+            {
+                switch (settings.import_override)
+                {
+                    case 0:
+                        MessageBox.Show("This mod is Already installed");
+                        break;
+                    case 1:
+                        // just unpack, keep existing folder
+                        break;
+                    case 2:
+                        // delete folder, then unpack
+                        Directory.Delete(installPath, true);
+                        break;
+                    case 3:
+                        // find next available folder with _numb
+                        int numb = 2;
+                        string newPath;
+                        do
+                        {
+                            newPath = Path.Combine("installed", $"{info.Metadata.Name}_{numb}");
+                            numb++;
+                        } while (Directory.Exists(newPath));
+                        installPath = newPath;
+                        break;
+                    default:
+                        throw new Exception("Invalid import_override setting.");
+                }
+            }else if (Directory.Exists(installPath) && override_)
+            {
+                Directory.Delete(installPath, true);
+            }
+            ModPkgLib.Extract(path, installPath);
+
+            // Ensure META folder exists
+            string metaPath = Path.Combine(installPath, "META");
+            Directory.CreateDirectory(metaPath);
+
+            if (info.Metadata.Distributor.SiteId == "runeforge")
+            {
+                var obj = new
+                {
+                    modId = info.Metadata.Distributor.ModId,
+                    releaseId = info.Metadata.Distributor.ReleaseId,
+                };
+
+                string json_rf = JsonSerializer.Serialize(obj, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+                File.WriteAllText(Path.Combine(metaPath, "rf.json"), json_rf);
+            }
+
+
+            // Prepare authors as comma-separated string
+            string authors = info.Metadata.Authors != null
+                ? string.Join(", ", info.Metadata.Authors.Select(a => a?.Name ?? ""))
+                : "";
+
+            // Create ModInfo object with safe defaults
+            var modInfo = new ModInfo
+            {
+                Author = authors,
+                Description = info.Metadata.Description ?? "",
+                Heart = "",
+                Home = "",
+                Name = info.Metadata.DisplayName ?? "",
+                Version = info.Metadata.Version ?? "1.0.0"
+            };
+
+            // Serialize to JSON
+            string json = System.Text.Json.JsonSerializer.Serialize(modInfo, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+            // Save to META/info.json
+            File.WriteAllText(Path.Combine(metaPath, "info.json"), json);
+
+            var modDetails = new ModDetails
+            {
+                Layers = info.Layers // assign the layers directly
+            };
+
+            string json2 = System.Text.Json.JsonSerializer.Serialize(modDetails, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+            // Save to META/info.json
+            File.WriteAllText(Path.Combine(metaPath, "details.json"), json2);
+
+            string folderName = Path.GetFileName(installPath.TrimEnd(Path.DirectorySeparatorChar));
+            SaveModDetails(CreateModFromFolder(installPath, true));
+            RefreshModListPanel(Current_location_folder);
+        }
+
         private void HandleWadImport(string path)
         {
             if (Directory.Exists(path))
