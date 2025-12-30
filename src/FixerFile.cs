@@ -1,11 +1,12 @@
-﻿using ZstdSharp;
-using Jade.Ritobin;
+﻿using Jade.Ritobin;
 using Microsoft.VisualBasic.FileIO;
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Formats.Asn1;
 using System.IO;
 using System.IO.Compression;
@@ -15,39 +16,397 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Shapes;
 using System.Xml.Linq;
-using static repatheruwu.Repatheruwu;
-using static repatheruwu.Repatheruwu.WadExtractor;
+using Xceed.Wpf.Toolkit.PropertyGrid.Attributes;
+using ZstdSharp;
+using static ModManager.Repatheruwu;
 using static System.Collections.Specialized.BitVector32;
 using static System.Net.Mime.MediaTypeNames;
+using Path = System.IO.Path;
 using SearchOption = System.IO.SearchOption;
 
-namespace repatheruwu
+namespace ModManager
 {
-    public static class FixerSettings
+    public class FixerSettings
     {
-        // Example settings
-        public static string Character { get; set; } = "";
-        public static int skinNo { get; set; } = 0;
+        // NO LONGER STATIC
+        public string Character { get; set; } = "";
+        public int skinNo { get; set; } = 0;
 
-        public static int HealthbarStyle { get; set; } = 12;
-        public static bool verifyHpBar { get; set; } = true;
-        public static string inputDir { get; set; } = "TEMP";
-        public static string outputDir { get; set; } = ".";
-        public static string WADpath { get; set; } = "C:\\Riot Games\\League of Legends\\Game\\DATA\\FINAL";
-        public static List<string> AllWadPaths = new List<string>();
-        public static string repath_path_path { get; set; } = ".";
-        public static bool in_file_path { get; set; } = true;
-        public static bool cls_assets { get; set; } = true;
-        public static bool KillStaticMat { get; set; } = true;
-        public static string gamehashes_path { get; set; } = "cslol-tools\\hashes.game.txt";
-        public static List<string> base_wad_path { get; set; }
-        public static List<string> OldLookUp { get; set; }
-        public static bool keep_Icons { get; set; } = true;
+        public int HealthbarStyle { get; set; } = 12;
+        public bool verifyHpBar { get; set; } = true;
+        public string inputDir { get; set; } = "TEMP";
+        public string outputDir { get; set; } = ".";
+        public string WADpath { get; set; } = "C:\\Riot Games\\League of Legends\\Game\\DATA\\FINAL";
+        public List<string> AllWadPaths = [];
+        public string repath_path_path { get; set; } = ".";
+        public bool in_file_path { get; set; } = true;
+        public bool cls_assets { get; set; } = true;
+        public string gamehashes_path { get; set; } = "cslol-tools\\hashes.game.txt";
+        public List<string> base_wad_path { get; set; } = [];
+        public List<string> OldLookUp { get; set; } = [];
+        public List<string> LangLookUp { get; set; } = [];
+        public bool Lang { get; set; } = true; // good
+
+        public bool keep_Icons { get; set; } = true; // good
+        public bool KillStaticMat { get; set; } = true; // good
+        public bool sfx_events { get; set; } = true; // good
+        public bool folder { get; set; } = true; // good
+        public bool binless { get; set; } = true; // good
+        public bool noskinni { get; set; } = true; // good
+        public bool AllAviable { get; set; } = true; // good
+        public int SoundOption { get; set; } = 0; // good
+        public int AnimOption { get; set; } = 0; // good
+
+        public List<string> Missing_Bins { get; set; } = new List<string>();
+        public List<string> Missing_Files { get; set; } = new List<string>();
     }
 
-    class Repatheruwu
+    public class Repatheruwu
     {
+        Dictionary<string, List<string>> CharacterCases = new Dictionary<string, List<string>>
+        {
+            ["anivia"] = new List<string>
+    {
+        "aniviaegg",
+        "aniviaiceblock",
+    },
+            ["annie"] = new List<string>
+    {
+        "annietibbers",
+    },
+            ["aphelios"] = new List<string>
+    {
+        "apheliosturret",
+    },
+            ["aurora"] = new List<string>
+    {
+        "auroraspirits",
+    },
+            ["azir"] = new List<string>
+    {
+        "azirsoldier",
+        "azirsundisc",
+        "azirtowerclicker",
+        "azirultsoldier",
+    },
+            ["bard"] = new List<string>
+    {
+        "bardfollower",
+        "bardhealthshrine",
+        "bardpickup",
+        "bardpickupnoicon",
+        "bardportalclickable",
+    },
+            ["bardpickup"] = new List<string>
+    {
+        "bardpickupnoicon",
+    },
+            ["belveth"] = new List<string>
+    {
+        "belvethspore",
+        "belvethvoidling",
+    },
+            ["caitlyn"] = new List<string>
+    {
+        "caitlyntrap",
+    },
+            ["cassiopeia"] = new List<string>
+    {
+        "cassiopeia_death",
+    },
+            ["elise"] = new List<string>
+    {
+        "elisespider",
+        "elisespiderling",
+    },
+            ["elisespider"] = new List<string>
+    {
+        "elisespiderling",
+    },
+            ["fiddlesticks"] = new List<string>
+    {
+        "fiddlestickseffigy",
+    },
+            ["fizz"] = new List<string>
+    {
+        "fizzbait",
+        "fizzshark",
+    },
+            ["gangplank"] = new List<string>
+    {
+        "gangplankbarrel",
+    },
+            ["gnar"] = new List<string>
+    {
+        "gnarbig",
+    },
+            ["illaoi"] = new List<string>
+    {
+        "illaoiminion",
+    },
+            ["irelia"] = new List<string>
+    {
+        "ireliablades",
+    },
+            ["ivern"] = new List<string>
+    {
+        "ivernminion",
+        "iverntotem",
+    },
+            ["jarvaniv"] = new List<string>
+    {
+        "jarvanivstandard",
+        "jarvanivwall",
+    },
+            ["jhin"] = new List<string>
+    {
+        "jhintrap",
+    },
+            ["jinx"] = new List<string>
+    {
+        "jinxmine",
+    },
+            ["kalista"] = new List<string>
+    {
+        "kalistaaltar",
+        "kalistaspawn",
+    },
+            ["kindred"] = new List<string>
+    {
+        "kindredjunglebountyminion",
+        "kindredwolf",
+    },
+            ["kled"] = new List<string>
+    {
+        "kledmount",
+        "kledrider",
+    },
+            ["kogmaw"] = new List<string>
+    {
+        "kogmawdead",
+    },
+            ["lissandra"] = new List<string>
+    {
+        "lissandrapassive",
+    },
+            ["lulu"] = new List<string>
+    {
+        "lulufaerie",
+        "lulupolymorphcritter",
+    },
+            ["lux"] = new List<string>
+    {
+        "luxair",
+        "luxdark",
+        "luxfire",
+        "luxice",
+        "luxmagma",
+        "luxmystic",
+        "luxnature",
+        "luxstorm",
+        "luxwater",
+    },
+            ["malzahar"] = new List<string>
+    {
+        "malzaharvoidling",
+    },
+            ["maokai"] = new List<string>
+    {
+        "maokaisproutling",
+    },
+            ["milio"] = new List<string>
+    {
+        "miliominion",
+    },
+            ["monkeyking"] = new List<string>
+    {
+        "monkeykingclone",
+        "monkeykingflying",
+    },
+            ["naafiri"] = new List<string>
+    {
+        "naafiripackmate",
+    },
+            ["nasus"] = new List<string>
+    {
+        "nasusult",
+    },
+            ["nidalee"] = new List<string>
+    {
+        "nidaleecougar",
+        "nidaleespear",
+    },
+            ["nunu"] = new List<string>
+    {
+        "nunusnowball",
+    },
+            ["olaf"] = new List<string>
+    {
+        "olafaxe",
+    },
+            ["orianna"] = new List<string>
+    {
+        "oriannaball",
+        "oriannanoball",
+    },
+            ["ornn"] = new List<string>
+    {
+        "ornnram",
+    },
+            ["quinn"] = new List<string>
+    {
+        "quinnvalor",
+    },
+            ["rammus"] = new List<string>
+    {
+        "rammusdbc",
+        "rammuspb",
+    },
+            ["reksai"] = new List<string>
+    {
+        "reksaitunnel",
+    },
+            ["ruby_jinx"] = new List<string>
+    {
+        "ruby_jinx_monkey",
+    },
+            ["senna"] = new List<string>
+    {
+        "sennasoul",
+    },
+            ["shaco"] = new List<string>
+    {
+        "shacobox",
+    },
+            ["shen"] = new List<string>
+    {
+        "shenspirit",
+    },
+            ["shyvana"] = new List<string>
+    {
+        "shyvanadragon",
+    },
+            ["sona"] = new List<string>
+    {
+        "sonadjgenre01",
+        "sonadjgenre02",
+        "sonadjgenre03",
+    },
+            ["strawberry_aurora"] = new List<string>
+    {
+        "strawberry_auroraspirits",
+    },
+            ["strawberry_illaoi"] = new List<string>
+    {
+        "strawberry_illaoiminion",
+    },
+            ["swain"] = new List<string>
+    {
+        "swaindemonform",
+    },
+            ["syndra"] = new List<string>
+    {
+        "syndraorbs",
+        "syndrasphere",
+    },
+            ["taliyah"] = new List<string>
+    {
+        "taliyahwallchunk",
+    },
+            ["teemo"] = new List<string>
+    {
+        "teemomushroom",
+    },
+            ["thresh"] = new List<string>
+    {
+        "threshlantern",
+    },
+            ["trundle"] = new List<string>
+    {
+        "trundlewall",
+    },
+            ["vi"] = new List<string>
+    {
+        "viego",
+        "viegosoul",
+        "viktor",
+        "viktorsingularity",
+    },
+            ["viego"] = new List<string>
+    {
+        "viegosoul",
+    },
+            ["viktor"] = new List<string>
+    {
+        "viktorsingularity",
+    },
+            ["yorick"] = new List<string>
+    {
+        "yorickbigghoul",
+        "yorickghoulmelee",
+        "yorickwghoul",
+        "yorickwinvisible",
+    },
+            ["zac"] = new List<string>
+    {
+        "zacrebirthbloblet",
+    },
+            ["zed"] = new List<string>
+    {
+        "zedshadow",
+    },
+            ["zoe"] = new List<string>
+    {
+        "zoeorbs",
+    },
+            ["zyra"] = new List<string>
+    {
+        "zyragraspingplant",
+        "zyrapassive",
+        "zyraseed",
+        "zyrathornplant",
+    },
+        };
+
+        public FixerSettings Settings { get; private set; }
+        private WadExtractor _wadExtractor;
+        private PathFixer _pathFixer;
+        private Hashes _hashes;
+        private FixerUI x;
+        public Repatheruwu()
+        {
+            Settings = new FixerSettings();
+            _wadExtractor = new WadExtractor(Settings);
+            _pathFixer = new PathFixer(Settings);
+            _hashes = new Hashes(Settings);
+        }
+
+        public static uint FNV1aHash(string input)
+        {
+            const uint FNV_OFFSET_BASIS = 0x811C9DC5;
+            const uint FNV_PRIME = 0x01000193;
+
+            uint hash = FNV_OFFSET_BASIS;
+            byte[] data = Encoding.UTF8.GetBytes(input.ToLowerInvariant());
+
+            foreach (byte b in data)
+            {
+                hash ^= b;
+                hash *= FNV_PRIME;
+            }
+
+            return hash;
+        }
+
+        public static ulong HashPath(string path, bool not_x16 = false)
+        {
+            string norm = path.Replace('\\', '/').ToLowerInvariant(); ;
+            byte[] data = Encoding.UTF8.GetBytes(norm);
+            ulong h = XxHash64.HashToUInt64(data, seed: 0);
+            return h;
+        }
         public enum Defi : uint
         {
             ContextualActionData = 3476110372,
@@ -67,7 +426,47 @@ namespace repatheruwu
             GearSkinUpgrade = 668820321,
             AnimationGraphData = 4126869447
         }
-        public static void ProcessAviableSkin(List<int> entries, string charra)
+
+        private Queue<(string, int, bool)> Characters = new Queue<(string, int, bool)>();
+        public (int, bool) getSkinInts(string charra)
+        {
+            List<int> Skins = _wadExtractor.GetAvailableSkinNumbers(Settings.base_wad_path, charra);
+            var (i, b) = ProcessAviableSkin2(Skins);
+            return (i, b);
+        }
+        public (int, bool) ProcessAviableSkin2(List<int> entries)
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                return (0, true);
+            }
+
+            if (entries.Count == 1)
+            {
+                return (entries[0], false);
+            }
+
+            bool isSequential = true;
+            for (int i = 0; i < entries.Count - 1; i++)
+            {
+                if (entries[i + 1] != entries[i] + 1)
+                {
+                    isSequential = false;
+                    break;
+                }
+            }
+
+            if (isSequential)
+            {
+                return (0, false);
+            }
+            else
+            {
+                return (-1, false);
+            }
+        }
+
+        public void ProcessAviableSkin(List<int> entries, string charra)
         {
             if (entries == null || entries.Count == 0)
             {
@@ -103,89 +502,195 @@ namespace repatheruwu
                 }
             }
         }
-        static Queue<(string, int, bool)> Characters = new Queue<(string, int, bool)>();
-        public void FixSkini(string charra, List<string> input_wads, string outPUut, string AllWadPath)
+
+        public void FixiniYoursSkini(FixerUI ui)
         {
+            this.x = ui;
+            Settings.AllWadPaths = CollectWads(Settings.WADpath);
+            _wadExtractor.x = this.x;
             string tmp = Path.Combine(Path.GetTempPath(), "cslolgo_fixer_" + Guid.NewGuid().ToString());
 
             Directory.CreateDirectory(tmp);
-            FixerSettings.inputDir = tmp;
+            Settings.inputDir = tmp;
 
-            FixerSettings.outputDir = Path.Combine(outPUut, $"{charra}.wad");
-            FixerSettings.base_wad_path = input_wads;
-            FixerSettings.WADpath = AllWadPath; 
-            FixerSettings.OldLookUp = [];
 
-            for (int i = 0; i < FixerSettings.base_wad_path.Count; i++)
+            for (int i = 0; i < Settings.base_wad_path.Count; i++)
             {
-                string currentPath = FixerSettings.base_wad_path[i];
+                string currentPath = Settings.base_wad_path[i];
 
                 if (Directory.Exists(currentPath))
                 {
                     string randomchar = Path.GetRandomFileName().Replace(".", "").Substring(0, 8);
+                    string outputWadPath = Path.Combine(Settings.inputDir, $"{randomchar}.wad.client");
 
-                    string outputWadPath = Path.Combine(FixerSettings.inputDir, $"{randomchar}.wad.client");
+                    // Use instance method
+                    _wadExtractor.PackDirectoryToWad(currentPath, outputWadPath);
 
-                    PackDirectoryToWad(currentPath, outputWadPath);
-
-                    FixerSettings.base_wad_path[i] = outputWadPath;
+                    Settings.base_wad_path[i] = outputWadPath;
                 }
 
             }
-            List<int> Skins = GetAvailableSkinNumbers(FixerSettings.base_wad_path, charra);
-            ProcessAviableSkin(Skins, charra);
-
-            var priorityWads = new[]
+            if (Settings.AllAviable)
             {
-                $"{FixerSettings.Character}.wad.client",
-            };
-            FixerSettings.AllWadPaths = CollectWads(FixerSettings.WADpath, priorityWads);
+                List<int> Skins = _wadExtractor.GetAvailableSkinNumbers(Settings.base_wad_path, Settings.Character);
+                ProcessAviableSkin(Skins, Settings.Character);
+            }
+            else
+            {
+                Characters.Enqueue((Settings.Character, Settings.skinNo, true));
+            }
+
 
             while (Characters.Count > 0)
             {
                 var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
 
-                FixerSettings.Character = Current_Char;
-                FixerSettings.skinNo = skinNo;
-                FixerSettings.verifyHpBar = HpBar;
-                string binPath = $"data/characters/{FixerSettings.Character}/skins/skin{FixerSettings.skinNo}.bin";
+                x.LowerLog($"Fixing {Current_Char} skin {skinNo}");
+
+                Settings.Character = Current_Char;
+                Settings.skinNo = skinNo;
+                Settings.verifyHpBar = HpBar;
+                string binPath = $"data/characters/{Settings.Character}/skins/skin{Settings.skinNo}.bin";
                 var check = CheckLinked([binPath]);
-                if (check != null) continue;
+                if (check != null)
+                {
+                    x.LowerLog($"Failed to find {binPath}, Aborting");
+                    return;
+                }
 
 
                 var (binentries, concat, staticMat, allStrings, linkedList) = LoadAllBins(binPath);
+                x.LowerLog($"Processing Assets");
 
                 allStrings = process(allStrings);
+                foreach (var item in allStrings) {
+                    x.LowerLog($"Missing: {item.OriginalPath}");
+                }
 
+                var key = CharacterCases.Keys
+    .FirstOrDefault(k =>
+        string.Equals(k, Current_Char, StringComparison.OrdinalIgnoreCase));
 
-                string conat_path = $"data/{FixerSettings.Character}_skin{FixerSettings.skinNo}_concat.bin";
+                if (key != null)
+                {
+                    foreach (var name in CharacterCases[key])
+                    {
+                        Characters.Enqueue((name, skinNo, false));
+                        // linkedList.Items.Add(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
+                    }
+                }
+
+                if (Settings.binless) continue;
+
+                x.LowerLog($"Saving Bins");
+                string conat_path = $"data/{Settings.Character}_skin{Settings.skinNo}_concat.bin";
                 var EmptyLinked = new BinList(BinType.String);
-                Save_Bin(EmptyLinked, concat, $"{FixerSettings.outputDir}/{conat_path}");
+                x.LowerLog($"Saving: {conat_path}");
+                Save_Bin(EmptyLinked, concat, $"{Settings.outputDir}/{conat_path}");
                 linkedList.Items.Add(new BinString(conat_path));
 
-                string static_mat_path = $"data/{FixerSettings.Character}_skin{FixerSettings.skinNo}_StaticMat.bin";
-                Save_Bin(EmptyLinked, staticMat, $"{FixerSettings.outputDir}/{static_mat_path}");
-                if (FixerSettings.KillStaticMat)
+                if (staticMat.Items.Count() > 0)
                 {
-                    string static_mat_path_proxy = $"data/{FixerSettings.Character}_skin{FixerSettings.skinNo}_StaticMat_proxy.bin";
-                    EmptyLinked.Items.Add(new BinString(static_mat_path));
-                    var EmptyEntries = new BinMap(BinType.Hash, BinType.Embed);
-                    Save_Bin(EmptyLinked, EmptyEntries, $"{FixerSettings.outputDir}/{static_mat_path_proxy}");
-                    linkedList.Items.Add(new BinString(static_mat_path_proxy));
-                }
-                else
-                {
-                    linkedList.Items.Add(new BinString(static_mat_path));
+                    string static_mat_path = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat.bin";
+                    x.LowerLog($"Saving: {static_mat_path}");
+                    Save_Bin(EmptyLinked, staticMat, $"{Settings.outputDir}/{static_mat_path}");
+                    if (Settings.KillStaticMat)
+                    {
+                        string static_mat_path_proxy = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat_proxy.bin";
+                        EmptyLinked.Items.Add(new BinString(static_mat_path));
+                        var EmptyEntries = new BinMap(BinType.Hash, BinType.Embed);
+                        x.LowerLog($"Saving: {static_mat_path_proxy}");
+                        Save_Bin(EmptyLinked, EmptyEntries, $"{Settings.outputDir}/{static_mat_path_proxy}");
+                        linkedList.Items.Add(new BinString(static_mat_path_proxy));
+                    }
+                    else
+                    {
+                        linkedList.Items.Add(new BinString(static_mat_path));
+                    }
                 }
 
-                Save_Bin(linkedList, binentries, $"{FixerSettings.outputDir}/{binPath}");
+                x.LowerLog($"Saving: {binPath}");
+                Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
+                if (Settings.noskinni && Settings.skinNo == 0)
+                {
+                    x.LowerLog($"Creating No Skinni Lightinni Italini");
+
+                    var skinEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.SkinCharacterDataProperties);
+                    var rrEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver);
+
+                    var rrLinkRef = ((BinEmbed)skinEntry.Value).Items.First(x => x.Key.Hash == 0x62286e7e).Value as BinLink;
+                    var skinKeyRef = (BinHash)skinEntry.Key;
+                    var rrKeyRef = (BinHash)rrEntry.Key;
+
+                    foreach (int i in Enumerable.Range(1, 99))
+                    {
+                        binPath = $"data/characters/{Settings.Character}/skins/skin{i}.bin";
+
+                        uint newSkinHash = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{i}");
+                        uint newRRHash = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{i}/Resources");
+
+                        skinKeyRef.Value = new FNV1a(newSkinHash);
+                        rrKeyRef.Value = new FNV1a(newRRHash);
+                        rrLinkRef.Value = new FNV1a(newRRHash);
+
+                        Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
+                    }
+                }
 
             }
-            if (Directory.Exists(FixerSettings.inputDir)) Directory.Delete(FixerSettings.inputDir, true);
+
+            if (!Settings.folder)
+            {
+                x.LowerLog("Packing WAD");
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cslol-tools/wad-make.exe",
+                    Arguments = $"\"{Settings.outputDir}\"",
+                    CreateNoWindow = true,      // Don't show a console window
+                    UseShellExecute = false,    // Required for redirecting output or hiding window
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
+                };
+
+                using (var proc = Process.Start(psi))
+                {
+                    proc.WaitForExit();
+                }
+
+                Directory.Delete(Settings.outputDir, true);
+            }
+
+
+            if (Directory.Exists(Settings.inputDir)) Directory.Delete(Settings.inputDir, true);
+            
+            if (Settings.Missing_Bins.Count() > 2)
+            {
+                x.LowerLog($"done. . . BUT {Settings.Missing_Bins.Count()} bins are missing");
+                foreach (string bin in Settings.Missing_Bins)
+                {
+                    x.LowerLog($"[MISS] {bin}", "#ff0022");
+                }
+                x.LowerLog($"[CHANCE] Try using Manifest downloader, if u remember when this specific version of mod was made");
+            }
+            else
+            {
+                foreach (string bin in Settings.Missing_Bins)
+                {
+                    x.LowerLog($"[MISS] {bin}", "#ff0022");
+                }
+                x.LowerLog($"DONE ^^");
+            }
+
+            foreach (string bin in Settings.Missing_Files)
+            {
+                x.UpperLog($"[MISS] {bin}", "#dec509");
+            }
+
 
         }
 
-        public static void Save_Bin(BinList Linked, BinMap entries, string output)
+        public void Save_Bin(BinList Linked, BinMap entries, string output)
         {
             var newBin = new Bin();
             newBin.Sections["type"] = new BinString("PROP");
@@ -202,64 +707,103 @@ namespace repatheruwu
             File.WriteAllBytes(output, bytes);
         }
 
-        public static List<Target> process(List<Target> processing)
+        public List<WadExtractor.Target> process(List<WadExtractor.Target> processing)
         {
             var allPaths = new HashSet<string>(
-    processing.Select(t => t.OriginalPath),
-    StringComparer.OrdinalIgnoreCase
-);
-
-            var bnkToWpkMap = new Dictionary<Target, string>();
-
-            foreach (var target in processing.Where(t => t.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0))
-            {
-                string partnerWpk = Regex.Replace(
-                    target.OriginalPath,
-                    "_vo_events.bnk",
-                    "_vo_audio.wpk",
-                    RegexOptions.IgnoreCase
+                    processing.Select(t => t.OriginalPath),
+                    StringComparer.OrdinalIgnoreCase
                 );
 
-                if (allPaths.Contains(partnerWpk))
+            var bnkToWpkMap = new Dictionary<WadExtractor.Target, string>();
+
+
+            if (Settings.SoundOption == 0)
+            {
+                foreach (var target in processing.Where(t => t.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0))
                 {
-                    bnkToWpkMap.Add(target, partnerWpk);
+                    string partnerWpk = Regex.Replace(
+                        target.OriginalPath,
+                        "_vo_events.bnk",
+                        "_vo_audio.wpk",
+                        RegexOptions.IgnoreCase
+                    );
+
+                    if (allPaths.Contains(partnerWpk))
+                    {
+                        bnkToWpkMap.Add(target, partnerWpk);
+                    }
                 }
+                if (!Settings.sfx_events)
+                {
+                    processing.RemoveAll(target =>
+                        target.OriginalPath.IndexOf("_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+                else
+                {
+                    processing.RemoveAll(target =>
+                        target.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+
+            }else if (Settings.SoundOption == 2)
+            {
+                processing.RemoveAll(target =>
+                string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
+                processing.RemoveAll(target =>
+                    string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
             }
 
-            processing.RemoveAll(target =>
-                target.OriginalPath.IndexOf("_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
-
-            processing = WadExtractor.ExtractAndSwapReferences(FixerSettings.base_wad_path, processing);
+            if (Settings.AnimOption == 2)
+            {
+                processing.RemoveAll(target =>
+                string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
+            }
+            // Use _wadExtractor instance
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
             if (processing.Count == 0) return processing;
+            if (Settings.binless) return new List<WadExtractor.Target>();
 
-            var remainingPaths = new HashSet<string>(
+            if (Settings.SoundOption == 0)
+            {
+                var remainingPaths = new HashSet<string>(
                 processing.Select(t => t.OriginalPath),
                 StringComparer.OrdinalIgnoreCase
             );
-            processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
-            processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
-            foreach (var pair in bnkToWpkMap)
-            {
-                Target bnkTarget = pair.Key;
-                string wpkPath = pair.Value;
-
-                if (!remainingPaths.Contains(wpkPath))
+                processing.RemoveAll(target =>
+                    string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
+                processing.RemoveAll(target =>
+                    string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
+                foreach (var pair in bnkToWpkMap)
                 {
-                    processing.Add(bnkTarget);
+                    WadExtractor.Target bnkTarget = pair.Key;
+                    string wpkPath = pair.Value;
+
+                    if (!remainingPaths.Contains(wpkPath))
+                    {
+                        processing.Add(bnkTarget);
+                    }
                 }
             }
 
-            processing.RemoveAll(target =>
+            if (Settings.AnimOption == 0)
+            {
+                processing.RemoveAll(target =>
                 string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
+            }
 
+            // if (Settings.Lang)                                                                                               //uwu
+            // {
+            //     processing = _wadExtractor.ExtractAndSwapReferences(Settings.LangLookUp, processing);
+            //     if (processing.Count() == 0) return processing;
+            // }
 
-            processing = WadExtractor.ExtractAndSwapReferences(FixerSettings.OldLookUp, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
             if (processing.Count() == 0) return processing;
-            processing = WadExtractor.ExtractAndSwapReferences(FixerSettings.AllWadPaths, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
             if (processing.Count() == 0) return processing;
-            processing = Hashes.FindMatches(processing);
+
+            // Use _hashes instance
+            processing = _hashes.FindMatches(processing);
+
             processing.RemoveAll(t =>
             {
                 if (t.Hashes.Count == 0)
@@ -268,73 +812,48 @@ namespace repatheruwu
                 }
                 return false;
             });
-            processing = WadExtractor.ExtractAndSwapReferences(FixerSettings.AllWadPaths, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
             if (processing.Count() == 0) return processing;
             foreach (var item in processing)
             {
-                Console.WriteLine($"MISS: {item.OriginalPath}");
+                Settings.Missing_Files.Add(item.OriginalPath);
             }
             return processing;
         }
 
-        public static uint FNV1aHash(string input)
+
+        Bin LoadBin(string path)
         {
-            const uint FNV_OFFSET_BASIS = 0x811C9DC5; // 2166136261
-            const uint FNV_PRIME = 0x01000193;        // 16777619
-
-            uint hash = FNV_OFFSET_BASIS;
-            byte[] data = Encoding.UTF8.GetBytes(input.ToLowerInvariant()); // lowercase
-
-            foreach (byte b in data)
+            if (File.Exists($"{Settings.inputDir}/{path}"))
             {
-                hash ^= b;
-                hash *= FNV_PRIME;
-            }
-
-            return hash;
-        }
-
-        public static ulong HashPath(string path, bool not_x16 = false)
-        {
-            string norm = path.Replace('\\', '/').ToLowerInvariant(); ;
-
-            byte[] data = Encoding.UTF8.GetBytes(norm);
-
-            ulong h = XxHash64.HashToUInt64(data, seed: 0);
-
-            return h;
-        }
-        static Bin LoadBin(string path)
-        {
-            if (File.Exists($"{FixerSettings.inputDir}/{path}"))
-            {
-                var data = File.ReadAllBytes($"{FixerSettings.inputDir}/{path}");
+                var data = File.ReadAllBytes($"{Settings.inputDir}/{path}");
                 return new BinReader(data).Read();
             }
             else
             {
                 string hashed = $"{HashPath(path).ToString("x16")}.bin";
-                if (!File.Exists($"{FixerSettings.inputDir}/{hashed}")) return null;
-                var data = File.ReadAllBytes($"{FixerSettings.inputDir}/{hashed}");
+                if (!File.Exists($"{Settings.inputDir}/{hashed}")) return null;
+                var data = File.ReadAllBytes($"{Settings.inputDir}/{hashed}");
                 return new BinReader(data).Read();
             }
         }
-        static List<string> CheckLinked(List<string> bins_to_check)
+
+        List<string> CheckLinked(List<string> bins_to_check)
         {
             var bins_hashed = new List<WadExtractor.Target>();
             foreach (string path in bins_to_check)
             {
-                if (File.Exists($"{FixerSettings.inputDir}/{path}")) continue;
+                if (File.Exists($"{Settings.inputDir}/{path}")) continue;
                 string hashed = $"{HashPath(path).ToString("x16")}.bin";
-                if (File.Exists($"{FixerSettings.inputDir}/{hashed}")) continue;
+                if (File.Exists($"{Settings.inputDir}/{hashed}")) continue;
 
-                Target found = bins_hashed.FirstOrDefault(t => t.OriginalPath == hashed);
+                WadExtractor.Target found = bins_hashed.FirstOrDefault(t => t.OriginalPath == hashed);
                 if (found == null)
                 {
                     bins_hashed.Add(new WadExtractor.Target
                     {
                         Hashes = new List<string> { path },
-                        OutputPath = FixerSettings.inputDir,
+                        OutputPath = Settings.inputDir,
                         OutputString = hashed,
                         BinStringRef = null,
                         OriginalPath = path,
@@ -342,44 +861,40 @@ namespace repatheruwu
                 }
             }
             if (bins_hashed.Count() < 1) return null;
+            if (!Settings.binless) {
+                bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, bins_hashed);
+                if (bins_hashed.Count() < 1) return null;
 
-            var left = WadExtractor.ExtractAndSwapReferences(FixerSettings.base_wad_path, bins_hashed);
+                bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, bins_hashed);
+                if (bins_hashed.Count() < 1) return null;
+            }
 
-            if (left.Count() < 1) return null;
-            left = WadExtractor.ExtractAndSwapReferences(FixerSettings.OldLookUp, left);
 
-            if (left.Count() < 1) return null;
-            left = WadExtractor.ExtractAndSwapReferences(FixerSettings.AllWadPaths, left);
+            bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bins_hashed);
+            if (bins_hashed.Count() < 1) return null;
+            bins_hashed = _hashes.FindMatches(bins_hashed, false);
 
-            if (left.Count() < 1) return null;
-            left = Hashes.FindMatches(left, false);
-            // Console.WriteLine($"----------------------------------");
-            left.RemoveAll(t =>
+            bins_hashed.RemoveAll(t =>
             {
                 if (t.Hashes.Count == 0)
                 {
                     Console.WriteLine($"Missing CAC linked bin: {t.OriginalPath}");
                     return true; // Remove this item
                 }
-                // Console.WriteLine($"Possible linked bin: {t.OriginalPath}");
-                // foreach (var hash in t.Hashes)
-                // {
-                //     Console.WriteLine($"Possible linked bin: {hash}");
-                // }
-                // Console.WriteLine($"----------------------------------");
                 return false; // Keep this item
             });
-            left = WadExtractor.ExtractAndSwapReferences(FixerSettings.AllWadPaths, left);
-            if (left.Count() < 1) return null;
+            bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bins_hashed);
+            if (bins_hashed.Count() < 1) return null;
             List<string> returning = new List<string>();
-            foreach (Target tar in left)
+            foreach (WadExtractor.Target tar in bins_hashed)
             {
+                Settings.Missing_Files.Add(tar.OriginalPath);
                 returning.Add(tar.OriginalPath);
             }
             return returning;
         }
 
-        static bool ShouldSkipFile(string path)
+        bool ShouldSkipFile(string path)
         {
             // data/characters/<folder>/<file>.bin
             var dir = Path.GetDirectoryName(path);
@@ -404,7 +919,8 @@ namespace repatheruwu
 
             return folder.Equals(fileStem, StringComparison.OrdinalIgnoreCase);
         }
-        static void repathIcon(string charbnin)
+
+        void repathIcon(string charbnin)
         {
             var notfound = CheckLinked([charbnin]);
             if (notfound != null) return;
@@ -420,33 +936,31 @@ namespace repatheruwu
                     uint hash = entryKey.Value.Hash;
 
                     if (hash == 0) continue;
-                    Dictionary<uint, KeyValuePair<BinValue, BinValue>> targetDict;
 
                     Elements[hash] = kvp;
                 }
 
             }
 
-            var collectedIcons = new List<Target>();
+            var collectedIcons = new List<WadExtractor.Target>();
             foreach (var kvp in Elements.Values)
             {
                 FindStringsRecursive(kvp.Value, collectedIcons);
             }
 
-            // Console.WriteLine($"Found Files: {collectedIcons.Count()}");
             collectedIcons.RemoveAll(target =>
-    !target.OriginalPath.Contains("icons2d", StringComparison.OrdinalIgnoreCase));
+                 !target.OriginalPath.Contains("icons2d", StringComparison.OrdinalIgnoreCase));
 
             foreach (var tar in collectedIcons)
             {
                 tar.OutputString = tar.OriginalPath;
                 tar.BinStringRef = null;
             }
-            // Console.WriteLine($"Found icons: {collectedIcons.Count()}");
-            WadExtractor.ExtractAndSwapReferences(FixerSettings.base_wad_path, collectedIcons);
+            _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, collectedIcons);
 
         }
-        static (BinMap, BinMap, BinMap, List<Target>, BinList) LoadAllBins(string rootBinPath)
+
+        (BinMap, BinMap, BinMap, List<WadExtractor.Target>, BinList) LoadAllBins(string rootBinPath)
         {
             var SkinDataEntries = new Dictionary<uint, KeyValuePair<BinValue, BinValue>>();
             var VFXEntries = new Dictionary<uint, KeyValuePair<BinValue, BinValue>>();
@@ -458,7 +972,7 @@ namespace repatheruwu
             var GameplayEntries = new Dictionary<uint, KeyValuePair<BinValue, BinValue>>();
             var OtherEntries = new Dictionary<uint, KeyValuePair<BinValue, BinValue>>();
 
-            var collectedStrings = new List<Target>();
+            var collectedStrings = new List<WadExtractor.Target>();
 
             var loaded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var loaded_linked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -476,7 +990,11 @@ namespace repatheruwu
                 if (loaded.Contains(path)) continue;
 
                 loaded.Add(path);
+                string trimmedPath = path.Length > 100
+    ? "…" + path[^99..]   // keep last 99 chars + ellipsis
+    : path;
 
+                x.UpperLog($"Processing: {trimmedPath}", "#0276e3");
                 var bin = LoadBin(path);
                 if (bin == null) continue;
 
@@ -498,7 +1016,8 @@ namespace repatheruwu
                             }
                             else
                             {
-                                if (FixerSettings.keep_Icons) repathIcon(s.Value);
+                                x.UpperLog($"Skipping: {path}", "#eaff00");
+                                if (Settings.keep_Icons) repathIcon(s.Value);
                                 linkedListtoReturn.Items.Add(s);
                             }
                         }
@@ -512,6 +1031,7 @@ namespace repatheruwu
                     {
                         foreach (var left in notfound)
                         {
+                            x.LowerLog($"Failed to find: {path}");
                             linkedListtoReturn.Items.Add(new BinString(left));
                         }
                     }
@@ -575,14 +1095,14 @@ namespace repatheruwu
                         }
                         targetDict[hash] = kvp;
                     }
-
-
+                                                                                                                   
+                                                                                                                    
                 }
             }
 
             if (SkinDataEntries.Count > 1)
             {
-                Validate(SkinDataEntries, [FNV1aHash($"Characters/{FixerSettings.Character}/Skins/Skin{FixerSettings.skinNo}")]);
+                Validate(SkinDataEntries, [FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}")]);
             }
 
             var mainEntry = (BinEmbed)SkinDataEntries.Values.First().Value;
@@ -591,7 +1111,9 @@ namespace repatheruwu
                 => embed.Items.FirstOrDefault(f => f.Key.Hash == hash)?.Value;
 
             uint CAC_name = (GetField(mainEntry, 0xd8f64a0d) as BinLink)?.Value.Hash ?? 0;
-            uint RR_name = FNV1aHash($"Characters/{FixerSettings.Character}/Skins/Skin{FixerSettings.skinNo}/Resources"); // (GetField(mainEntry, 0x62286e7e) as BinLink)?.Value.Hash ?? 0;
+            uint RR_name = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}/Resources"); // 
+            BinLink? rrLinkRef = GetField(mainEntry, 0x62286e7e) as BinLink;
+            rrLinkRef.Value = new FNV1a(RR_name);
             var GearUpgrades = new List<uint>();
             uint anmgraph_name = 0;
 
@@ -632,7 +1154,7 @@ namespace repatheruwu
                     }
                 }
             }
-            if (FixerSettings.verifyHpBar)
+            if (Settings.verifyHpBar)
             {
                 var targetField = mainEntry.Items.FirstOrDefault(f => f.Key.Hash == 0x51c83af8);
 
@@ -642,14 +1164,14 @@ namespace repatheruwu
 
                     if (u8Field != null && u8Field.Value is BinU8 valU8)
                     {
-                        if (valU8.Value != (byte)FixerSettings.HealthbarStyle)
+                        if (valU8.Value != (byte)Settings.HealthbarStyle)
                         {
-                            valU8.Value = (byte)FixerSettings.HealthbarStyle;
+                            valU8.Value = (byte)Settings.HealthbarStyle;
                         }
                     }
                     else
                     {
-                        targetEmbed.Items.Add(new BinField(new FNV1a(0x3fcb5693), new BinU8((byte)FixerSettings.HealthbarStyle)));
+                        targetEmbed.Items.Add(new BinField(new FNV1a(0x3fcb5693), new BinU8((byte)Settings.HealthbarStyle)));
                     }
                 }
                 else
@@ -659,7 +1181,7 @@ namespace repatheruwu
                     var newEmbed = new BinEmbed(new FNV1a(0x11b71b5e));
 
                     newEmbed.Items.Add(new BinField(new FNV1a(0x4d5ff2d7), new BinString("Buffbone_Cstm_Healthbar")));
-                    newEmbed.Items.Add(new BinField(new FNV1a(0x3fcb5693), new BinU8((byte)FixerSettings.HealthbarStyle)));
+                    newEmbed.Items.Add(new BinField(new FNV1a(0x3fcb5693), new BinU8((byte)Settings.HealthbarStyle)));
 
                     mainEntry.Items.Add(new BinField(new FNV1a(0x51c83af8), newEmbed));
                 }
@@ -670,7 +1192,6 @@ namespace repatheruwu
             {
                 Validate(RREntries, [RR_name]);
             }
-            Console.WriteLine(CACEntries.Count());
             if (CACEntries.Count > 1)
             {
                 Validate(CACEntries, [CAC_name]);
@@ -678,6 +1199,18 @@ namespace repatheruwu
             if (AnimEntries.Count > 1)
             {
                 Validate(AnimEntries, [anmgraph_name]);
+            }
+            if (RREntries.Count == 0)
+            {
+                x.LowerLog($"MISSING: Resource Resolver");
+            }
+            if (CACEntries.Count == 0)
+            {
+                x.LowerLog($"MISSING: Contextual Action Data");
+            }
+            if (AnimEntries.Count == 0)
+            {
+                x.LowerLog($"MISSING: Animations Definitions");
             }
             Validate(GearEntries, GearUpgrades);
 
@@ -745,13 +1278,12 @@ namespace repatheruwu
             ScanStrings(StaticMatEntries);
             ScanStrings(VFXEntries);
             ScanStrings(CACEntries);
-            ScanStrings(GameplayEntries);
             ScanStrings(AnimEntries);
             ScanStrings(OtherEntries);
 
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
-                Characters.Enqueue((characterToLoad, FixerSettings.skinNo, false));
+                Characters.Enqueue((characterToLoad, Settings.skinNo, false));
             }
 
             var finalMap = new BinMap(BinType.Hash, BinType.Embed);
@@ -786,13 +1318,13 @@ namespace repatheruwu
             MergeIntoFinal3(StaticMatEntries);
             MergeIntoFinal2(VFXEntries);
             MergeIntoFinal2(CACEntries);
-            MergeIntoFinal2(GameplayEntries);
             MergeIntoFinal2(AnimEntries);
             MergeIntoFinal2(OtherEntries);
 
             return (finalMap, finalMap2, finalMap3, collectedStrings, linkedListtoReturn);
         }
-        private static void Validate(Dictionary<uint, KeyValuePair<BinValue, BinValue>> RREntries, List<uint> RR_names)
+
+        private void Validate(Dictionary<uint, KeyValuePair<BinValue, BinValue>> RREntries, List<uint> RR_names)
         {
             foreach (var rr in RR_names)
             {
@@ -813,7 +1345,7 @@ namespace repatheruwu
             }
         }
 
-        public static void FindStringsRecursive(BinValue value, List<Target> results)
+        public void FindStringsRecursive(BinValue value, List<WadExtractor.Target> results)
         {
             if (value == null) return;
 
@@ -829,7 +1361,12 @@ namespace repatheruwu
                         int lastDot = s.LastIndexOf('.');
                         if (lastDot < s.Length - 1 && (s.Length - lastDot) <= 6)
                         {
-                            var string_out = PathFixer.FixPath(s);
+                            var string_out = s;
+                            if (!Settings.binless)
+                            {
+                                string_out = _pathFixer.FixPath(s);
+
+                            }
                             var hashes = new List<string> { s };
 
                             if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
@@ -840,19 +1377,19 @@ namespace repatheruwu
                             {
                                 hashes.Add(Path.ChangeExtension(s, ".tex"));
                             }
-                            Target found = results.FirstOrDefault(t => t.OriginalPath == s);
+                            WadExtractor.Target found = results.FirstOrDefault(t => t.OriginalPath == s);
                             if (found != null)
                             {
                                 found.BinStringRef.Add(str);
                             }
                             else
                             {
-                                results.Add(new Target
+                                results.Add(new WadExtractor.Target
                                 {
                                     BinStringRef = [str],
                                     OriginalPath = s,
                                     Hashes = hashes,
-                                    OutputPath = FixerSettings.outputDir,
+                                    OutputPath = Settings.outputDir,
                                     OutputString = string_out,
                                 });
                             }
@@ -890,15 +1427,12 @@ namespace repatheruwu
                     break;
             }
         }
-        public static List<string> CollectWads(string rootFolder, IEnumerable<string> priorityWadNames)
-        {
-            // 1. Map priority names to their index for O(1) lookup.
-            //    We use OrdinalIgnoreCase so we don't have to manually normalize strings.
-            var priorityMap = (priorityWadNames ?? Enumerable.Empty<string>())
-                .Select((name, index) => (Name: name, Index: index))
-                .ToDictionary(x => x.Name, x => x.Index, StringComparer.OrdinalIgnoreCase);
 
-            // 2. Enumerate, Sort, and Materialize.
+        public List<string> CollectWads(string rootFolder)
+        {
+            // Ensure we have a valid string to search for to avoid null reference exceptions
+            var searchToken = Settings.Character ?? string.Empty;
+
             return Directory
                 .EnumerateFiles(rootFolder, "*.wad.client", SearchOption.AllDirectories)
                 .Select(Path.GetFullPath)
@@ -906,50 +1440,77 @@ namespace repatheruwu
                 {
                     var fileName = Path.GetFileName(path);
 
-                    // If the file is in the priority map, use its index (0, 1, 2...).
-                    // If not, assign int.MaxValue so it is sorted to the very end.
-                    return priorityMap.TryGetValue(fileName, out int index)
-                        ? index
-                        : int.MaxValue;
+                    // If the filename contains the character name, return 0 (top priority).
+                    // Otherwise, return 1 (bottom priority).
+                    return fileName.Contains(searchToken, StringComparison.OrdinalIgnoreCase)
+                        ? 0
+                        : 1;
                 })
+                // Optional: Add a secondary sort (e.g., alphabetical) to keep the list stable
+                .ThenBy(path => path)
                 .ToList();
         }
+
         public class WadExtractor
         {
-            public static List<int> GetAvailableSkinNumbers(List<string> wadPaths, string character)
+            private FixerSettings _settings;
+            public FixerUI x;
+
+            public WadExtractor(FixerSettings settings)
+            {
+                _settings = settings;
+            }
+
+            public List<int> GetAvailableSkinNumbers(List<string> wadPaths, string character)
             {
                 var foundSkins = new HashSet<int>();
+                var skinHashes = new Dictionary<ulong, int>();
 
-                // Pre-calculate hashes for skins 0-99 to avoid re-hashing inside the file loop
-                var skinHashes = new Dictionary<ulong, int>();
+                // Pre-calculate hashes for WAD file lookups
                 for (int i = 0; i < 100; i++)
                 {
-                    // Format: data/characters/{Character}/skins/skin{No}.bin
-                    // We force lowercase/normalization if your HashPath expects it
-                    string path = $"data/characters/{character}/skins/skin{i}.bin";
-                    skinHashes[HashPath(path)] = i;
+                    string path = $"data/characters/{character}/skins/skin{i}.bin";
+                    skinHashes[Repatheruwu.HashPath(path)] = i;
                 }
 
                 byte[] entryBuffer = new byte[32];
 
                 foreach (var wadPath in wadPaths)
                 {
+                    // --- NEW LOGIC START ---
+                    // If the path is a directory, check for loose files
+                    if (Directory.Exists(wadPath))
+                    {
+                        for (int i = 0; i < 100; i++)
+                        {
+                            // Reconstruct the internal path structure
+                            string relativePath = $"data/characters/{character}/skins/skin{i}.bin";
+
+                            // Combine the directory with the relative path
+                            string fullPath = Path.Combine(wadPath, relativePath);
+
+                            if (File.Exists(fullPath))
+                            {
+                                foundSkins.Add(i);
+                            }
+                        }
+                        continue; // Skip the WAD reading logic for this iteration
+                    }
+                    // --- NEW LOGIC END ---
+
+                    // Existing logic for .wad files
                     if (!File.Exists(wadPath)) continue;
 
                     using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                     using (var br = new BinaryReader(fs))
                     {
                         if (fs.Length < 272) continue;
-
-                        // Jump to file count
-                        fs.Seek(268, SeekOrigin.Begin);
+                        fs.Seek(268, SeekOrigin.Begin);
                         uint fileCount = br.ReadUInt32();
 
-                        // Scan all entries in this WAD
-                        for (int i = 0; i < fileCount; i++)
+                        for (int i = 0; i < fileCount; i++)
                         {
                             if (fs.Read(entryBuffer, 0, 32) != 32) break;
-
                             ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
 
                             if (skinHashes.TryGetValue(pathHash, out int skinNo))
@@ -964,7 +1525,6 @@ namespace repatheruwu
                 result.Sort();
                 return result;
             }
-
             struct WadEntryInfo
             {
                 public string FilePath;
@@ -973,7 +1533,7 @@ namespace repatheruwu
                 public uint Size;
             }
 
-            public static void PackDirectoryToWad(string sourceDirectory, string outputWadPath)
+            public void PackDirectoryToWad(string sourceDirectory, string outputWadPath)
             {
                 if (!Directory.Exists(sourceDirectory))
                     throw new DirectoryNotFoundException($"Source directory not found: {sourceDirectory}");
@@ -981,83 +1541,59 @@ namespace repatheruwu
                 string outputDir = Path.GetDirectoryName(outputWadPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
 
-                // 1. GATHER FILES
-                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
                 var entries = new WadEntryInfo[files.Length];
 
-                // 2. PARALLEL PROCESSING (Hashing & Checksums)
-                // We use Parallel.For to maximize SSD/CPU usage for checksum calculation
-                Parallel.For(0, files.Length, i =>
+                Parallel.For(0, files.Length, i =>
                 {
                     string file = files[i];
-
-                    // A. Path Hashing (XXH64 of relative path)
-                    string relativePath = Path.GetRelativePath(sourceDirectory, file);
+                    string relativePath = Path.GetRelativePath(sourceDirectory, file);
                     string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
-
-                    // B. Data Checksum (XXH64 of file content)
-                    // Reading file to compute checksum is necessary for a valid WAD.
-                    // We reuse a buffer per thread or use XxHash64.Hash(byte[]) if available.
-                    byte[] fileBytes = File.ReadAllBytes(file);
+                    byte[] fileBytes = File.ReadAllBytes(file);
 
                     entries[i] = new WadEntryInfo
                     {
                         FilePath = file,
-                        PathHash = HashPath(wadPath), // Uses your existing HashPath helper
-                        DataChecksum = BitConverter.ToUInt64(XxHash64.Hash(fileBytes)), // Using System.IO.Hashing
-                        Size = (uint)fileBytes.Length
+                        PathHash = Repatheruwu.HashPath(wadPath),
+                        DataChecksum = BitConverter.ToUInt64(XxHash64.Hash(fileBytes)),
+                        Size = (uint)fileBytes.Length
                     };
                 });
 
-                // 3. SORT BY HASH (Standard convention)
-                Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
+                Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
 
-                // 4. CALCULATE HEADER CHECKSUM (XOR of all entry checksums)
-                ulong tocChecksum = 0;
+                ulong tocChecksum = 0;
                 foreach (var e in entries) tocChecksum ^= e.DataChecksum;
 
-                // 5. WRITE WAD
-                using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
+                using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
                 using (var bw = new BinaryWriter(fs))
                 {
-                    // --- HEADER ---
-                    bw.Write(new char[] { 'R', 'W' });  // Magic
-                    bw.Write((byte)3);                  // Major
-                    bw.Write((byte)4);                  // Minor
-                    bw.Write(new byte[256]);            // ECDSA Signature (Padding)
-                    bw.Write(tocChecksum);              // TOC Checksum (64-bit)
-                    bw.Write((uint)entries.Length);     // File Count
+                    bw.Write(new char[] { 'R', 'W' });
+                    bw.Write((byte)3);
+                    bw.Write((byte)4);
+                    bw.Write(new byte[256]);
+                    bw.Write(tocChecksum);
+                    bw.Write((uint)entries.Length);
 
-                    // Calculate Start of Data Block
-                    // Header (272) + (Count * EntrySize(32))
-                    uint dataStartOffset = 272 + ((uint)entries.Length * 32);
-                    uint currentOffset = 0; // Offsets are relative to the start of the Data Block? 
-                                            // NO, in WADs, offsets are usually relative to start of file.
-                                            // BUT based on your Python script:
-                                            // f.write((section.offset + data_offset_base).to_bytes(...))
-                                            // So the Python script calculates the absolute offset.
-
+                    uint dataStartOffset = 272 + ((uint)entries.Length * 32);
                     uint absoluteOffset = dataStartOffset;
 
-                    // --- ENTRY TABLE ---
-                    foreach (var entry in entries)
+                    foreach (var entry in entries)
                     {
-                        bw.Write(entry.PathHash);       // 00-08: Path Hash
-                        bw.Write(absoluteOffset);       // 08-12: Offset
-                        bw.Write(entry.Size);           // 12-16: Compressed Size (Uncompressed, so same)
-                        bw.Write(entry.Size);           // 16-20: Uncompressed Size
-                        bw.Write((byte)0);              // 20-21: Type (0 = Uncompressed)
-                        bw.Write((byte)0);              // 21-22: SubChunk High (unused)
-                        bw.Write((ushort)0);            // 22-24: SubChunk Low (unused)
-                        bw.Write(entry.DataChecksum);   // 24-32: XXHash64 of Data (CRITICAL FIX)
+                        bw.Write(entry.PathHash);
+                        bw.Write(absoluteOffset);
+                        bw.Write(entry.Size);
+                        bw.Write(entry.Size);
+                        bw.Write((byte)0);
+                        bw.Write((byte)0);
+                        bw.Write((ushort)0);
+                        bw.Write(entry.DataChecksum);
 
-                        absoluteOffset += entry.Size;
+                        absoluteOffset += entry.Size;
                     }
 
-                    // --- DATA BLOCK ---
-                    // Copy files directly to stream (Fastest, low RAM usage)
-                    byte[] copyBuffer = new byte[81920]; // 80KB buffer
-                    foreach (var entry in entries)
+                    byte[] copyBuffer = new byte[81920];
+                    foreach (var entry in entries)
                     {
                         using (var inputFile = new FileStream(entry.FilePath, FileMode.Open, FileAccess.Read))
                         {
@@ -1070,6 +1606,7 @@ namespace repatheruwu
                     }
                 }
             }
+
             public class Target
             {
                 public List<BinString> BinStringRef { get; set; }
@@ -1079,40 +1616,35 @@ namespace repatheruwu
                 public string OutputString { get; set; }
             }
 
-            // Simple struct to hold extraction jobs so we can sort them
-            private struct ExtractionJob
+            private struct ExtractionJob
             {
                 public ulong Hash;
                 public uint Offset;
                 public uint CompressedSize;
-                public uint UncompressedSize; // Often useful if available, otherwise 0
-                public byte Type;
+                public uint UncompressedSize;
+                public byte Type;
                 public Target Target;
                 public string Extension;
             }
 
-            public static List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets)
+            public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets)
             {
                 if (targets == null || targets.Count == 0) return targets;
 
-                // 1. Modified Lookup: Stores Priority Index (int)
-                // lookup: Hash -> (Target, Extension, Priority)
-                var lookup = new Dictionary<ulong, (Target target, string ext, int priority)>(); // <--- CHANGED
-                int pendingCount = 0;
+                var lookup = new Dictionary<ulong, (Target target, string ext, int priority)>();
+                int pendingCount = 0;
 
                 foreach (var t in targets)
                 {
                     bool added = false;
-                    // Iterate with index to capture priority
-                    for (int i = 0; i < t.Hashes.Count; i++) // <--- CHANGED
-                    {
+                    for (int i = 0; i < t.Hashes.Count; i++)
+                    {
                         var h = t.Hashes[i];
-                        ulong hashVal = HashPath(h);
+                        ulong hashVal = Repatheruwu.HashPath(h);
                         if (!lookup.ContainsKey(hashVal))
                         {
-                            // Store index 'i' as priority (lower is better)
-                            lookup[hashVal] = (t, Path.GetExtension(h), i); // <--- CHANGED
-                            added = true;
+                            lookup[hashVal] = (t, Path.GetExtension(h), i);
+                            added = true;
                         }
                     }
                     if (added) pendingCount++;
@@ -1134,18 +1666,16 @@ namespace repatheruwu
                         fs.Seek(268, SeekOrigin.Begin);
                         uint fileCount = br.ReadUInt32();
 
-                        // Temporary buffer to hold the best candidate for each target found in THIS WAD
-                        var bestCandidates = new Dictionary<Target, (ExtractionJob job, int priority)>(); // <--- NEW
+                        var bestCandidates = new Dictionary<Target, (ExtractionJob job, int priority)>();
 
-                        for (int i = 0; i < fileCount; i++)
+                        for (int i = 0; i < fileCount; i++)
                         {
                             if (fs.Read(entryBuffer, 0, 32) != 32) break;
                             ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
 
                             if (lookup.TryGetValue(pathHash, out var entry))
                             {
-                                // Create potential job
-                                var newJob = new ExtractionJob
+                                var newJob = new ExtractionJob
                                 {
                                     Hash = pathHash,
                                     Target = entry.target,
@@ -1155,9 +1685,7 @@ namespace repatheruwu
                                     Type = entryBuffer[20]
                                 };
 
-                                // LOGIC: Only keep if it's the first time seeing this target,
-                                // OR if this hash has a better (lower) priority index than what we found before.
-                                if (!bestCandidates.ContainsKey(entry.target) || entry.priority < bestCandidates[entry.target].priority)
+                                if (!bestCandidates.ContainsKey(entry.target) || entry.priority < bestCandidates[entry.target].priority)
                                 {
                                     bestCandidates[entry.target] = (newJob, entry.priority);
                                 }
@@ -1166,67 +1694,55 @@ namespace repatheruwu
 
                         if (bestCandidates.Count == 0) continue;
 
-                        // Transfer the winners to the actual job list
-                        var jobs = bestCandidates.Values.Select(x => x.job).ToList(); // <--- NEW
+                        var jobs = bestCandidates.Values.Select(x => x.job).ToList();
 
-                        // Remove found hashes from lookup to prevent extraction from subsequent WADs
-                        // (Assumes First WAD Wins policy for global order)
-                        foreach (var job in jobs)
+                        foreach (var job in jobs)
                         {
-                            // We must remove ALL hashes belonging to this Target from the lookup
-                            // so we don't try to find "LowRes" in WAD 2 after finding "HighRes" in WAD 1.
-                            foreach (var h in job.Target.Hashes)
-                                lookup.Remove(HashPath(h));
+                            foreach (var h in job.Target.Hashes)
+                                lookup.Remove(Repatheruwu.HashPath(h));
                         }
 
                         if (jobs.Count == 0) continue;
 
-                        // --- PASS 2: EXTRACT DATA (Sequential Read) ---
-                        // Sorting by offset minimizes disk seeking time
-                        jobs.Sort((a, b) => a.Offset.CompareTo(b.Offset));
+                        jobs.Sort((a, b) => a.Offset.CompareTo(b.Offset));
 
                         foreach (var job in jobs)
                         {
                             fs.Seek(job.Offset, SeekOrigin.Begin);
-
-                            // Rent a buffer to avoid GC allocation
-                            byte[] poolBuffer = ArrayPool<byte>.Shared.Rent((int)job.CompressedSize);
+                            byte[] poolBuffer = ArrayPool<byte>.Shared.Rent((int)job.CompressedSize);
 
                             try
                             {
-                                // Read directly into the pooled buffer
-                                int bytesRead = fs.Read(poolBuffer, 0, (int)job.CompressedSize);
+                                int bytesRead = fs.Read(poolBuffer, 0, (int)job.CompressedSize);
                                 var rawSpan = new ReadOnlySpan<byte>(poolBuffer, 0, bytesRead);
 
                                 byte[] finalData;
 
-                                // Check Signature (Magic Numbers)
-                                // We check the signature first as it is more reliable than the 'Type' byte
-                                if (IsZstd(rawSpan) || job.Type == 3)
+                                if (IsZstd(rawSpan) || job.Type == 3)
                                 {
                                     try { finalData = DecompressZstd(poolBuffer, bytesRead); }
-                                    catch { finalData = rawSpan.ToArray(); } // Fallback
-                                }
+                                    catch { finalData = rawSpan.ToArray(); }
+                                }
                                 else if (IsGzip(rawSpan) || job.Type == 1)
                                 {
                                     finalData = DecompressGzip(poolBuffer, bytesRead);
                                 }
                                 else
                                 {
-                                    // If uncompressed, we must copy only the specific bytes read
-                                    finalData = rawSpan.ToArray();
+                                    finalData = rawSpan.ToArray();
                                 }
-
-                                // --- WRITE TO DISK ---
-                                string final_out = Path.ChangeExtension(job.Target.OutputString, job.Extension);
+                                string final_out = job.Target.OutputString;
+                                if (!_settings.binless)
+                                {
+                                    final_out = Path.ChangeExtension(job.Target.OutputString, job.Extension);
+                                }
                                 if (string.IsNullOrEmpty(Path.GetFileNameWithoutExtension(final_out))) final_out = Path.Combine(Path.GetDirectoryName(final_out) ?? "", $"dot_{Guid.NewGuid().ToString().Substring(0, 4)}{job.Extension}");
                                 if (!string.IsNullOrEmpty(job.Target.OutputPath))
                                 {
                                     string outPath = Path.Combine(job.Target.OutputPath, final_out);
                                     string dir = Path.GetDirectoryName(outPath);
 
-                                    // Cache directory creation
-                                    if (!createdDirectories.Contains(dir))
+                                    if (!createdDirectories.Contains(dir))
                                     {
                                         Directory.CreateDirectory(dir);
                                         createdDirectories.Add(dir);
@@ -1235,24 +1751,29 @@ namespace repatheruwu
                                     File.WriteAllBytes(outPath, finalData);
                                 }
 
-                                // --- UPDATE REFERENCES ---
-                                if (job.Target.BinStringRef != null)
+                                if (job.Target.BinStringRef != null)
                                 {
+                                    string left = job.Target.OriginalPath.Length > 55
+    ? job.Target.OriginalPath[..55]
+    : job.Target.OriginalPath;
+
+                                    string right = final_out.Length > 55
+                                        ? final_out[..55]
+                                        : final_out;
+
+                                    x.UpperLog($"[GOOD] {left,-55} --> {right,-55}", "#00801e");
+
                                     string outRef = final_out;
                                     foreach (BinString s in job.Target.BinStringRef)
                                     {
                                         s.Value = outRef;
                                     }
                                 }
-
-                                // Mark target as processed for the return list
-                                // (We modify the original list at the very end or track 'found' items)
-                                targets.Remove(job.Target);
+                                targets.Remove(job.Target);
                             }
                             finally
                             {
-                                // Always return buffer to pool
-                                ArrayPool<byte>.Shared.Return(poolBuffer);
+                                ArrayPool<byte>.Shared.Return(poolBuffer);
                             }
                         }
                     }
@@ -1261,10 +1782,7 @@ namespace repatheruwu
                 return targets;
             }
 
-            // --- HELPERS ---
-
-            // Optimized Magic Number Checks using Spans
-            private static bool IsZstd(ReadOnlySpan<byte> data) =>
+            private static bool IsZstd(ReadOnlySpan<byte> data) =>
         data.Length >= 4 &&
         data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD;
 
@@ -1283,28 +1801,162 @@ namespace repatheruwu
 
             private static byte[] DecompressZstd(byte[] data, int length)
             {
-                // Assuming you are using a library like ZstdNet
-                // We pass the specific length because the buffer is pooled and might be larger than data
-                var decompressor = new Decompressor();
+                var decompressor = new Decompressor();
                 var span = new ReadOnlySpan<byte>(data, 0, length);
                 return decompressor.Unwrap(span.ToArray()).ToArray();
             }
+            public void PackDirectoryToWadCompressed(string sourceDirectory, string outputWadPath)
+            {
+                if (!Directory.Exists(sourceDirectory))
+                    throw new DirectoryNotFoundException($"Source directory not found: {sourceDirectory}");
 
+                string outputDir = Path.GetDirectoryName(outputWadPath);
+                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+
+                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+
+                // We use a temporary container to hold the compressed data in memory 
+                // because we need exact sizes for the TOC before writing the file body.
+                var entryData = new ConcurrentDictionary<ulong, byte[]>();
+                var entries = new WadEntryInfo[files.Length];
+
+                // 1. Compress and Hash in Parallel
+                Parallel.For(0, files.Length, i =>
+                {
+                    string file = files[i];
+                    string relativePath = Path.GetRelativePath(sourceDirectory, file);
+                    string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
+
+                    byte[] originalBytes = File.ReadAllBytes(file);
+                    ulong pathHash = Repatheruwu.HashPath(wadPath);
+                    ulong dataChecksum = BitConverter.ToUInt64(XxHash64.Hash(originalBytes)); // Checksum is usually of the original data
+
+                    byte[] finalData;
+                    byte type;
+
+                    // Attempt Compression (Zstd Level 22 is usually 'Ultra')
+                    // Using a disposable compressor context if your library requires it
+                    using (var compressor = new Compressor(22))
+                    {
+                        byte[] compressedBytes = compressor.Wrap(originalBytes).ToArray();
+
+                        // If compression actually saves space, use it. Otherwise, store raw.
+                        if (compressedBytes.Length < originalBytes.Length)
+                        {
+                            finalData = compressedBytes;
+                            type = 3; // ZSTD Type
+                        }
+                        else
+                        {
+                            finalData = originalBytes;
+                            type = 0; // Uncompressed
+                        }
+                    }
+
+                    // Store the data for the writing phase
+                    entryData[pathHash] = finalData;
+
+                    // Fill metadata (Size = Compressed Size, UncompressedSize = Original)
+                    entries[i] = new WadEntryInfo
+                    {
+                        FilePath = file, // Kept for reference, though we use entryData now
+                        PathHash = pathHash,
+                        DataChecksum = dataChecksum,
+                        Size = (uint)finalData.Length,
+                        // We'll store the Type in the unused high bits or just handle it during write. 
+                        // Since the struct doesn't have a Type field, let's piggyback or just rely on the logic below.
+                        // However, the cleanest way without changing your struct is to assume 
+                        // if Size < OriginalSize (we need to track OriginalSize somewhere).
+                        // Let's assume we modify WadEntryInfo or use a Tuple. 
+                        // For this snippet, I will modify the write logic to look up the type from the data comparison
+                        // or simpler: I'll assume you add a 'Type' field or 'UncompressedSize' to WadEntryInfo. 
+                        // But sticking to your provided struct:
+                    };
+
+                    // HACK: Since WadEntryInfo definition in your snippet is fixed, 
+                    // and we need to pass UncompressedSize and Type to the writer:
+                    // I will use a local dictionary to store the extra metadata needed for the TOC.
+                });
+
+                // 2. Sort entries to match standard WAD structure (by PathHash)
+                Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
+
+                ulong tocChecksum = 0;
+                foreach (var e in entries) tocChecksum ^= e.DataChecksum;
+
+                using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
+                using (var bw = new BinaryWriter(fs))
+                {
+                    // --- Header ---
+                    bw.Write(new char[] { 'R', 'W' });
+                    bw.Write((byte)3);
+                    bw.Write((byte)4);
+                    bw.Write(new byte[256]);
+                    bw.Write(tocChecksum);
+                    bw.Write((uint)entries.Length);
+
+                    // Calculate Start of Data Area
+                    uint dataStartOffset = 272 + ((uint)entries.Length * 32);
+                    uint absoluteOffset = dataStartOffset;
+
+                    // --- Write TOC ---
+                    foreach (var entry in entries)
+                    {
+                        byte[] data = entryData[entry.PathHash];
+
+                        // We need to retrieve the uncompressed size. 
+                        // Since we don't have it in the struct, we can infer it or (better) 
+                        // re-read the original file size or store it in a parallel list. 
+                        // For safety/speed here, let's grab the file info.
+                        uint uncompressedSize = (uint)new FileInfo(entry.FilePath).Length;
+
+                        // Determine type based on data comparison
+                        byte compressionType = (data.Length < uncompressedSize) ? (byte)3 : (byte)0;
+
+                        bw.Write(entry.PathHash);        // 0-7
+                        bw.Write(absoluteOffset);        // 8-11: Offset
+                        bw.Write((uint)data.Length);     // 12-15: Compressed Size
+                        bw.Write(uncompressedSize);      // 16-19: Uncompressed Size
+                        bw.Write(compressionType);       // 20: Type (3 = Zstd, 0 = None)
+                        bw.Write((byte)0);               // 21
+                        bw.Write((ushort)0);             // 22-23
+                        bw.Write(entry.DataChecksum);    // 24-31
+
+                        absoluteOffset += (uint)data.Length;
+                    }
+
+                    // --- Write Data ---
+                    foreach (var entry in entries)
+                    {
+                        byte[] data = entryData[entry.PathHash];
+                        bw.Write(data);
+
+                        // Help GC slightly by removing reference (optional)
+                        entryData.TryRemove(entry.PathHash, out _);
+                    }
+                }
+            }
         }
 
         public class PathFixer
         {
+            private FixerSettings _settings;
+            public PathFixer(FixerSettings settings)
+            {
+                _settings = settings;
+            }
+
             static readonly string[] Roots = { "assets", "data" };
 
             static readonly string[] Categories =
             {
-        "characters", "items", "loadouts", "maps", "particles",
-        "perks", "rewards", "shared", "sounds", "spells", "ux"
-    };
+                "characters", "items", "loadouts", "maps", "particles",
+                "perks", "rewards", "shared", "sounds", "spells", "ux"
+            };
 
-            public static string FixPath(string finalPath)
+            public string FixPath(string finalPath)
             {
-                if (FixerSettings.cls_assets)
+                if (_settings.cls_assets)
                     finalPath = CleanRootPath(finalPath);
 
                 string norm = finalPath.Replace("\\", "/");
@@ -1315,12 +1967,9 @@ namespace repatheruwu
                     ? Path.GetExtension(parts[^1]).ToLower()
                     : "";
 
-                string repath = FixerSettings.repath_path_path;
-                bool inFilePath = FixerSettings.in_file_path;
+                string repath = _settings.repath_path_path;
+                bool inFilePath = _settings.in_file_path;
 
-                // ---------------------------
-                // CASE 1 — data/... or assets/...
-                // ---------------------------
                 if (firstFolder == "data" || firstFolder == "assets")
                 {
                     string root = firstFolder == "data" ? "DATA" : "ASSETS";
@@ -1341,18 +1990,13 @@ namespace repatheruwu
                     }
                 }
 
-                // ---------------------------
-                // CASE 2 — generic path
-                // ---------------------------
                 bool isFileOnly = parts.Length == 1;
 
-                // Single file → always ASSETS
                 if (isFileOnly)
                 {
                     return $"ASSETS/{repath}/{parts[0]}";
                 }
 
-                // Multi-folder
                 string prefixRoot = (ext == ".bin" || ext == "")
                     ? "DATA"
                     : "ASSETS";
@@ -1369,9 +2013,6 @@ namespace repatheruwu
                 }
             }
 
-            // ---------------------------------
-            // CleanRootPath (C# port)
-            // ---------------------------------
             static string CleanRootPath(string path)
             {
                 string pathNorm = path.Replace("\\", "/").ToLower();
@@ -1380,7 +2021,6 @@ namespace repatheruwu
                 string root = null;
                 int rootIndex = -1;
 
-                // 1) find root
                 for (int i = 0; i < parts.Length; i++)
                 {
                     foreach (string r in Roots)
@@ -1399,7 +2039,6 @@ namespace repatheruwu
                 if (root == null)
                     return path;
 
-                // 2) find category
                 string category = null;
                 int categoryIndex = -1;
 
@@ -1417,27 +2056,30 @@ namespace repatheruwu
                 if (category == null)
                     return path;
 
-                // 3) build cleaned path
                 var rest = parts.Skip(categoryIndex + 1);
                 return string.Join("/", new[] { root, category }.Concat(rest));
             }
         }
 
-        public static class Hashes
+        public class Hashes
         {
-            private static readonly Lazy<List<string>> _cachedPaths =
-                new Lazy<List<string>>(() => LoadPathsOnly(FixerSettings.gamehashes_path));
+            private FixerSettings _settings;
+            // Cached paths are now per-instance to allow settings isolation
+            private List<string> _cachedPaths;
 
-            private static List<string> LoadPathsOnly(string path)
+            public Hashes(FixerSettings settings)
+            {
+                _settings = settings;
+            }
+
+            private List<string> LoadPathsOnly(string path)
             {
                 var paths = new List<string>();
 
                 if (!File.Exists(path)) return paths;
 
-
                 foreach (var line in File.ReadLines(path))
                 {
-                    // Skip the hash, take everything after the first space
                     int spaceIndex = line.IndexOf(' ');
                     if (spaceIndex >= 0 && spaceIndex < line.Length - 1)
                     {
@@ -1448,15 +2090,21 @@ namespace repatheruwu
                 return paths;
             }
 
-            public static List<Target> FindMatches(List<Target> targets, bool useBaseName = true)
+            private List<string> GetCachedPaths()
             {
-                // 1. Get the list of all paths (Lazy loaded)
-                var loadedPaths = _cachedPaths.Value;
+                if (_cachedPaths == null)
+                {
+                    _cachedPaths = LoadPathsOnly(_settings.gamehashes_path);
+                }
+                return _cachedPaths;
+            }
 
-                // 2. Iterate through each target
+            public List<WadExtractor.Target> FindMatches(List<WadExtractor.Target> targets, bool useBaseName = true)
+            {
+                var loadedPaths = GetCachedPaths();
+
                 foreach (var target in targets)
                 {
-                    // Clear the list for this target
                     target.Hashes = new List<string>();
 
                     if (string.IsNullOrEmpty(target.OriginalPath)) continue;
@@ -1476,8 +2124,6 @@ namespace repatheruwu
 
                         string pathExt = Path.GetExtension(path).ToLowerInvariant();
 
-                        // Allow match if extensions are identical
-                        // Or if it's a dds ↔ tex match
                         if (pathExt == targetExt ||
                             (targetExt == ".dds" && pathExt == ".tex") ||
                             (targetExt == ".tex" && pathExt == ".dds"))
@@ -1521,5 +2167,4 @@ namespace repatheruwu
         }
 
     }
-
 }

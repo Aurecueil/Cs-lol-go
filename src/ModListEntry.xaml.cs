@@ -9,6 +9,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -123,12 +124,14 @@ namespace ModManager
 
         private void ActiveCheckbox_Checked(object sender, RoutedEventArgs e)
         {
+            if (fixerRunning) return;
             if (IsSelected)
             {
                 foreach (var entry in selectedEntries)
                 {
                     if (entry.IsMod && entry.ModElement != null)
                     {
+                        if (entry.fixerRunning) continue;
                         entry.ModElement.isActive = true;
                         entry.RefreshDisplay(false, true);
                         MainWindow.ProfileEntries[entry.ModElement.ModFolder] = entry.ModElement.Details.Priority;
@@ -159,10 +162,12 @@ namespace ModManager
 
         private void ActiveCheckbox_Unchecked(object sender, RoutedEventArgs e)
         {
+            if (fixerRunning) return;
             if (IsSelected)
             {
                 foreach (var entry in selectedEntries)
                 {
+                    if (entry.fixerRunning) continue;
                     if (entry.IsMod && entry.ModElement != null)
                     {
                         entry.ModElement.isActive = false;
@@ -203,6 +208,9 @@ namespace ModManager
                 int has_folder = 0;
                 foreach (var entry in selectedEntries)
                 {
+                    if (entry.fixerRunning) continue;
+                    if (entry.exporter) continue;
+
                     if (entry.IsMod)
                     {
                         meow.Add((entry.ModElement.ModFolder, 0, true));
@@ -288,11 +296,14 @@ namespace ModManager
 
         }
 
-        private void Export_Item(object sender, RoutedEventArgs e)
+        private async void Export_Item(object sender, RoutedEventArgs e)
         {
             if (IsMod)
             {
-                Main.Export_Mod(ModElement);
+                block.Text = "Exporting Mod";
+                set_export(true);
+                await Main.Export_Mod(ModElement);
+                set_export(false);
             }
         }
         private void Open_details_page(object sender, RoutedEventArgs e)
@@ -310,20 +321,72 @@ namespace ModManager
             Main.OverlayHost.Children.Add(metaEdior);
         }
 
+        Repatheruwu rep = null;
+        FixerUI Fixer = null;
+        public bool fixerRunning = false;
+        bool exporter = false;
+        bool was_enabled;
+
         private void Fixer_settings_panel_open(object sender, RoutedEventArgs e)
         {
-            string url = "https://www.youtube.com/watch?v=BbeeuzU5Qc8&autoplay=1"; // Replace with your actual URL
-            try
+            if (Fixer == null || !fixerRunning) // Only create it if it doesn’t exist
             {
-                Process.Start(new ProcessStartInfo
+                rep = new Repatheruwu();
+
+                Fixer = new FixerUI(Main, ModElement, rep)
                 {
-                    FileName = url,
-                    UseShellExecute = true // Required for default browser
-                });
+                    CallerModListEntry = this,
+                };
+                Main.OverlayHost.Children.Add(Fixer);
             }
-            catch (Exception ex)
+            else
             {
-                MessageBox.Show($"Failed to open link: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!Main.OverlayHost.Children.Contains(Fixer))
+                    Main.OverlayHost.Children.Add(Fixer);
+            }
+        }
+        public void null_fixer()
+        {
+            Fixer = null;
+        }
+
+        public void end_fixer()
+        {
+            if (!Main.OverlayHost.Children.Contains(Fixer))
+            {
+                Fixer = null;
+            }
+        }
+        public void set_export(bool running)
+        {
+            exporter = running;
+            if (running)
+            {
+                FixerOverlay.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                FixerOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+        public void set_fixer(bool running)
+        {
+            fixerRunning = running;
+            if (running)
+            {
+                block.Text = "Fixer is Running";
+                this.IsEnabled = false;
+                FixerOverlay.Visibility = Visibility.Visible;
+                was_enabled = ModElement.isActive;
+                ModElement.isActive = false;
+                ActiveCheckbox.IsChecked = ModElement.isActive;
+            }
+            else
+            {
+                this.IsEnabled = true;
+                FixerOverlay.Visibility = Visibility.Collapsed;
+                ModElement.isActive = was_enabled;
+                ActiveCheckbox.IsChecked = ModElement.isActive;
             }
         }
 
@@ -438,56 +501,33 @@ namespace ModManager
                     elements2.VerticalAlignment = VerticalAlignment.Top;
                     elements2.Margin = new Thickness(6);
                     elements3.VerticalAlignment = VerticalAlignment.Top;
-                    elements3.Margin = new Thickness(6);
+                    elements3.Margin = new Thickness(0,18,0,0);
                     break;
                 case 1: // Center
                     elements1.VerticalAlignment = VerticalAlignment.Center;
                     elements2.VerticalAlignment = VerticalAlignment.Center;
                     elements2.Margin = new Thickness(8, 0, 0, 0);
-                    elements3.VerticalAlignment = VerticalAlignment.Center;
-                    elements3.Margin = new Thickness(8, 0, 8, 0);
+                    DetailsText.VerticalAlignment = VerticalAlignment.Center;
+                    DetailsText.Margin = new Thickness(8, 0, 8, 0);
                     break;
                 case 2: // Bottom
                     elements1.VerticalAlignment = VerticalAlignment.Bottom;
                     elements2.VerticalAlignment = VerticalAlignment.Bottom;
                     elements2.Margin = new Thickness(6);
                     elements3.VerticalAlignment = VerticalAlignment.Bottom;
-                    elements3.Margin = new Thickness(6);
+                    elements3.Margin = new Thickness(0, 0, 0, 18);
                     break;
                 default:
                     break;
             }
         }
-        private async void LoadBackgroundImageAsync(bool update)
-        {
-            try
-            {
-                // background thread: IO + decode
-                var image = await Task.Run(() =>
-                    ImageLoader.GetModImage(ModElement.ModFolder)
-                );
-
-                if (image == null)
-                    return;
-
-                // UI thread: assign + update visuals
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    bg_image = image;
-                    if (update) { UpdateBackgroundUI(); }
-                }, DispatcherPriority.Background);
-            }
-            catch
-            {
-                // optional logging — never crash UI
-            }
-        }
+        
 
         private async void UpdateBackgroundUI()
         {
-            if (bg_image != null && Main.settings.show_thumbs == true)
+            if (has_thumb != null && Main.settings.show_thumbs == true)
             {
-                BackgroundBorder.Background = new ImageBrush(bg_image)
+                BackgroundBorder.Background = new ImageBrush(has_thumb)
                 {
                     Stretch = Stretch.UniformToFill,
                     Opacity = Main.settings.thumb_opacity
@@ -499,20 +539,25 @@ namespace ModManager
             }
         }
 
+        private async Task loadin_thumb()
+        {
+            has_thumb = await Task.Run(() => ImageLoader.GetModImage(ModElement.ModFolder));
+            UpdateBackgroundUI();
+        }
 
-        private void UpdateUIForMod(bool info, bool basee, bool image3, bool first)
+        private async void UpdateUIForMod(bool info, bool basee, bool image3, bool first)
         {
             if (first)
             {
                 ExportIcon.Visibility = Visibility.Visible;
                 ModHandlingIcon.Visibility = Visibility.Visible;
                 DeleteIcon.Visibility = Visibility.Visible;
+                FixingIcon.Visibility = Visibility.Visible;
 
                 // Update tooltips for mod context
                 ModHandlingIcon.ToolTip = "Mod Settings";
                 DeleteIcon.ToolTip = "Delete Mod";
-                LoadBackgroundImageAsync(image3);
-                //  UpdateLayerComboBox();
+                loadin_thumb();
             }
             if (info)
             {
@@ -528,24 +573,21 @@ namespace ModManager
 
                     DetailsText.Text = details;
                     DetailsText.Visibility = Visibility.Visible;
-                    det_grid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
-                    det_grid.ColumnDefinitions[0].MaxWidth = 250;
-                    det_grid.ColumnDefinitions[2].MaxWidth = 250;
+                    // det_grid.ColumnDefinitions[1].Width = new GridLength(1, GridUnitType.Star);
+                    // det_grid.ColumnDefinitions[0].MaxWidth = 250;
+                    // det_grid.ColumnDefinitions[2].MaxWidth = 250;
                 }
                 else
                 {
                     DetailsText.Visibility = Visibility.Collapsed;
-                    det_grid.ColumnDefinitions[1].Width = new GridLength(0, GridUnitType.Pixel);
-                    det_grid.ColumnDefinitions[0].MaxWidth = 1500;
-                    det_grid.ColumnDefinitions[2].MaxWidth = 1500;
+                    // det_grid.ColumnDefinitions[1].Width = new GridLength(0, GridUnitType.Pixel);
+                    // det_grid.ColumnDefinitions[0].MaxWidth = 1500;
+                    // det_grid.ColumnDefinitions[2].MaxWidth = 1500;
                 }
             }
             if (image3)
             {
-                if (!first)
-                {
-                    UpdateBackgroundUI();
-                }
+                if (!first) { UpdateBackgroundUI(); }
             }
 
 
@@ -559,7 +601,7 @@ namespace ModManager
 
             UpdateSelectionVisual();
         }
-        private BitmapImage bg_image;
+        private BitmapSource has_thumb;
         private void UpdateSelectionVisual()
         {
             var border = this.FindName("EntryBorder") as Border;

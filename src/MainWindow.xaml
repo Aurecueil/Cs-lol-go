@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077 - 0.1.4:15.24"
+        Title="LoL for GlobalOffensive 2077 - 0.2.0"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
@@ -67,7 +67,7 @@
 
             <Button DockPanel.Dock="Left" 
         Style="{StaticResource IconButtonStyle}" 
-        ToolTip="Delete Profile" x:Name="deleteteProfile"
+        ToolTip="Yone Button (Delete Profile)" x:Name="deleteteProfile"
         Margin="5,5,10,5"
         Click="DeleteProfile_Click">
                 <TextBlock x:Name="deleteteProfileFont" Text="D" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
@@ -75,7 +75,7 @@
 
             <Button DockPanel.Dock="Left" 
 Style="{StaticResource IconButtonStyle}" 
-ToolTip="Yasuo Button" x:Name="yasuoButton"
+ToolTip="Yasuo Button (diagnostics)" x:Name="yasuoButton"
 Margin="25,5,10,5"
 Click="YasuoButtons_click">
                 <TextBlock Text="♿" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>

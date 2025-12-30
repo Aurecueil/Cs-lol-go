@@ -432,47 +432,95 @@ namespace ModManager
     }
     public static class ImageLoader
     {
-        public static BitmapImage GetModImage(string modFolder)
+        private static readonly string[] Extensions =
         {
-            string metaFolder = Path.Combine(Directory.GetCurrentDirectory(), "installed", modFolder, "META");
+        ".png", ".jpg", ".jpeg", ".bmp", ".gif"
+    };
+
+        public static BitmapSource? GetModImage(string modFolder)
+        {
+            string metaFolder = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "installed",
+                modFolder,
+                "META");
 
             if (!Directory.Exists(metaFolder))
                 return null;
 
-            // Supported extensions
-            string[] extensions = { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
-
-            foreach (var ext in extensions)
+            foreach (var ext in Extensions)
             {
                 string imagePath = Path.Combine(metaFolder, "image" + ext);
                 if (File.Exists(imagePath))
-                {
-                    var image = LoadBitmapImage(imagePath);
-                    if (image != null)
-                        return image;
-                }
+                    return LoadBitmap(imagePath);
             }
 
-            return null; // No valid image found
+            return null;
         }
 
-        private static BitmapImage LoadBitmapImage(string filePath)
+        private static BitmapSource? LoadBitmap(string filePath)
         {
+            const int maxWidth = 600;
+            const double maxHeightRatio = 1.8;
+
             try
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad; // Load image into memory immediately
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache; // Force refresh, ignore cache
-                bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
-                bitmap.EndInit();
-                bitmap.Freeze(); // Makes it safe for multi-threaded use
-                return bitmap;
+                BitmapSource source;
+
+                // 🔥 Load fully into memory (no file locks)
+                using (var stream = File.OpenRead(filePath))
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = maxWidth;
+                    bitmap.StreamSource = stream;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+
+                    source = bitmap;
+                }
+
+                // 🔥 Crop WITHOUT re-encoding
+                int maxHeight = (int)(source.PixelWidth * maxHeightRatio);
+
+                if (source.PixelHeight > maxHeight)
+                {
+                    int y = (source.PixelHeight - maxHeight) / 2;
+                    var cropped = new CroppedBitmap(
+                        source,
+                        new Int32Rect(0, y, source.PixelWidth, maxHeight));
+
+                    cropped.Freeze();
+                    return cropped;
+                }
+
+                return source;
             }
             catch
             {
-                return null; // In case of an invalid image or error
+                return null;
             }
+        }
+
+        public static bool ModImageExists(string modFolder)
+        {
+            string metaFolder = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "installed",
+                modFolder,
+                "META");
+
+            if (!Directory.Exists(metaFolder))
+                return false;
+
+            foreach (var ext in Extensions)
+            {
+                if (File.Exists(Path.Combine(metaFolder, "image" + ext)))
+                    return true;
+            }
+
+            return false;
         }
     }
 
