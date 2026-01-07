@@ -3,7 +3,7 @@
 </p>
 
 # cslol-go
-My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueToolkit/cslol-manager), but more features and options.
+My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueToolkit/cslol-manager), but with more features and options.
 
 
 ## Features
@@ -11,7 +11,7 @@ My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueTool
 - Mod Folders
 - Random mod selection
 - [Runeforge](https://www.runeforge.dev/) one-click downloads
-- Modpkg import/export
+- [Modpkg](https://github.com/LeagueToolkit/league-mod) import/export
 - Mod fixer
 - Mod thumbnails
 - Instant profiles
