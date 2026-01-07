@@ -496,7 +496,7 @@ namespace ModManager
 
                                 }
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             {
 
                             }
@@ -1334,7 +1334,7 @@ namespace ModManager
                         Environment.Exit(0);
                     }
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     MessageBox.Show($"Cannot verify version, app will now close. Get internet connection and try again");
                     Environment.Exit(0);
@@ -1679,7 +1679,7 @@ namespace ModManager
         }
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ProfileComboBox.SelectedItem != null)
+            if (ProfileComboBox.SelectedItem is not null)
             {
                 settings.CurrentProfile = ProfileComboBox.SelectedItem.ToString();
                 save_settings();
@@ -2872,7 +2872,7 @@ namespace ModManager
                     });
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Load_check_box.IsChecked = false;
                 if (!string.IsNullOrEmpty(err_catch))
@@ -3171,7 +3171,7 @@ namespace ModManager
                     RefreshModListPanel(Current_location_folder, rebuild);
                 }
             }
-
+            
             
             var folders = new List<(string childId, HierarchyElement element)>();
             var mods = new List<(string childId, Mod element)>();
@@ -4247,8 +4247,15 @@ namespace ModManager
                 {
                     string infoJson = File.ReadAllText(infoPath);
                     modInfo = JsonSerializer.Deserialize<ModInfo>(infoJson);
+
+                    // modInfo.Author ??= settings.default_author;
+                    // modInfo.Description ??= "";
+                    // modInfo.Heart ??= settings.default_Hearth;
+                    // modInfo.Home ??= settings.default_home;
+                    // modInfo.Name ??= "null";
+                    // modInfo.Version ??= "1.0.0";
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     modInfo.Name = modFolderName;
                     modInfo.Author = settings.default_author;
@@ -4596,7 +4603,8 @@ namespace ModManager
                         else if (modByFolder.TryGetValue(fileName, out var mod))
                         {
                             int overrideSetting = settings.import_override;
-                            bool shouldReturn = false;
+
+                            // bool shouldReturn = false;
 
                             // UI logic inside background task requires Dispatcher for standard execution flow
                             // However, we can't easily await a Dispatcher call in this structure for logic branching
@@ -4695,7 +4703,7 @@ namespace ModManager
                             Application.Current.Dispatcher.Invoke(() =>
                                 RefreshModListPanel(Current_location_folder));
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             if (Directory.Exists(extractTargetDir))
                                 Directory.Delete(extractTargetDir, true);

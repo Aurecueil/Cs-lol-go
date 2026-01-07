@@ -32,7 +32,7 @@ namespace ModManager
         public HierarchyElement FolderElement { get; private set; }
         public Mod ModElement { get; private set; }
         public bool IsMod { get; private set; }
-        private bool valid_Name = true;
+        // private bool valid_Name = true;
         private bool valid_Folder = true;
         private string start_name = string.Empty;
         public string image_path = "";
@@ -607,7 +607,7 @@ namespace ModManager
 
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         
                     }

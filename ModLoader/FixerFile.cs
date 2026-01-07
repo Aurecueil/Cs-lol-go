@@ -798,7 +798,7 @@ namespace ModManager
                 {
                     bin = LoadBin(path);
                 }
-                catch (Exception e) {
+                catch (Exception) {
                     x.UpperLog($"[FAIL] Failed to read {trimmedPath}", CLR_ERR);
                     Settings.Missing_Bins.Add($"[Read Error] {path}");
                     continue; }
@@ -1656,6 +1656,7 @@ namespace ModManager
                     ulong dataChecksum = BitConverter.ToUInt64(XxHash64.Hash(originalBytes)); // Checksum is usually of the original data
 
                     byte[] finalData;
+
                     byte type;
 
                     // Attempt Compression (Zstd Level 22 is usually 'Ultra')

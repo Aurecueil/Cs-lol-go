@@ -21,7 +21,7 @@ namespace ModLoader
                     process.Kill();
                     process.WaitForExit(1000); // Wait up to 1 second
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Log if needed
                 }
