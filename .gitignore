@@ -1,0 +1,23 @@
+# Build results
+bin/
+obj/
+
+# Visual Studio cache / IDE state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider / VS Code (safe to include even if unused)
+.idea/
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Unused
+ModLoader/exploreros.xaml
+ModLoader/exploreros.xaml.cs
+/ModLoader/Properties/PublishProfiles

@@ -50,10 +50,10 @@
                     </TextBox.Template>
                 </TextBox>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Grid.Column="1">
-                        <Button Content="Cancel" Click="Cancel_Click" Width="40" Height="40" Margin="0,0,5,0"
-                Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
-                        <Button Content="Create" Click="Create_Click" Width="40" Height="40" Margin="0"
-                Style="{StaticResource IconButtonStyle}" Background="{DynamicResource  AccentBrush}"/>
+                        <Button Content="Cancel" Click="Cancel_Click" Width="60" Height="40" FontSize="13" Margin="0,0,5,0" Background="#FF252525"
+                Style="{StaticResource AccentOutlineHighlightButton}"/>
+                        <Button Content="Create" Click="Create_Click" Width="60" Height="40" FontSize="13" Margin="0" Background="#FF252525"
+                Style="{StaticResource AccentOutlineHighlightButton}"/>
                 </StackPanel>
 
                 </Grid>

@@ -753,5 +753,201 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="FontSize" Value="24"/>
         </Style>
+
+
+        <Style x:Key="BigToggleSlider"
+       TargetType="ToggleButton">
+
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+
+                            <!-- Background (always neutral) -->
+                            <Border x:Name="Bg"
+                            CornerRadius="20"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"/>
+
+                            <!-- Labels -->
+                            <Grid Margin="11,0,11,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock x:Name="LeftText"
+                                   Text="LOL"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Left"
+                                   Foreground="#FFF"/>
+
+                                <TextBlock x:Name="RightText"
+                                   Text="TFT"
+                                   Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Right"
+                                   Foreground="#666"/>
+                            </Grid>
+
+                            <!-- Selection ring -->
+                            <Border x:Name="Knob"
+                            Width="32"
+                            Height="32"
+                            CornerRadius="16"
+                            Background="Transparent"
+                            BorderThickness="2"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            HorizontalAlignment="Left"
+                            Margin="6,4"/>
+
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+
+                            <!-- TFT selected -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Knob"
+                                Property="HorizontalAlignment"
+                                Value="Right"/>
+
+                                <Setter TargetName="LeftText"
+                                Property="Foreground"
+                                Value="#666"/>
+
+                                <Setter TargetName="RightText"
+                                Property="Foreground"
+                                Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+
+                            <!-- LOL selected -->
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="Knob"
+                                Property="HorizontalAlignment"
+                                Value="Left"/>
+
+                                <Setter TargetName="LeftText"
+                                Property="Foreground"
+                                Value="{DynamicResource AccentBrush}"/>
+
+                                <Setter TargetName="RightText"
+                                Property="Foreground"
+                                Value="#666"/>
+                            </Trigger>
+
+                            <!-- Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg"
+                                Property="BorderBrush"
+                                Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+
+                            <!-- Disabled -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ButtonTemple" TargetType="CheckBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Border x:Name="BackgroundBorder"
+      Background="Transparent"
+      CornerRadius="50"
+      SnapsToDevicePixels="True" />
+                            <TextBlock x:Name="IconText" 
+         HorizontalAlignment="Center" 
+         VerticalAlignment="Center"
+         Foreground="White"
+         FontSize="18"
+         Text="▶"
+         Margin="10,5,10,5"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="IconText" Property="Text" Value="⏸️" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BackgroundBorder" Property="Background" Value="#99000000" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BackgroundBorder" Property="Background" Value="transparent" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="AccentOutlineHighlightButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="6">
+                            <ContentPresenter
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <!-- Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border"
+                        Property="Background"
+                        Value="#FF3A3A3A"/>
+                                <Setter Property="Foreground" Value="Black"/>
+                            </Trigger>
+
+                            <!-- Press -->
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border"
+                        Property="Opacity"
+                        Value="0.3"/>
+                            </Trigger>
+
+                            <!-- Disabled -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Application.Resources>
 </Application>

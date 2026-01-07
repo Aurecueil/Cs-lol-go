@@ -187,11 +187,10 @@
                                              FontSize="14"
                                              CaretBrush="White"/>
 
-                                    <Button Grid.Column="0"
-                                            Content="Browse..."
-                                            Style="{StaticResource IconButtonStyle}"
-                                            Background="{DynamicResource AccentBrush}"
-                                            Foreground="White"
+                                    <Button Grid.Column="0" Background="#FF252525"
+                                            Content="Browse..." Width="60" Height="30"
+                                            Style="{StaticResource AccentOutlineHighlightButton}"
+                                            Foreground="White" BorderThickness="1"
                                             Padding="10,5"
                                             Click="BrowseGamePath_Click"/>
                                 </Grid>

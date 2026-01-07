@@ -104,13 +104,44 @@
             <Border x:Name="StatusBorder" Panel.ZIndex="15" Background="Transparent" CornerRadius="6" Opacity="0.15" IsHitTestVisible="False"/>
             <Border x:Name="StatusBorderBorder" Panel.ZIndex="15" BorderBrush="Transparent" BorderThickness="2" CornerRadius="3" Opacity="0.8" IsHitTestVisible="False"/>
 
-            <Border x:Name="FixerOverlay" Visibility="Collapsed" Panel.ZIndex="20" Background="#AA000000" CornerRadius="6">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- Optional text -->
-                    <TextBlock x:Name="block" Text="Fixer Running..." Foreground="White" FontWeight="Bold" FontSize="12" 
-                   HorizontalAlignment="Center" Margin="0,5,0,0"/>
+            <Border x:Name="FixerOverlay"
+        Visibility="Collapsed"
+        Panel.ZIndex="20"
+        Background="#AA000000"
+        CornerRadius="6">
+
+                <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+
+                    <TextBlock x:Name="block"
+                   Text="Fixer Running..."
+                   Foreground="White"
+                   FontWeight="Bold"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   Margin="8,5,4,5"/>
+
+                    <Button Style="{StaticResource roundHighlight}"
+                ToolTip="Fixing"
+                Cursor="Hand"
+                Click="Fixer_settings_panel_open"
+                BorderThickness="0"
+                Background="Transparent"
+                Visibility="Visible"
+                VerticalAlignment="Center">
+
+                        <TextBlock Text="🔧" x:Name="whenrun" Visibility="Collapsed"
+                       Style="{StaticResource IconTextBlockStyle}"
+                       Foreground="White"
+                       FontSize="15"
+                       Padding="8"/>
+                    </Button>
+
                 </StackPanel>
             </Border>
+
+            
 
         </Grid>
     </Border>

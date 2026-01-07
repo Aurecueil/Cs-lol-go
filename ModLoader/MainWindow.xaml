@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="LoL for GlobalOffensive 2077 - 0.2.0"
+        Title="cslolgo - 0.2.1.1"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="400"
@@ -81,26 +81,39 @@ Click="YasuoButtons_click">
                 <TextBlock Text="♿" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
 
+
+            <Button DockPanel.Dock="Right" x:Name="create_folder"
+                    Style="{StaticResource IconButtonStyle}" 
+                    ToolTip="Create Folder" Click="Create_Folder"
+                    Margin="5,5,50,5">
+                <TextBlock Text="📁" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+            </Button>
+
+            <ToggleButton DragEnter="OnDragEnterMode"
+        DragOver="OnDragOverMode" AllowDrop="True"
+        Drop="OnDropMode" Style="{StaticResource BigToggleSlider}" DockPanel.Dock="Right" x:Name="tftModButton"
+            Margin="0,1,0,0"/>
+
             <Button DockPanel.Dock="Left" 
 Style="{StaticResource IconButtonStyle}" 
 ToolTip="Enable Runeforge Fas Download" x:Name="Rf_Button"
-Margin="85,5,10,5"
+Margin="10,5,40,5"
 Click="Runeforge_protocol_add">
                 <TextBlock x:Name="Rf_Button_Icon" FontSize="40" Text="R" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
 
 
-            <Button DockPanel.Dock="Right" x:Name="create_folder"
-                    Style="{StaticResource IconButtonStyle}" 
-                    ToolTip="Create Folder" Click="show_profile"
-                    Margin="5,5,50,5">
-                <TextBlock Text="📁" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
-            </Button>
-            
-
-
         </DockPanel>
 
+
+        <CheckBox x:Name="Load_check_box"
+ToolTip="Start/Stop loader"
+Margin="0,8,10,0" Panel.ZIndex="10"
+Checked="Start_loader"
+Unchecked="Stop_loader" Style="{StaticResource ButtonTemple}"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Right" Grid.ColumnSpan="3"/>
+        
         <Border 
     Grid.Row="1"
     BorderBrush="{DynamicResource AccentBrush}" 
@@ -262,56 +275,6 @@ Click="Runeforge_protocol_add">
 
             </Grid>
         </DockPanel>
-
-        <CheckBox x:Name="Load_check_box"
-ToolTip="Start/Stop loader"
-Margin="0,8,10,0" Panel.ZIndex="10"
-Checked="Start_loader"
-Unchecked="Stop_loader"
-              VerticalAlignment="Top"
-              HorizontalAlignment="Right" Grid.ColumnSpan="3">
-            <CheckBox.Style>
-                <Style TargetType="CheckBox">
-                    <Setter Property="Background" Value="Transparent" />
-                    <Setter Property="BorderThickness" Value="0" />
-                    <Setter Property="Padding" Value="8" />
-                    <Setter Property="Cursor" Value="Hand" />
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="CheckBox">
-                                <Grid>
-                                    <Border x:Name="BackgroundBorder"
-                          Background="Transparent"
-                          CornerRadius="50"
-                          SnapsToDevicePixels="True" />
-                                    <TextBlock x:Name="IconText" 
-                             HorizontalAlignment="Center" 
-                             VerticalAlignment="Center"
-                             Foreground="White"
-                             FontSize="18"
-                             Text="▶"
-                             Margin="10,5,10,5"/>
-                                </Grid>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsChecked" Value="True">
-                                        <Setter TargetName="IconText" Property="Text" Value="⏸️" />
-                                    </Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="BackgroundBorder" Property="Background" Value="#99000000" />
-                                    </Trigger>
-                                    <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="BackgroundBorder" Property="Background" Value="transparent" />
-                                    </Trigger>
-                                    <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Opacity" Value="0.5" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </CheckBox.Style>
-        </CheckBox>
 
         <GridSplitter Grid.Column="1"
       Grid.Row="2" 

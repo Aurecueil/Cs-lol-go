@@ -1,27 +1,28 @@
 ﻿using ModManager;
+using System.Collections.Concurrent;
 using System.Configuration;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
-using System.IO.Pipes;
+using System.Drawing.Imaging;
 using System.IO;
+using System.IO.Pipes;
+using System.Net;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using SystemColors = System.Windows.SystemColors;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Diagnostics;
+using System.Windows.Media.Imaging;
 using Application = System.Windows.Application;
 using Cursors = System.Windows.Input.Cursors;
-using System.Windows.Media.Imaging;
-using System.Drawing.Imaging;
 using Image = System.Drawing.Image;
-using System.Net;
-using System.Text.Json;
-using System.Text;
+using SystemColors = System.Windows.SystemColors;
 
 namespace ModManager
 {
@@ -60,6 +61,8 @@ namespace ModManager
         public static bool StartMinimized = false;
         public static bool is_startup = false;
 
+        public static bool IsMainLoaded = false;
+        public static ConcurrentQueue<string> ProtocolQueue = new ConcurrentQueue<string>();
     }
 
     public partial class App : Application
@@ -69,6 +72,7 @@ namespace ModManager
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // System.Diagnostics.Debugger.Launch();
             bool isNewInstance;
             _mutex = new Mutex(true, @"Global\ModdoLoudaDA", out isNewInstance);
 
@@ -102,8 +106,6 @@ namespace ModManager
 
             base.OnStartup(e);
 
-            StartHttpServer();
-
             Task.Run(() =>
             {
                 while (true)
@@ -133,122 +135,15 @@ namespace ModManager
 
         }
 
-        private HttpListener _listener;
-
-        private void StartHttpServer()
-        {
-            _listener = new HttpListener();
-            _listener.Prefixes.Add("http://localhost:7345/");
-            _listener.Start();
-
-            Task.Run(async () =>
-            {
-                while (_listener.IsListening)
-                {
-                    try
-                    {
-                        var context = await _listener.GetContextAsync();
-                        _ = Task.Run(() => HandleRequest(context));
-                    }
-                    catch (Exception ex)
-                    {
-                        File.AppendAllText("http_server_error.log", ex.ToString());
-                    }
-                }
-            });
-        }
-
-        private async void HandleRequest(HttpListenerContext context)
-        {
-            context.Response.AddHeader("Access-Control-Allow-Origin", "*");
-            context.Response.AddHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-            context.Response.AddHeader("Access-Control-Allow-Headers", "Content-Type");
-
-            if (context.Request.HttpMethod == "OPTIONS")
-            {
-                context.Response.StatusCode = 200;
-                context.Response.Close();
-                return;
-            }
-
-            if (context.Request.HttpMethod == "GET" && context.Request.Url.AbsolutePath == "/fetch-mods")
-            {
-                var savedMods = new List<ModStatus>();
-
-                // Path to your /installed folder (relative or absolute)
-                string installedPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed");
-
-                if (Directory.Exists(installedPath))
-                {
-                    var modFolders = Directory.GetDirectories(installedPath)
-                        .Where(dir => Path.GetFileName(dir).StartsWith(".rf---"));
-
-                    foreach (var folder in modFolders)
-                    {
-                        string folderName = Path.GetFileName(folder);
-                        string modId = folderName.Substring(".rf---".Length); // Remove prefix
-
-                        string releaseFile = Path.Combine(folder, "meta", "release.txt");
-                        string release = "";
-
-                        if (File.Exists(releaseFile))
-                        {
-                            try
-                            {
-                                release = File.ReadAllText(releaseFile).Trim();
-                            }
-                            catch
-                            {
-                                release = "";
-                            }
-                        }
-
-                        savedMods.Add(new ModStatus
-                        {
-                            Id = modId,
-                            Release = release,
-                            Status = ""
-                        });
-                    }
-                }
-
-                var jsonResponse = JsonSerializer.Serialize(new { Mods = savedMods });
-
-                var buffer = Encoding.UTF8.GetBytes(jsonResponse);
-                context.Response.ContentType = "application/json";
-                context.Response.ContentLength64 = buffer.Length;
-                await context.Response.OutputStream.WriteAsync(buffer);
-                context.Response.Close();
-                return;
-            }
-
-            context.Response.StatusCode = 404;
-            context.Response.Close();
-        }
-
-        public class InstallModRequest
-        {
-            public string Id { get; set; }
-            public string Release { get; set; }
-            public string Extra { get; set; }
-        }
-
-        
-        public class ModStatus
-        {
-            public string Id { get; set; }
-            public string Release { get; set; }
-            public string Status { get; set; }
-        }
-
-
         void HandleArguments(string args)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                if (Application.Current.MainWindow is MainWindow mainWindow)
+                Globals.ProtocolQueue.Enqueue(args);
+
+                if (Globals.IsMainLoaded && Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    mainWindow.ProcessArguments(args);
+                    mainWindow.TriggerQueueProcessing();
                 }
             });
         }

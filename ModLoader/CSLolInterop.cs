@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 public static class CSLolInterop
 {
-    private const string DllName = "cslol-tools/cslol-dll.dll";
+    private const string DllName = "ZstdSharp.port.dll";
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr cslol_init();

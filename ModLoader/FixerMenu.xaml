@@ -9,53 +9,6 @@
              Foreground="White">
 
     <UserControl.Resources>
-        <Style x:Key="AccentOutlineHighlightButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="6">
-                            <ContentPresenter
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <!-- Hover -->
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border"
-                                Property="Background"
-                                Value="#FF3A3A3A"/>
-                                <Setter Property="Foreground" Value="Black"/>
-                            </Trigger>
-
-                            <!-- Press -->
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border"
-                                Property="Opacity"
-                                Value="0.3"/>
-                            </Trigger>
-
-                            <!-- Disabled -->
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="border" Property="Opacity" Value="0.4"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="LogRichTextBoxStyle" TargetType="RichTextBox">
             <Setter Property="Background" Value="#1E1E1E"/>
             <Setter Property="BorderBrush" Value="#444"/>
@@ -238,6 +191,7 @@
             HorizontalAlignment="Center"
             VerticalAlignment="Center">
 
+
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -245,9 +199,19 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
+
+            <Border x:Name="TopazBorder"
+        Panel.ZIndex="99"
+        Grid.RowSpan="2"
+        Width="58"
+        Height="64"
+        HorizontalAlignment="Left"
+        VerticalAlignment="Top" />
+
+
+
             <Border Grid.Row="0" Background="{DynamicResource AccentBrush}" CornerRadius="4,4,0,0" Padding="10">
-                <TextBlock Text="MOD FIXER" FontWeight="Bold" Foreground="White" FontSize="16" HorizontalAlignment="Center"/>
-                
+                <TextBlock Text="Topaz MOD FIXER" FontWeight="Bold" Foreground="White" FontSize="16" HorizontalAlignment="Center"/>
             </Border>
 
             <Button x:Name="CloseButton"
@@ -264,12 +228,12 @@
 
             </Button>
 
-            
+
             <Grid Grid.Row="1" Margin="15,10,15,0" x:Name="SettingsView">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,5,0">
                     <StackPanel>
 
-                        <TextBlock Text="Character &amp; Skin" FontSize="14" Foreground="Gray" Margin="0,0,0,5"/>
+                        <TextBlock Text="Champion &amp; Skin" FontSize="14" Foreground="Gray" Margin="0,0,0,5"/>
                         <Border Background="#252525" CornerRadius="5" BorderBrush="#444" BorderThickness="1" Padding="10">
                             <StackPanel>
                                 <Grid Margin="0,0,0,10">
@@ -321,7 +285,7 @@
                                     <CheckBox x:Name="chkNoSkinLight" Grid.Column="2" Content="Apply to all skins" IsChecked="True"
                                               Style="{StaticResource CustomCheckBoxStyle}" Visibility="Visible"/>
 
-                                    <CheckBox x:Name="chkKillStatic" Grid.Column="1" Content="Kill Static Mats" Style="{StaticResource CustomCheckBoxStyle}" ToolTip="outdated static mats can often crash mods, but some mod look ass without them"/>
+                                    <CheckBox x:Name="chkKillStatic" Grid.Column="1" Content="Kill Static Mats"  Style="{StaticResource CustomCheckBoxStyle}" ToolTip="outdated static mats can often crash mods, but some mod look ass without them"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -368,6 +332,46 @@
                                         <CheckBox x:Name="chkKeepIcons" Content="Keep Icons if mod has any" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
                                         <CheckBox x:Name="chkKeepUI" Content="Keep UI.wad" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
                                         <CheckBox x:Name="chkAddStuff" Content="Keep bonus Stuff" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
+                                        <Grid Height="30">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Content -->
+                                            <Grid Grid.Column="1" Margin="5,0,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="40"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Label -->
+                                                <TextBlock Text="Bin Fallback" ToolTip="If no amtching bin, fixerr will use bin that has bin with name similar in at least x %"
+                   VerticalAlignment="Center"
+                   Foreground="White"
+                   Margin="0,0,8,0"/>
+
+                                                <!-- Slider -->
+                                                <Slider x:Name="sliderValue"
+                Grid.Column="1"
+                Minimum="10"
+                Maximum="100"
+                Value="80"
+                Height="18"
+                VerticalAlignment="Center"
+                TickFrequency="10"
+                IsSnapToTickEnabled="True"
+                Foreground="{DynamicResource AccentBrush}"/>
+
+                                                <!-- Value display -->
+                                                <TextBlock Grid.Column="2"
+                   Text="{Binding Value, ElementName=sliderValue, StringFormat={}{0:0}%}"
+                   VerticalAlignment="Center"
+                   Foreground="Gray"
+                   HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </Grid>
+
                                     </UniformGrid>
                                 </StackPanel>
                             </StackPanel>
@@ -402,7 +406,7 @@
 
                                 <CheckBox x:Name="chkManifestLang" Grid.Column="2" Content="Lang" Visibility="Collapsed"
           Style="{StaticResource CustomCheckBoxStyle}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                
+
                                 <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="10,0" Visibility="Collapsed">
                                     <ComboBox x:Name="cmbManifestLanguage" Style="{StaticResource StyledComboBox}" Height="25" IsEnabled="{Binding IsChecked, ElementName=chkManifest}"/>
 
@@ -481,7 +485,7 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Standard Output" Foreground="#999" FontSize="11" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                    <TextBlock Text="File OP Log" Foreground="#999" FontSize="11" Margin="0,0,0,5" FontWeight="SemiBold"/>
 
                     <RichTextBox x:Name="txtLogUpper" 
              Grid.Row="1" 
@@ -498,11 +502,11 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Main Log" Foreground="#FF6B6B" FontSize="11" Margin="0,5,0,5" FontWeight="SemiBold"/>
+                    <TextBlock Text="Main Log" Foreground="White" FontSize="11" Margin="0,5,0,5" FontWeight="SemiBold"/>
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                             <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="auto"/>
                         </Grid.ColumnDefinitions>
                         <RichTextBox x:Name="txtLogLower" 
              Grid.Row="1" 
@@ -510,8 +514,8 @@
                             <FlowDocument />
                         </RichTextBox>
                     </Grid>
-                    
-                    
+
+
                 </Grid>
 
                 <Grid Grid.Row="3" Margin="0,15,0,0" Visibility="Collapsed">
@@ -539,15 +543,14 @@
             </Grid>
 
             <Grid Grid.Row="2" Margin="15,0,15,15" x:Name="close"  Visibility="Collapsed">
-                <Button Content="Fixing done, Close Fixer"
-        Height="40"
+                <Button Content="Fixing in progress" x:Name="close_txt"
+        Height="40" IsEnabled="False"
         FontSize="14"
         Style="{StaticResource AccentOutlineHighlightButton}"
         Click="Cancel_Click"/>
 
 
             </Grid>
-
 
         </Grid>
     </Border>

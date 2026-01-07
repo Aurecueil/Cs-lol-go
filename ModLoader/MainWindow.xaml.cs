@@ -25,6 +25,7 @@ using System.Security.Policy;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Web;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,6 +39,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Xml.Linq;
+using Xceed.Wpf.Toolkit;
 using static ModManager.FixerUI;
 using static System.Net.Mime.MediaTypeNames;
 using static System.Net.WebRequestMethods;
@@ -49,6 +51,7 @@ using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using DataFormats = System.Windows.DataFormats;
 using File = System.IO.File;
+using MessageBox = System.Windows.MessageBox;
 using Path = System.IO.Path;
 using SystemColors = System.Windows.SystemColors;
 
@@ -150,6 +153,7 @@ namespace ModManager
     }
     public class Settings
     {
+        public bool tft_mode { get; set; } = false;
         public bool hide_on_minimize { get; set; } = false;
         public bool show_path_window { get; set; } = true;
         public bool autodetect_game_path { get; set; } = true;
@@ -393,7 +397,7 @@ namespace ModManager
         }
 
 
-        private void show_profile(object sender, RoutedEventArgs e)
+        private void Create_Folder(object sender, RoutedEventArgs e)
         {
             var control = new ProfileNameDialog();
 
@@ -407,17 +411,15 @@ namespace ModManager
 
                 string inner_path = "";
                 int temporary_cur_loca = Current_location_folder;
-                if (temporary_cur_loca != 0)
+                if (temporary_cur_loca > 0)
                 {
                     List<int> pathSegments = new();
 
-                    
-                    while (temporary_cur_loca != 0 && hierarchyById.TryGetValue(temporary_cur_loca, out var parentElement))
+                    while (temporary_cur_loca > 0 && hierarchyById.TryGetValue(temporary_cur_loca, out var parentElement))
                     {
                         pathSegments.Add(parentElement.ID);
                         temporary_cur_loca = parentElement.parent;
                     }
-
                     pathSegments.Reverse(); // Make it top-down
                     inner_path = string.Join("/", pathSegments);
                     
@@ -733,12 +735,35 @@ namespace ModManager
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (this.WindowState == WindowState.Minimized && settings.hide_on_minimize)
+            if (this.WindowState == System.Windows.WindowState.Minimized && settings.hide_on_minimize)
             {
                 this.Hide();
                 this.ShowInTaskbar = false;
             }
         }
+        private readonly SemaphoreSlim _queueSemaphore = new SemaphoreSlim(1, 1);
+        public void TriggerQueueProcessing()
+        {
+            _ = ProcessProtocolQueueAsync();
+        }
+
+        private async Task ProcessProtocolQueueAsync()
+        {
+            if (!await _queueSemaphore.WaitAsync(0)) return;
+
+            try
+            {
+                while (Globals.ProtocolQueue.TryDequeue(out string args))
+                {
+                    await ProcessArguments(args);
+                }
+            }
+            finally
+            {
+                _queueSemaphore.Release();
+            }
+        }
+
         public async Task ProcessArguments(string args)
         {
             var splitArgs = SplitArgs(args);
@@ -796,6 +821,8 @@ namespace ModManager
         {
             try
             {
+                ToggleFeed(true, 3);
+                Feed3.Text = "Installing Mod from Runeforge.dev";
                 var uri = new Uri(url);
                 var segments = uri.AbsolutePath.Trim('/').Split('/');
 
@@ -848,8 +875,10 @@ namespace ModManager
                     // Fallback: get filename from URL
                     fileName = Path.GetFileName(new Uri(downloadUrl).AbsolutePath);
                 }
-
+                
                 fileName = fileName.Split(new string[] { "%2F" }, StringSplitOptions.None).Last();
+
+                Feed3.Text = $"Installing {fileName}";
 
                 // Create temporary directory for Runeforge mods
                 string tempDir = Path.Combine(Path.GetTempPath(), "cslolgo");
@@ -905,6 +934,7 @@ namespace ModManager
                 Logger.LogError("Failed to Download mod from Runeforge API", ex);
                 MessageBox.Show("Failed to download/install mod:\n" + ex.Message);
             }
+            ToggleFeed(false, 3);
         }
 
         public static List<string> SplitArgs(string input)
@@ -1021,7 +1051,7 @@ namespace ModManager
         {
             this.Show();
             this.ShowInTaskbar = true;
-            this.WindowState = WindowState.Normal;
+            this.WindowState = System.Windows.WindowState.Normal;
             this.Activate();
         }
 
@@ -1282,6 +1312,71 @@ namespace ModManager
 
             Wad_champs_dict = result;
         }
+        private async void awaitKillSwitch()
+        {
+
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    Console.WriteLine("Checking killswitch...");
+
+                    // Download the text content of the file
+                    string content = await client.GetStringAsync($"https://raw.githubusercontent.com/Aurecueil/Temp/main/images/killswitch?t={DateTime.UtcNow.Ticks}");
+                    // Clean up whitespace (newlines/spaces)
+                    string cleanContent = content.Trim();
+
+                    Console.WriteLine($"Current status: {cleanContent}");
+
+                    if (!cleanContent.Equals("GOOD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CustomMessageBox.Show($"Cslolgo is out of date, and so will now close. Please download an update");
+                        Environment.Exit(0);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show($"Cannot verify version, app will now close. Get internet connection and try again");
+                    Environment.Exit(0);
+                }
+            }
+        }
+        static async void CleanUpOldBackups()
+        {
+            string path = "backup";
+            int days = 7;
+            // 1. Verify the directory exists to avoid crashes
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            DirectoryInfo dirInfo = new DirectoryInfo(path);
+
+            // 2. Calculate the cutoff date (Current time minus 7 days)
+            DateTime cutoffDate = DateTime.Now.AddDays(-days);
+
+            // 3. Iterate through each immediate subdirectory
+            foreach (DirectoryInfo subDir in dirInfo.GetDirectories())
+            {
+                try
+                {
+                    // 4. Check Creation Date
+                    if (subDir.CreationTime < cutoffDate)
+                    {
+                        Console.WriteLine($"Deleting: {subDir.FullName} (Created: {subDir.CreationTime})");
+
+                        // 5. Delete recursively (true argument)
+                        subDir.Delete(recursive: true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Unexpected error on {subDir.Name}: {ex.Message}");
+                }
+            }
+        }
+
         public List<Manifest> manifests = null;
         public MainWindow()
         {
@@ -1294,6 +1389,8 @@ namespace ModManager
             this.SizeChanged += MainWindow_SizeChanged;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
 
+            awaitKillSwitch();
+            CleanUpOldBackups();
             ModListEntry.MainWindowInstance = this;
 
             SetLoading("Settings", 1, 0.17);
@@ -1351,7 +1448,7 @@ namespace ModManager
 
                 var root_folder = new HierarchyElement
                 {
-                    Name = "root",
+                    Name = "LOL",
                     override_ = false,
                     Priority = 0,
                     Random = false,
@@ -1364,6 +1461,21 @@ namespace ModManager
                 };
                 hierarchyById[0] = root_folder;
 
+                var tft_root_folder = new HierarchyElement
+                {
+                    Name = "TFT",
+                    override_ = false,
+                    Priority = 0,
+                    Random = false,
+                    ID = -1,
+                    parent = -1,
+                    InnerPath = "",
+                    Children = new List<Tuple<string, bool>>
+                    {
+                    }
+                };
+                hierarchyById[-1] = tft_root_folder;
+
                 if (settings.auto_update_hashes)
                 {
                     StartHashUpdate();
@@ -1375,8 +1487,17 @@ namespace ModManager
                 SetLoading("Mods Index", 1, 0.85);
                 await Task.Run(() => LoadMods());
                 details_colums_change(settings.detials_column_active);
+                if (settings.tft_mode)
+                {
+                    tftModButton.IsChecked= true;
+                    Current_location_folder = -1;
+                    lastbeen = 0;
+                }
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
+
+                tftModButton.Checked += tft_mode_enable;
+                tftModButton.Unchecked += tft_mode_disable;
                 if (!Directory.Exists(ProfilesFolder))
                 {
                     Directory.CreateDirectory(ProfilesFolder);
@@ -1400,7 +1521,7 @@ namespace ModManager
                 ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
 
 
-                ShowBreadcrumb(0);
+                ShowBreadcrumb(Current_location_folder);
                 EnsureRuneforgeProtocolRegistered();
 
                 OverlayHost3.Visibility = Visibility.Collapsed;
@@ -1410,6 +1531,8 @@ namespace ModManager
             {
                 MessageBox.Show("Error loading mods:\n" + ex.Message);
             }
+            Globals.IsMainLoaded = true;
+            TriggerQueueProcessing();
         }
         private void SetLoading(string text, int progress, double stage)
         {
@@ -1579,6 +1702,8 @@ namespace ModManager
                     if (!relativeToBase.StartsWith("..") && Directory.Exists(fullPath))
                     {
                         Directory.Delete(fullPath, true); // true = recursive delete
+                        string backup = Path.GetFullPath(Path.Combine("backup", mod_folder));
+                        if (Directory.Exists(backup)) { Directory.Delete(backup, true); }
                     }
 
 
@@ -2059,6 +2184,7 @@ namespace ModManager
                 }
             });
         }
+
         public void CloseSettingsOverlay()
         {
             OverlayHost.Children.Clear();
@@ -2084,6 +2210,25 @@ namespace ModManager
             }
 
             OverlayHost.Children.Add(new SettingsOverlay());
+        }
+        private int lastbeen = -1;
+        public async void tft_mode_enable(object sender, RoutedEventArgs e)
+        {
+            int to_ref = lastbeen;
+            lastbeen = Current_location_folder;
+            settings.tft_mode = true;
+            RefreshModListPanel(to_ref);
+            Change_State_allButtons(false);
+            save_settings();
+        }
+        public async void tft_mode_disable(object sender, RoutedEventArgs e)
+        {
+            int to_ref = lastbeen;
+            lastbeen = Current_location_folder;
+            settings.tft_mode = false;
+            RefreshModListPanel(to_ref);
+            Change_State_allButtons(false);
+            save_settings();
         }
         public void load_settings()
         {
@@ -2125,7 +2270,11 @@ namespace ModManager
             };
 
             string json = JsonSerializer.Serialize(settings, options);
-            File.WriteAllText("settings.json", json);
+            try
+            {
+                File.WriteAllText("settings.json", json);
+            }
+            catch (Exception ex) { Logger.LogError("Error Saving Settings",ex); }
         }
 
         private void LoadFolders()
@@ -2270,6 +2419,11 @@ namespace ModManager
 
         public async void True_Start_loader()
         {
+            if (!File.Exists(settings.gamepath))
+            {
+                CustomMessageBox.Show("Set Gamepath in settings first");
+                return;
+            }
             ToggleOverlay(true);
             currentProgress = 0;
             SetProgress();
@@ -2472,7 +2626,14 @@ namespace ModManager
             WADS = CopyWadsDictionary(EMPTY_WADS);
             mods_loaded_in.Clear();
             folders_loaded_in.Clear();
-            await ProcessFolderChildrenAsync(0, token);
+            if (settings.tft_mode)
+            {
+                await ProcessFolderChildrenAsync(-1, token);
+            }
+            else
+            {
+                await ProcessFolderChildrenAsync(0, token);
+            }
             await WriteWads(token);
             ToggleOverlay(false);
         }
@@ -2526,6 +2687,68 @@ namespace ModManager
                 })
             );
         }
+        private void OnDropMode(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ModListEntry)))
+            {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true; // Prevent ScrollViewer from handling
+            }
+            if (e.Data.GetDataPresent("ModListEntries"))
+            {
+                var draggedItems = e.Data.GetData("ModListEntries") as List<ModListEntry>;
+                if (draggedItems != null && draggedItems.Count > 0)
+                {
+                    // Call the drop handler
+                    HandleItemsDropMode(draggedItems);
+                }
+            }
+        }
+
+        private void OnDragEnterMode(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent("ModListEntries"))
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+
+        private void OnDragOverMode(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ModListEntry)))
+            {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true; // Prevent ScrollViewer from handling
+            }
+            OnDragEnterMode(sender, e);
+        }
+        private void HandleItemsDropMode(List<ModListEntry> draggedItems)
+        {
+            var draggedElements = new List<(string, bool)>();
+            foreach (var item in draggedItems)
+            {
+                if (item.IsMod && item.ModElement != null)
+                {
+                    draggedElements.Add((item.ModElement.ModFolder, true));
+                }
+                else if (!item.IsMod && !item.IsParentFolder && item.FolderElement != null)
+                {
+                    draggedElements.Add((item.FolderElement.ID.ToString(), false));
+                }
+            }
+
+            if (draggedElements.Count > 0)
+            {
+                DragHandler(draggedElements, (lastbeen.ToString(), false));
+            }
+
+                     
+        }
+
         private async void PaintActiveMods()
         {
             foreach(string mod in mods_loaded_in)
@@ -2563,7 +2786,7 @@ namespace ModManager
         }
         private ModToolsRunner _currentRunner;
 
-        List<string> mods_loaded_in = new List<string>(); 
+        HashSet<string> mods_loaded_in = new HashSet<string>();
         List<int> folders_loaded_in = new List<int>();
 
         public async Task WriteWads(CancellationToken token)
@@ -2577,20 +2800,25 @@ namespace ModManager
             var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
             _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
-            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
 
 
+            //OverlayTool.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
+            
+            
+            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
+            
+            
             if (settings.not_tft)
             {
                 args += " --noTFT";
             }
-
+            
             if (settings.supress_install_confilcts)
             {
                 args += " --ignoreConflict";
             }
-
-
+            
+            
             string err_catch = "";
             var outputLines = new List<string>();
             var errorLines = new List<string>();
@@ -2610,14 +2838,14 @@ namespace ModManager
                             int position = EMPTY_WADS.Keys
                                 .Select((key, index) => new { key, index })
                                 .FirstOrDefault(x => x.key.Equals(trimmedWad, StringComparison.OrdinalIgnoreCase))?.index ?? -1;
-
+            
                             if (position >= 0)
                             {
                                 int total = EMPTY_WADS.Count;
                                 currentProgress = (double)(position + 1) / total;
                                 SetProgress();
-
-
+            
+            
                             }
                         }
                     });
@@ -2628,7 +2856,7 @@ namespace ModManager
                 }
             );
                 PaintActiveMods();
-
+            
                 // After RunAsync completes, display all error lines if any
                 if (errorLines.Count > 0)
                 {
@@ -2720,7 +2948,7 @@ namespace ModManager
                                 if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                                 {
                                     var clearedFolders = modsTuple.Item2.Keys.ToList();
-                                    mods_loaded_in.RemoveAll(m => clearedFolders.Contains(m));
+                                    mods_loaded_in.RemoveWhere(m => clearedFolders.Contains(m));
 
                                     modsTuple.Item2.Clear();
 
@@ -2750,7 +2978,7 @@ namespace ModManager
                                 if (mod.Details.override_)
                                 {
                                     var clearedFolders = modsTuple.Item2.Keys.ToList();
-                                    mods_loaded_in.RemoveAll(m => clearedFolders.Contains(m));
+                                    mods_loaded_in.RemoveWhere(m => clearedFolders.Contains(m));
                                     modsTuple.Item2.Clear();
                                 }
 
@@ -2826,20 +3054,34 @@ namespace ModManager
             // Always include root
             List<HierarchyElement> path = new();
 
-            if (currentFolderId == 0 || !hierarchyById.ContainsKey(currentFolderId))
+            if (currentFolderId <= 0 || !hierarchyById.ContainsKey(currentFolderId))
             {
-                path.Add(new HierarchyElement { ID = 0, Name = "Root" });
+                if (settings.tft_mode)
+                {
+                    path.Add(new HierarchyElement { ID = -1, Name = "TFT" });
+                }
+                else
+                {
+                    path.Add(new HierarchyElement { ID = 0, Name = "LOL" });
+                }
             }
             else
             {
                 int id = currentFolderId;
-                while (id != 0 && hierarchyById.TryGetValue(id, out var element))
+                while (id > 0 && hierarchyById.TryGetValue(id, out var element))
                 {
                     path.Add(element);
                     id = element.parent;
                 }
                 path.Reverse();
-                path.Insert(0, new HierarchyElement { ID = 0, Name = "Root" });
+                if (settings.tft_mode)
+                {
+                    path.Insert(0, new HierarchyElement { ID = -1, Name = "TFT" });
+                }
+                else
+                {
+                    path.Insert(0, new HierarchyElement { ID = 0, Name = "LOL" });
+                }
             }
 
             // Add buttons and separators
@@ -2915,7 +3157,14 @@ namespace ModManager
             {
                 if (!hierarchyById.TryGetValue(Current_location_folder, out var meow))
                 {
-                    RefreshModListPanel(0, rebuild);
+                    if (settings.tft_mode)
+                    {
+                        RefreshModListPanel(-1, rebuild);
+                    }
+                    else
+                    {
+                        RefreshModListPanel(0, rebuild);
+                    }
                 }
                 else
                 {
@@ -2928,8 +3177,10 @@ namespace ModManager
             var mods = new List<(string childId, Mod element)>();
 
             bool isEmptySearch = string.IsNullOrWhiteSpace(searchString);
-            bool isFullModSearch = searchString == "-f";
-            bool isFilteredModSearch = searchString.StartsWith("-f ");
+            bool isFlatFullModSearch = searchString == "-f";
+            bool isFlatFilteredModSearch = searchString.StartsWith("-f ");
+            bool isFullModSearch = searchString == "-g";
+            bool isFilteredModSearch = searchString.StartsWith("-g ");
             bool isRecursiveModSearch = searchString == "-l";
             bool isFilteredRecursiveModSearch = searchString.StartsWith("-l ");
             string filteredSearchString = isFilteredModSearch ? searchString.Substring(3) :
@@ -2937,7 +3188,7 @@ namespace ModManager
 
             if (isEmptySearch)
             {
-                if (c_location != 0)
+                if (c_location > 0)
                 {
                     AddParentFolderEntry(root);
                 }
@@ -2978,6 +3229,15 @@ namespace ModManager
                     }
                 }
             }
+
+            else if (isFlatFullModSearch)
+            {
+                CollectAllModsRecursively(root, mods);
+            }
+            else if (isFlatFilteredModSearch)
+            {
+                CollectAllModsRecursively(root, mods, filteredSearchString);
+            }
             else if (isRecursiveModSearch)
             {
                 CollectAllModsRecursively(root, mods);
@@ -2988,7 +3248,7 @@ namespace ModManager
             }
             else
             {
-                if (c_location != 0)
+                if (c_location > 0)
                 {
                     AddParentFolderEntry(root);
                 }
@@ -3671,12 +3931,18 @@ namespace ModManager
         public static string BuildInnerPath(int parentId, Dictionary<int, HierarchyElement> hierarchyById)
         {
             if (parentId == 0 || !hierarchyById.ContainsKey(parentId))
-                return "";
+            {
+                return "0";
+            }
+            if (parentId == -1 || !hierarchyById.ContainsKey(parentId))
+            {
+                return "-1";
+            }
 
             List<int> pathSegments = new();
             int currentId = parentId;
 
-            while (currentId != 0 && hierarchyById.TryGetValue(currentId, out var parentElement))
+            while (currentId > 0 && hierarchyById.TryGetValue(currentId, out var parentElement))
             {
                 pathSegments.Add(parentElement.ID);
                 currentId = parentElement.parent;
@@ -3989,7 +4255,7 @@ namespace ModManager
                 string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
-
+            if (modInfo.Description.Contains("darkseal") || modInfo.Author.Contains("darkseal")) return null;
 
             // Create and return Mod object
             Mod new_mod_netyr = new Mod
@@ -4082,38 +4348,6 @@ namespace ModManager
             
         }
 
-        private void DropScrollViewer_Drop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                if (IsOverlayBlocking()) return;
-
-                if (e.Data.GetDataPresent(DataFormats.FileDrop))
-                {
-                    bool very = false;
-                    string[] paths = (string[])e.Data.GetData(DataFormats.FileDrop);
-                    foreach (string path in paths)
-                    {
-                        if (IsAcceptedDropItem(path))
-                        {
-                            very = true;
-                            HandleDroppedItem(path);
-                        }
-                    }
-                    if (very)
-                    {
-                        RefreshModListPanel(Current_location_folder);
-                    }
-                    else
-                    {
-                        // MessageBox.Show("no valid mods");
-                    }
-
-                }
-                e.Handled = true;
-            }
-        }
-
         private bool IsOverlayBlocking()
         {
             return (OverlayHost.Visibility == Visibility.Visible && OverlayHost.Children.Count > 0) ||
@@ -4200,203 +4434,288 @@ namespace ModManager
             return ext == ".zip" || ext == ".fantome" || ext == ".7fantome" || ext == ".wad.client" || ext == ".client" || ext == ".wad" || ext == ".7z" || ext == ".rar" || ext == ".modpkg";
         }
 
-
-        public async void HandleDroppedItem(string path)
+        private async void DropScrollViewer_Drop(object sender, DragEventArgs e)
         {
-            try
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
-                string ext = Path.GetExtension(path).ToLowerInvariant();
-                bool isRaw = false;
+                if (IsOverlayBlocking()) return;
 
-                if (ext == ".fantome" || ext == ".zip")
+                string[] paths = (string[])e.Data.GetData(DataFormats.FileDrop);
+                bool anyValid = false;
+
+                // 1. Open the Feed
+                ToggleFeed(true, 3);
+
+                try
                 {
-                    string fileName = Path.GetFileNameWithoutExtension(path);
-                    bool isValidZip = false;
-
-                    try
+                    foreach (string path in paths)
                     {
-                        using (var archive = ZipFile.OpenRead(path))
+                        if (IsAcceptedDropItem(path))
                         {
-                            isRaw = archive.Entries.Any(e =>
-                                e.FullName.StartsWith("RAW/", StringComparison.OrdinalIgnoreCase) ||
-                                e.FullName.StartsWith("RAW\\", StringComparison.OrdinalIgnoreCase));
+                            anyValid = true;
+                            string fileName = Path.GetFileName(path);
 
-                            bool hasWad = isRaw || archive.Entries.Any(e =>
-                                e.FullName.StartsWith("WAD/", StringComparison.OrdinalIgnoreCase) ||
-                                e.FullName.StartsWith("WAD\\", StringComparison.OrdinalIgnoreCase));
+                            // 2. Update status text (Must be on UI thread)
+                            Feed3.Text = $"importing mod {fileName}";
 
-                            bool hasMetaInfo = archive.Entries.Any(e =>
-                                e.FullName.Equals("META/info.json", StringComparison.OrdinalIgnoreCase) ||
-                                e.FullName.Equals("META\\info.json", StringComparison.OrdinalIgnoreCase));
-
-                            if (!hasWad || !hasMetaInfo)
-                            {
-                                MessageBox.Show("Invalid mod archive: Must contain 'WAD' or 'RAW' folder and 'META/info.json'", "Invalid Mod", MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
-                            }
-
-                            isValidZip = true;
+                            // 3. Await the heavy processing (Non-blocking)
+                            await HandleDroppedItem(path);
                         }
                     }
-                    catch (Exception ex)
+
+                    if (anyValid)
                     {
-                        MessageBox.Show($"Error reading archive:\n{ex.Message}", "Zip Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
+                        // Refresh logic is now handled at the end or inside HandleDroppedItem safely
+                        RefreshModListPanel(Current_location_folder);
                     }
-
-                    if (!isValidZip)
-                        return;
-
-                    string extractTargetDir = "";
-                    if (settings.catch_updated)
+                    else
                     {
-                        string? lowerVersionPath = HasLowerVersionInstalled(path, installedPath);
-                        if (lowerVersionPath != null)
+                        // MessageBox.Show("no valid mods");
+                    }
+                }
+                finally
+                {
+                    // 4. Close the feed when done, even if errors occur
+                    ToggleFeed(false, 3);
+                }
+
+                e.Handled = true;
+            }
+        }
+
+        public async Task HandleDroppedItem(string path)
+        {
+            // Offload the heavy work to a background thread
+            await Task.Run(() =>
+            {
+                try
+                {
+                    string ext = Path.GetExtension(path).ToLowerInvariant();
+                    bool isRaw = false;
+
+                    if (ext == ".fantome" || ext == ".zip")
+                    {
+                        string fileName = Path.GetFileNameWithoutExtension(path);
+                        bool isValidZip = false;
+
+                        try
                         {
-                            extractTargetDir = Path.Combine(installedPath, fileName);
+                            using (var archive = ZipFile.OpenRead(path))
+                            {
+                                isRaw = archive.Entries.Any(e =>
+                                    e.FullName.StartsWith("RAW/", StringComparison.OrdinalIgnoreCase) ||
+                                    e.FullName.StartsWith("RAW\\", StringComparison.OrdinalIgnoreCase));
+
+                                bool hasWad = isRaw || archive.Entries.Any(e =>
+                                    e.FullName.StartsWith("WAD/", StringComparison.OrdinalIgnoreCase) ||
+                                    e.FullName.StartsWith("WAD\\", StringComparison.OrdinalIgnoreCase));
+
+                                bool hasMetaInfo = archive.Entries.Any(e =>
+                                    e.FullName.Equals("META/info.json", StringComparison.OrdinalIgnoreCase) ||
+                                    e.FullName.Equals("META\\info.json", StringComparison.OrdinalIgnoreCase));
+
+                                if (!hasWad || !hasMetaInfo)
+                                {
+                                    Application.Current.Dispatcher.Invoke(() =>
+                                        MessageBox.Show("Invalid mod archive: Must contain 'WAD' or 'RAW' folder and 'META/info.json'", "Invalid Mod", MessageBoxButton.OK, MessageBoxImage.Error));
+                                    return;
+                                }
+
+                                isValidZip = true;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Application.Current.Dispatcher.Invoke(() =>
+                                MessageBox.Show($"Error reading archive:\n{ex.Message}", "Zip Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                            return;
+                        }
+
+                        if (!isValidZip) return;
+
+                        string extractTargetDir = "";
+
+                        // Note: Assuming 'settings' and 'installedPath' are thread-safe or static. 
+                        // If they are UI controls, capture them before Task.Run.
+                        if (settings.catch_updated)
+                        {
+                            // HasLowerVersionInstalled likely does disk IO, safe here.
+                            string? lowerVersionPath = HasLowerVersionInstalled(path, installedPath);
+                            if (lowerVersionPath != null)
+                            {
+                                extractTargetDir = Path.Combine(installedPath, fileName);
+                                using (var archive = ZipFile.OpenRead(path))
+                                {
+                                    foreach (var entry in archive.Entries)
+                                    {
+                                        string fullPath = Path.Combine(extractTargetDir, entry.FullName);
+                                        if (string.IsNullOrEmpty(entry.Name))
+                                        {
+                                            Directory.CreateDirectory(fullPath);
+                                            continue;
+                                        }
+                                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                                        entry.ExtractToFile(fullPath, overwrite: true);
+                                    }
+                                }
+
+                                // File IO Operations
+                                File.Move(Path.Combine(installedPath, lowerVersionPath, "META", "details.json"), Path.Combine(extractTargetDir, "META", "details.json"), overwrite: true);
+                                DeleteMod(lowerVersionPath);
+
+                                // Dictionary operations need care if shared across threads, assuming single consumer or safe context
+                                ProfileEntries.Remove(lowerVersionPath);
+                                ProfileEntries[fileName] = 10;
+                                SaveProfileEntriesToFile();
+
+                                var newmod = CreateModFromFolder(Path.Combine(installedPath, fileName), true);
+                                if (newmod == null)
+                                {
+                                    Application.Current.Dispatcher.Invoke(() =>
+                                        CustomMessageBox.Show("skinhacks are not supported, get lost"));
+                                    return;
+                                }
+                                SaveModDetails(newmod);
+
+                                Application.Current.Dispatcher.Invoke(() =>
+                                    RefreshModListPanel(Current_location_folder));
+
+                                return;
+                            }
+                        }
+                        else if (modByFolder.TryGetValue(fileName, out var mod))
+                        {
+                            int overrideSetting = settings.import_override;
+                            bool shouldReturn = false;
+
+                            // UI logic inside background task requires Dispatcher for standard execution flow
+                            // However, we can't easily await a Dispatcher call in this structure for logic branching
+                            // So we run the logic that determines paths here, but alerts on UI.
+
+                            switch (overrideSetting)
+                            {
+                                case 0:
+                                    Application.Current.Dispatcher.Invoke(() =>
+                                        MessageBox.Show($"Mod already EXISTS under this path:\n{mod.ModFolder}", "Import Skipped", MessageBoxButton.OK, MessageBoxImage.Warning));
+                                    return;
+
+                                case 1:
+                                    extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder);
+                                    break;
+
+                                case 2:
+                                    string wadPath = Path.Combine(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder), "WAD");
+                                    if (Directory.Exists(wadPath)) Directory.Delete(wadPath, true);
+
+                                    string infoJsonPath = Path.Combine(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder), "META", "info.json");
+                                    if (File.Exists(infoJsonPath)) File.Delete(infoJsonPath);
+
+                                    extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder);
+                                    Directory.CreateDirectory(extractTargetDir);
+                                    break;
+
+                                case 3:
+                                    string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileName);
+                                    int i = 1;
+                                    string newPath = basePath + "_" + i;
+                                    while (Directory.Exists(newPath))
+                                    {
+                                        i++;
+                                        newPath = basePath + "_" + i;
+                                    }
+                                    Directory.CreateDirectory(newPath);
+                                    extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", newPath);
+                                    break;
+
+                                default:
+                                    Application.Current.Dispatcher.Invoke(() =>
+                                        MessageBox.Show("Unknown import override setting.", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                                    return;
+                            }
+                        }
+                        else
+                        {
+                            extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileName);
+                            Directory.CreateDirectory(extractTargetDir);
+                        }
+
+                        // Step 3: Extract
+                        try
+                        {
                             using (var archive = ZipFile.OpenRead(path))
                             {
                                 foreach (var entry in archive.Entries)
                                 {
-                                    string fullPath = Path.Combine(extractTargetDir, entry.FullName);
+                                    string relativePath = entry.FullName;
 
-                                    // Create directory if needed
+                                    if (isRaw)
+                                    {
+                                        if (relativePath.StartsWith("RAW/", StringComparison.OrdinalIgnoreCase) ||
+                                            relativePath.StartsWith("RAW\\", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            relativePath = Path.Combine("WAD", "raw.wad.client", relativePath.Substring(4));
+                                        }
+                                    }
+
+                                    string fullPath = Path.Combine(extractTargetDir, relativePath);
+
                                     if (string.IsNullOrEmpty(entry.Name))
                                     {
                                         Directory.CreateDirectory(fullPath);
                                         continue;
                                     }
 
-                                    // Ensure directory exists
                                     Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-
-                                    // Overwrite the file
                                     entry.ExtractToFile(fullPath, overwrite: true);
                                 }
                             }
-                            File.Move(Path.Combine(installedPath, lowerVersionPath, "META", "details.json"), Path.Combine(extractTargetDir, "META", "details.json"), overwrite: true);
-                            DeleteMod(lowerVersionPath);
-                            ProfileEntries.Remove(lowerVersionPath);
-                            ProfileEntries[fileName] = 10;
-                            SaveProfileEntriesToFile();
-                            SaveModDetails(CreateModFromFolder(Path.Combine(installedPath, fileName), true));
-                            RefreshModListPanel(Current_location_folder);
 
-                            return;
-                        }
-                    }
-                    else if (modByFolder.TryGetValue(fileName, out var mod))
-                    {
-                        switch (settings.import_override)
-                        {
-                            case 0:
-                                MessageBox.Show($"Mod already EXISTS under this path:\n{mod.ModFolder}", "Import Skipped", MessageBoxButton.OK, MessageBoxImage.Warning);
-                                return;
+                            string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
+                            var newmod = CreateModFromFolder(extractTargetDir, true);
 
-                            case 1:
-                                extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder);
-                                break;
-
-                            case 2:
-                                string wadPath = Path.Combine(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder), "WAD");
-                                if (Directory.Exists(wadPath))
-                                    Directory.Delete(wadPath, true);
-
-                                string infoJsonPath = Path.Combine(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder), "META", "info.json");
-                                if (File.Exists(infoJsonPath))
-                                    File.Delete(infoJsonPath);
-
-                                extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", mod.ModFolder);
-                                Directory.CreateDirectory(extractTargetDir);
-                                break;
-
-                            case 3:
-                                string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileName);
-                                int i = 1;
-                                string newPath = basePath + "_" + i;
-                                while (Directory.Exists(newPath))
-                                {
-                                    i++;
-                                    newPath = basePath + "_" + i;
-                                }
-                                Directory.CreateDirectory(newPath);
-                                extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", newPath);
-                                break;
-
-                            default:
-                                MessageBox.Show("Unknown import override setting.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
-                        }
-                    }
-                    else
-                    {
-                        extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileName);
-                        Directory.CreateDirectory(extractTargetDir);
-                    }
-
-                    // Step 3: Extract
-                    try
-                    {
-                        using (var archive = ZipFile.OpenRead(path))
-                        {
-                            foreach (var entry in archive.Entries)
+                            if (newmod == null)
                             {
-                                // 1. Determine the relative path (Modify this ONLY, not the full path)
-                                string relativePath = entry.FullName;
-
-                                if (isRaw)
-                                {
-                                    if (relativePath.StartsWith("RAW/", StringComparison.OrdinalIgnoreCase) ||
-                                        relativePath.StartsWith("RAW\\", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        relativePath = Path.Combine("WAD", "raw.wad.client", relativePath.Substring(4));
-                                    }
-                                }
-
-                                // 2. Combine with target directory safely
-                                string fullPath = Path.Combine(extractTargetDir, relativePath);
-
-                                // --- Standard Extraction Below ---
-
-                                // Create directory if it's just a folder entry
-                                if (string.IsNullOrEmpty(entry.Name))
-                                {
-                                    Directory.CreateDirectory(fullPath);
-                                    continue;
-                                }
-
-                                // Ensure directory exists
-                                Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-
-                                // Overwrite the file
-                                entry.ExtractToFile(fullPath, overwrite: true);
+                                Application.Current.Dispatcher.Invoke(() =>
+                                   CustomMessageBox.Show("skinhacks are not supported, get lost"));
+                                return;
                             }
-                        }
-                        string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                        SaveModDetails(CreateModFromFolder(extractTargetDir, true));
-                        RefreshModListPanel(Current_location_folder);
-                    }
-                    catch (Exception ex)
-                    {
-                        if (Directory.Exists(extractTargetDir))
-                            Directory.Delete(extractTargetDir, true);
-                    }
-                }
-                else if (ext == ".modpkg")
-                {
-                    install_modpkg(path);
-                }
-                {
-                    HandleWadImport(path);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error handling dropped item:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            RefreshModListPanel(Current_location_folder);
-        }
 
+                            SaveModDetails(newmod);
+
+                            Application.Current.Dispatcher.Invoke(() =>
+                                RefreshModListPanel(Current_location_folder));
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Directory.Exists(extractTargetDir))
+                                Directory.Delete(extractTargetDir, true);
+                            // Optionally log error here
+                        }
+                    }
+                    else if (ext == ".modpkg")
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            install_modpkg(path);
+                        });
+                    }
+
+                    // The catch-all block from original code
+                    {
+                        HandleWadImport(path);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                        MessageBox.Show($"Error handling dropped item:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                }
+
+                // Final UI refresh for this item (wrapped in Dispatcher)
+                Application.Current.Dispatcher.Invoke(() =>
+                    RefreshModListPanel(Current_location_folder));
+            });
+        }
         private static readonly Regex modRegex = new Regex(
         @"^(?<name>.+?)_(?<version>\d+\.\d+\.\d+)(\(\d+\))?(\.fantome)?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase

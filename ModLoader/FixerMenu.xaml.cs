@@ -18,6 +18,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using static ModManager.FixerUI;
 using static ModManager.Repatheruwu.WadExtractor;
 
@@ -29,7 +30,6 @@ namespace ModManager
         public Mod ModElement { get; private set; }
         public Repatheruwu Fixer { get; private set; }
         public MainWindow Main { get; set; }
-        private string _currentModPath = @"C:\Riot Games\League of Legends\Game\MODS\MyMod";
 
         // INotifyPropertyChanged Implementation
         public event PropertyChangedEventHandler PropertyChanged;
@@ -46,6 +46,7 @@ namespace ModManager
             this.Fixer = Fixi;
             this.DataContext = this;
 
+            LoadTopazImage();
             PopulateCharacters();
 
             // Set Default UI states based on Fixer default settings (optional, but good for sync)
@@ -480,6 +481,32 @@ namespace ModManager
                 CopyDirectory(backupDir, modDir);
             }
         }
+        private async void LoadTopazImage()
+        {
+            // 1. Get the directory where the .exe is running
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // 2. Combine with your specific folder and filename
+            string fullPath = Path.Combine(baseDir, "runtimes", "topaz.png");
+
+            // 3. Check if file exists to prevent crashing
+            if (File.Exists(fullPath))
+            {
+                // Create the bitmap from the file
+                BitmapImage bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad; // Loads image into memory and releases the file handle
+                bitmap.UriSource = new Uri(fullPath, UriKind.Absolute);
+                bitmap.EndInit();
+
+                // 4. Create an ImageBrush and paint the Border's background
+                ImageBrush brush = new ImageBrush();
+                brush.ImageSource = bitmap;
+                brush.Stretch = Stretch.Fill; // Matches your previous "Stretch=Fill"
+
+                TopazBorder.Background = brush;
+            }
+        }
 
         private void create_backup()
         {
@@ -520,6 +547,7 @@ namespace ModManager
                 return;
             }
             CallerModListEntry.set_fixer(true);
+            close.Visibility = Visibility.Visible;
 
             // --- 1. UI PHASE (Main Thread) ---
             // Prepare the UI
@@ -558,6 +586,7 @@ namespace ModManager
             Fixer.Settings.keep_Icons = chkKeepIcons.IsChecked == true;
             Fixer.Settings.SoundOption = cmbSound.SelectedIndex;
             Fixer.Settings.AnimOption = cmbAnim.SelectedIndex;
+            Fixer.Settings.percent = sliderValue.Value;
 
             // Capture booleans for logic inside the thread
             bool doKeepUI = chkKeepUI.IsChecked == true;
@@ -594,7 +623,7 @@ namespace ModManager
                             Directory.Move(modWad, bakWad);
                         }
                         Directory.CreateDirectory(modWad);
-                        LowerLog("Created Backup (just in case)");
+                        LowerLog("[INFO] Created Backup (just in case)", "#2dc55e");
                     }
                     else
                     {
@@ -709,17 +738,16 @@ namespace ModManager
                     // Since this runs on the background thread now, FixiniYoursSkini MUST use 
                     // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
                     Fixer.FixiniYoursSkini(this);
-
-                    LowerLog("Done!");
                 }
                 catch (Exception ex)
                 {
                     LowerLog($"Error: {ex.Message}");
                 }
             });
+            close_txt.IsEnabled = true;
+            close_txt.Content = "Fixing done, Close Fixer";
             CallerModListEntry.set_fixer(false);
             CallerModListEntry.end_fixer();
-            close.Visibility = Visibility.Visible;
         }
         public void UpperLog(string text, string hexColor = "#FFFFFF")
         {

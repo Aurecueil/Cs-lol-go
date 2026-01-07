@@ -57,7 +57,8 @@ namespace ModManager
         public bool noskinni { get; set; } = true; // good
         public bool AllAviable { get; set; } = true; // good
         public int SoundOption { get; set; } = 0; // good
-        public int AnimOption { get; set; } = 0; // good
+        public int AnimOption { get; set; } = 0; // good percent
+        public double percent { get; set; } = 80; // good 
 
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
@@ -67,307 +68,72 @@ namespace ModManager
     {
         Dictionary<string, List<string>> CharacterCases = new Dictionary<string, List<string>>
         {
-            ["anivia"] = new List<string>
-    {
-        "aniviaegg",
-        "aniviaiceblock",
-    },
-            ["annie"] = new List<string>
-    {
-        "annietibbers",
-    },
-            ["aphelios"] = new List<string>
-    {
-        "apheliosturret",
-    },
-            ["aurora"] = new List<string>
-    {
-        "auroraspirits",
-    },
-            ["azir"] = new List<string>
-    {
-        "azirsoldier",
-        "azirsundisc",
-        "azirtowerclicker",
-        "azirultsoldier",
-    },
-            ["bard"] = new List<string>
-    {
-        "bardfollower",
-        "bardhealthshrine",
-        "bardpickup",
-        "bardpickupnoicon",
-        "bardportalclickable",
-    },
-            ["bardpickup"] = new List<string>
-    {
-        "bardpickupnoicon",
-    },
-            ["belveth"] = new List<string>
-    {
-        "belvethspore",
-        "belvethvoidling",
-    },
-            ["caitlyn"] = new List<string>
-    {
-        "caitlyntrap",
-    },
-            ["cassiopeia"] = new List<string>
-    {
-        "cassiopeia_death",
-    },
-            ["elise"] = new List<string>
-    {
-        "elisespider",
-        "elisespiderling",
-    },
-            ["elisespider"] = new List<string>
-    {
-        "elisespiderling",
-    },
-            ["fiddlesticks"] = new List<string>
-    {
-        "fiddlestickseffigy",
-    },
-            ["fizz"] = new List<string>
-    {
-        "fizzbait",
-        "fizzshark",
-    },
-            ["gangplank"] = new List<string>
-    {
-        "gangplankbarrel",
-    },
-            ["gnar"] = new List<string>
-    {
-        "gnarbig",
-    },
-            ["illaoi"] = new List<string>
-    {
-        "illaoiminion",
-    },
-            ["irelia"] = new List<string>
-    {
-        "ireliablades",
-    },
-            ["ivern"] = new List<string>
-    {
-        "ivernminion",
-        "iverntotem",
-    },
-            ["jarvaniv"] = new List<string>
-    {
-        "jarvanivstandard",
-        "jarvanivwall",
-    },
-            ["jhin"] = new List<string>
-    {
-        "jhintrap",
-    },
-            ["jinx"] = new List<string>
-    {
-        "jinxmine",
-    },
-            ["kalista"] = new List<string>
-    {
-        "kalistaaltar",
-        "kalistaspawn",
-    },
-            ["kindred"] = new List<string>
-    {
-        "kindredjunglebountyminion",
-        "kindredwolf",
-    },
-            ["kled"] = new List<string>
-    {
-        "kledmount",
-        "kledrider",
-    },
-            ["kogmaw"] = new List<string>
-    {
-        "kogmawdead",
-    },
-            ["lissandra"] = new List<string>
-    {
-        "lissandrapassive",
-    },
-            ["lulu"] = new List<string>
-    {
-        "lulufaerie",
-        "lulupolymorphcritter",
-    },
-            ["lux"] = new List<string>
-    {
-        "luxair",
-        "luxdark",
-        "luxfire",
-        "luxice",
-        "luxmagma",
-        "luxmystic",
-        "luxnature",
-        "luxstorm",
-        "luxwater",
-    },
-            ["malzahar"] = new List<string>
-    {
-        "malzaharvoidling",
-    },
-            ["maokai"] = new List<string>
-    {
-        "maokaisproutling",
-    },
-            ["milio"] = new List<string>
-    {
-        "miliominion",
-    },
-            ["monkeyking"] = new List<string>
-    {
-        "monkeykingclone",
-        "monkeykingflying",
-    },
-            ["naafiri"] = new List<string>
-    {
-        "naafiripackmate",
-    },
-            ["nasus"] = new List<string>
-    {
-        "nasusult",
-    },
-            ["nidalee"] = new List<string>
-    {
-        "nidaleecougar",
-        "nidaleespear",
-    },
-            ["nunu"] = new List<string>
-    {
-        "nunusnowball",
-    },
-            ["olaf"] = new List<string>
-    {
-        "olafaxe",
-    },
-            ["orianna"] = new List<string>
-    {
-        "oriannaball",
-        "oriannanoball",
-    },
-            ["ornn"] = new List<string>
-    {
-        "ornnram",
-    },
-            ["quinn"] = new List<string>
-    {
-        "quinnvalor",
-    },
-            ["rammus"] = new List<string>
-    {
-        "rammusdbc",
-        "rammuspb",
-    },
-            ["reksai"] = new List<string>
-    {
-        "reksaitunnel",
-    },
-            ["ruby_jinx"] = new List<string>
-    {
-        "ruby_jinx_monkey",
-    },
-            ["senna"] = new List<string>
-    {
-        "sennasoul",
-    },
-            ["shaco"] = new List<string>
-    {
-        "shacobox",
-    },
-            ["shen"] = new List<string>
-    {
-        "shenspirit",
-    },
-            ["shyvana"] = new List<string>
-    {
-        "shyvanadragon",
-    },
-            ["sona"] = new List<string>
-    {
-        "sonadjgenre01",
-        "sonadjgenre02",
-        "sonadjgenre03",
-    },
-            ["strawberry_aurora"] = new List<string>
-    {
-        "strawberry_auroraspirits",
-    },
-            ["strawberry_illaoi"] = new List<string>
-    {
-        "strawberry_illaoiminion",
-    },
-            ["swain"] = new List<string>
-    {
-        "swaindemonform",
-    },
-            ["syndra"] = new List<string>
-    {
-        "syndraorbs",
-        "syndrasphere",
-    },
-            ["taliyah"] = new List<string>
-    {
-        "taliyahwallchunk",
-    },
-            ["teemo"] = new List<string>
-    {
-        "teemomushroom",
-    },
-            ["thresh"] = new List<string>
-    {
-        "threshlantern",
-    },
-            ["trundle"] = new List<string>
-    {
-        "trundlewall",
-    },
-            ["vi"] = new List<string>
-    {
-        "viego",
-        "viegosoul",
-        "viktor",
-        "viktorsingularity",
-    },
-            ["viego"] = new List<string>
-    {
-        "viegosoul",
-    },
-            ["viktor"] = new List<string>
-    {
-        "viktorsingularity",
-    },
-            ["yorick"] = new List<string>
-    {
-        "yorickbigghoul",
-        "yorickghoulmelee",
-        "yorickwghoul",
-        "yorickwinvisible",
-    },
-            ["zac"] = new List<string>
-    {
-        "zacrebirthbloblet",
-    },
-            ["zed"] = new List<string>
-    {
-        "zedshadow",
-    },
-            ["zoe"] = new List<string>
-    {
-        "zoeorbs",
-    },
-            ["zyra"] = new List<string>
-    {
-        "zyragraspingplant",
-        "zyrapassive",
-        "zyraseed",
-        "zyrathornplant",
-    },
+            ["anivia"] = new List<string> { "aniviaegg", "aniviaiceblock", },
+            ["annie"] = new List<string> { "annietibbers", },
+            ["aphelios"] = new List<string> { "apheliosturret", },
+            ["aurora"] = new List<string> { "auroraspirits", },
+            ["azir"] = new List<string> { "azirsoldier", "azirsundisc", "azirtowerclicker", "azirultsoldier", },
+            ["bard"] = new List<string> { "bardfollower", "bardhealthshrine", "bardpickup", "bardpickupnoicon", "bardportalclickable", },
+            ["bardpickup"] = new List<string> { "bardpickupnoicon", },
+            ["belveth"] = new List<string> { "belvethspore", "belvethvoidling", },
+            ["caitlyn"] = new List<string> { "caitlyntrap", },
+            ["cassiopeia"] = new List<string> { "cassiopeia_death", },
+            ["elise"] = new List<string> { "elisespider", "elisespiderling", },
+            ["elisespider"] = new List<string> { "elisespiderling", },
+            ["fiddlesticks"] = new List<string> { "fiddlestickseffigy", },
+            ["fizz"] = new List<string> { "fizzbait", "fizzshark", },
+            ["gangplank"] = new List<string> { "gangplankbarrel", },
+            ["gnar"] = new List<string> { "gnarbig", },
+            ["heimerdinger"] = new List<string> { "heimertblue", "heimertyellow", },
+            ["illaoi"] = new List<string> { "illaoiminion", },
+            ["irelia"] = new List<string> { "ireliablades", },
+            ["ivern"] = new List<string> { "ivernminion", "iverntotem", },
+            ["jarvaniv"] = new List<string> { "jarvanivstandard", "jarvanivwall", },
+            ["jhin"] = new List<string> { "jhintrap", },
+            ["jinx"] = new List<string> { "jinxmine", },
+            ["kalista"] = new List<string> { "kalistaaltar", "kalistaspawn", },
+            ["kindred"] = new List<string> { "kindredjunglebountyminion", "kindredwolf", },
+            ["kled"] = new List<string> { "kledmount", "kledrider", },
+            ["kogmaw"] = new List<string> { "kogmawdead", },
+            ["lissandra"] = new List<string> { "lissandrapassive", },
+            ["lulu"] = new List<string> { "lulufaerie", "lulupolymorphcritter", },
+            ["lux"] = new List<string> { "luxair", "luxdark", "luxfire", "luxice", "luxmagma", "luxmystic", "luxnature", "luxstorm", "luxwater", },
+            ["malzahar"] = new List<string> { "malzaharvoidling", },
+            ["maokai"] = new List<string> { "maokaisproutling", },
+            ["milio"] = new List<string> { "miliominion", },
+            ["monkeyking"] = new List<string> { "monkeykingclone", "monkeykingflying", },
+            ["naafiri"] = new List<string> { "naafiripackmate", },
+            ["nasus"] = new List<string> { "nasusult", },
+            ["nidalee"] = new List<string> { "nidaleecougar", "nidaleespear", },
+            ["nunu"] = new List<string> { "nunusnowball", },
+            ["olaf"] = new List<string> { "olafaxe", },
+            ["orianna"] = new List<string> { "oriannaball", "oriannanoball", },
+            ["ornn"] = new List<string> { "ornnram", },
+            ["quinn"] = new List<string> { "quinnvalor", },
+            ["rammus"] = new List<string> { "rammusdbc", "rammuspb", },
+            ["reksai"] = new List<string> { "reksaitunnel", },
+            ["ruby_jinx"] = new List<string> { "ruby_jinx_monkey", },
+            ["senna"] = new List<string> { "sennasoul", },
+            ["shaco"] = new List<string> { "shacobox", },
+            ["shen"] = new List<string> { "shenspirit", },
+            ["shyvana"] = new List<string> { "shyvanadragon", },
+            ["sona"] = new List<string> { "sonadjgenre01", "sonadjgenre02", "sonadjgenre03", },
+            ["strawberry_aurora"] = new List<string> { "strawberry_auroraspirits", },
+            ["strawberry_illaoi"] = new List<string> { "strawberry_illaoiminion", },
+            ["swain"] = new List<string> { "swaindemonform", },
+            ["syndra"] = new List<string> { "syndraorbs", "syndrasphere", },
+            ["taliyah"] = new List<string> { "taliyahwallchunk", },
+            ["teemo"] = new List<string> { "teemomushroom", },
+            ["thresh"] = new List<string> { "threshlantern", },
+            ["trundle"] = new List<string> { "trundlewall", },
+            ["vi"] = new List<string> { "viego", "viegosoul", "viktor", "viktorsingularity", },
+            ["viego"] = new List<string> { "viegosoul", },
+            ["viktor"] = new List<string> { "viktorsingularity", },
+            ["yorick"] = new List<string> { "yorickbigghoul", "yorickghoulmelee", "yorickwghoul", "yorickwinvisible", },
+            ["zac"] = new List<string> { "zacrebirthbloblet", },
+            ["zed"] = new List<string> { "zedshadow", },
+            ["zoe"] = new List<string> { "zoeorbs", },
+            ["zyra"] = new List<string> { "zyragraspingplant", "zyrapassive", "zyraseed", "zyrathornplant", },
         };
 
         public FixerSettings Settings { get; private set; }
@@ -375,6 +141,14 @@ namespace ModManager
         private PathFixer _pathFixer;
         private Hashes _hashes;
         private FixerUI x;
+
+        // Constants for Logging Colors
+        private const string CLR_ACT = "#2a84d2";   // Blue
+        private const string CLR_ERR = "#f81118";   // Red
+        private const string CLR_WARN = "#ecba0f";  // Yellow
+        private const string CLR_GOOD = "#2dc55e";  // Green
+        private const string CLR_MOD = "#5350b9";   // Purple
+
         public Repatheruwu()
         {
             Settings = new FixerSettings();
@@ -545,27 +319,31 @@ namespace ModManager
             {
                 var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
 
-                x.LowerLog($"Fixing {Current_Char} skin {skinNo}");
+                x.LowerLog($"[FIXI]  Fixing {Current_Char} skin {skinNo}", CLR_ACT);
 
                 Settings.Character = Current_Char;
                 Settings.skinNo = skinNo;
                 Settings.verifyHpBar = HpBar;
+                string shortChar = Current_Char.Length > 4
+    ? Current_Char.Substring(0, 4)
+    : Current_Char;
+                Settings.repath_path_path = $".{shortChar}{skinNo}_{Guid.NewGuid().ToString("N").Substring(0, 3)}_";
                 string binPath = $"data/characters/{Settings.Character}/skins/skin{Settings.skinNo}.bin";
                 var check = CheckLinked([binPath]);
                 if (check != null)
                 {
-                    x.LowerLog($"Failed to find {binPath}, Aborting");
+                    x.LowerLog($"[FAIL] Failed to find {binPath}, Aborting", CLR_ERR);
                     return;
                 }
 
 
                 var (binentries, concat, staticMat, allStrings, linkedList) = LoadAllBins(binPath);
-                x.LowerLog($"Processing Assets");
+                x.LowerLog($"[PROC] Processing Assets", CLR_ACT);
 
                 allStrings = process(allStrings);
-                foreach (var item in allStrings) {
-                    x.LowerLog($"Missing: {item.OriginalPath}");
-                }
+                // foreach (var item in allStrings) {
+                //      x.LowerLog($"[MISS] {item.OriginalPath}", CLR_ERR);
+                // }
 
                 var key = CharacterCases.Keys
     .FirstOrDefault(k =>
@@ -582,24 +360,24 @@ namespace ModManager
 
                 if (Settings.binless) continue;
 
-                x.LowerLog($"Saving Bins");
+                x.LowerLog($"[SAVE] Saving Bins", CLR_ACT);
                 string conat_path = $"data/{Settings.Character}_skin{Settings.skinNo}_concat.bin";
                 var EmptyLinked = new BinList(BinType.String);
-                x.LowerLog($"Saving: {conat_path}");
+                x.LowerLog($"[SAVE] {conat_path}", CLR_ACT);
                 Save_Bin(EmptyLinked, concat, $"{Settings.outputDir}/{conat_path}");
                 linkedList.Items.Add(new BinString(conat_path));
 
                 if (staticMat.Items.Count() > 0)
                 {
                     string static_mat_path = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat.bin";
-                    x.LowerLog($"Saving: {static_mat_path}");
+                    x.LowerLog($"[SAVE] {static_mat_path}", CLR_ACT);
                     Save_Bin(EmptyLinked, staticMat, $"{Settings.outputDir}/{static_mat_path}");
                     if (Settings.KillStaticMat)
                     {
                         string static_mat_path_proxy = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat_proxy.bin";
                         EmptyLinked.Items.Add(new BinString(static_mat_path));
                         var EmptyEntries = new BinMap(BinType.Hash, BinType.Embed);
-                        x.LowerLog($"Saving: {static_mat_path_proxy}");
+                        x.LowerLog($"[SAVE] {static_mat_path_proxy}", CLR_ACT);
                         Save_Bin(EmptyLinked, EmptyEntries, $"{Settings.outputDir}/{static_mat_path_proxy}");
                         linkedList.Items.Add(new BinString(static_mat_path_proxy));
                     }
@@ -609,11 +387,11 @@ namespace ModManager
                     }
                 }
 
-                x.LowerLog($"Saving: {binPath}");
+                x.LowerLog($"[SAVE] {binPath}", CLR_ACT);
                 Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
                 if (Settings.noskinni && Settings.skinNo == 0)
                 {
-                    x.LowerLog($"Creating No Skinni Lightinni Italini");
+                    x.LowerLog($"[SKIN]  Creating No Skinni Lightinni Italini", CLR_MOD);
 
                     var skinEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.SkinCharacterDataProperties);
                     var rrEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver);
@@ -641,7 +419,7 @@ namespace ModManager
 
             if (!Settings.folder)
             {
-                x.LowerLog("Packing WAD");
+                x.LowerLog("[PACK] Packing WAD", CLR_ACT);
 
                 var psi = new ProcessStartInfo
                 {
@@ -657,37 +435,36 @@ namespace ModManager
                 {
                     proc.WaitForExit();
                 }
-
+                //_wadExtractor.PackDirectoryToWadCompressed(Settings.outputDir, $"{Settings.outputDir}.client");
                 Directory.Delete(Settings.outputDir, true);
             }
 
 
             if (Directory.Exists(Settings.inputDir)) Directory.Delete(Settings.inputDir, true);
-            
+
+            foreach (string bin in Settings.Missing_Files)
+            {
+                x.UpperLog($"[MISS] {bin}", CLR_WARN);
+            }
+
             if (Settings.Missing_Bins.Count() > 2)
             {
-                x.LowerLog($"done. . . BUT {Settings.Missing_Bins.Count()} bins are missing");
+                x.LowerLog($"[WARN] Done. . . BUT {Settings.Missing_Bins.Count()} bins are missing", CLR_WARN);
                 foreach (string bin in Settings.Missing_Bins)
                 {
-                    x.LowerLog($"[MISS] {bin}", "#ff0022");
+                    x.UpperLog($"{bin}", CLR_ERR);
                 }
-                x.LowerLog($"[CHANCE] Try using Manifest downloader, if u remember when this specific version of mod was made");
+                x.LowerLog($"[TIP]  Try using Manifest downloader if needed", CLR_WARN);
             }
             else
             {
                 foreach (string bin in Settings.Missing_Bins)
                 {
-                    x.LowerLog($"[MISS] {bin}", "#ff0022");
+                    x.UpperLog($"{bin}", CLR_ERR);
                 }
-                x.LowerLog($"DONE ^^");
+                x.LowerLog($"[DONE] Finished ^^", CLR_GOOD);
+                x.UpperLog($"[DONE] Finished ^^", CLR_GOOD);
             }
-
-            foreach (string bin in Settings.Missing_Files)
-            {
-                x.UpperLog($"[MISS] {bin}", "#dec509");
-            }
-
-
         }
 
         public void Save_Bin(BinList Linked, BinMap entries, string output)
@@ -744,7 +521,8 @@ namespace ModManager
                         target.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
                 }
 
-            }else if (Settings.SoundOption == 2)
+            }
+            else if (Settings.SoundOption == 2)
             {
                 processing.RemoveAll(target =>
                 string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
@@ -760,7 +538,21 @@ namespace ModManager
             // Use _wadExtractor instance
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
             if (processing.Count == 0) return processing;
-            if (Settings.binless) return new List<WadExtractor.Target>();
+            if (Settings.binless)
+            {
+                x.UpperLog("[CHEK] Double checking files . . .", CLR_ACT);
+                processing = _hashes.FindMatches(processing);
+                processing.RemoveAll(t =>
+                {
+                    if (t.Hashes.Count == 0)
+                    {
+                        return true;
+                    }
+                    return false;
+                });
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
+                return new List<WadExtractor.Target>();
+            }
 
             if (Settings.SoundOption == 0)
             {
@@ -790,10 +582,10 @@ namespace ModManager
                 string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
             }
 
-            // if (Settings.Lang)                                                                                               //uwu
+            // if (Settings.Lang)                                                                                   //uwu
             // {
-            //     processing = _wadExtractor.ExtractAndSwapReferences(Settings.LangLookUp, processing);
-            //     if (processing.Count() == 0) return processing;
+            //      processing = _wadExtractor.ExtractAndSwapReferences(Settings.LangLookUp, processing);
+            //      if (processing.Count() == 0) return processing;
             // }
 
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
@@ -812,6 +604,10 @@ namespace ModManager
                 }
                 return false;
             });
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
+            if (processing.Count() == 0) return processing;
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            if (processing.Count() == 0) return processing;
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
             if (processing.Count() == 0) return processing;
             foreach (var item in processing)
@@ -861,7 +657,8 @@ namespace ModManager
                 }
             }
             if (bins_hashed.Count() < 1) return null;
-            if (!Settings.binless) {
+            if (!Settings.binless)
+            {
                 bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, bins_hashed);
                 if (bins_hashed.Count() < 1) return null;
 
@@ -888,7 +685,7 @@ namespace ModManager
             List<string> returning = new List<string>();
             foreach (WadExtractor.Target tar in bins_hashed)
             {
-                Settings.Missing_Files.Add(tar.OriginalPath);
+                Settings.Missing_Bins.Add($"[Missing]{tar.OriginalPath}");
                 returning.Add(tar.OriginalPath);
             }
             return returning;
@@ -994,8 +791,17 @@ namespace ModManager
     ? "…" + path[^99..]   // keep last 99 chars + ellipsis
     : path;
 
-                x.UpperLog($"Processing: {trimmedPath}", "#0276e3");
-                var bin = LoadBin(path);
+                x.UpperLog($"[READ] {trimmedPath}", CLR_ACT);
+
+                Bin bin = null;
+                try
+                {
+                    bin = LoadBin(path);
+                }
+                catch (Exception e) {
+                    x.UpperLog($"[FAIL] Failed to read {trimmedPath}", CLR_ERR);
+                    Settings.Missing_Bins.Add($"[Read Error] {path}");
+                    continue; }
                 if (bin == null) continue;
 
                 Console.WriteLine($"Loaded: {path}");
@@ -1016,7 +822,7 @@ namespace ModManager
                             }
                             else
                             {
-                                x.UpperLog($"Skipping: {path}", "#eaff00");
+                                x.UpperLog($"[SKIP] {path}", CLR_WARN);
                                 if (Settings.keep_Icons) repathIcon(s.Value);
                                 linkedListtoReturn.Items.Add(s);
                             }
@@ -1031,7 +837,7 @@ namespace ModManager
                     {
                         foreach (var left in notfound)
                         {
-                            x.LowerLog($"Failed to find: {path}");
+                            x.LowerLog($"[FAIL] Missing: {path}", CLR_ERR);
                             linkedListtoReturn.Items.Add(new BinString(left));
                         }
                     }
@@ -1095,8 +901,8 @@ namespace ModManager
                         }
                         targetDict[hash] = kvp;
                     }
-                                                                                                                   
-                                                                                                                    
+
+
                 }
             }
 
@@ -1105,6 +911,10 @@ namespace ModManager
                 Validate(SkinDataEntries, [FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}")]);
             }
 
+            if (SkinDataEntries.Count == 0)
+            {
+                x.LowerLog($"[MISS] SkinCharacterDataProperties", CLR_ERR);
+            }
             var mainEntry = (BinEmbed)SkinDataEntries.Values.First().Value;
 
             BinValue? GetField(BinEmbed embed, uint hash)
@@ -1200,17 +1010,20 @@ namespace ModManager
             {
                 Validate(AnimEntries, [anmgraph_name]);
             }
-            if (RREntries.Count == 0)
+            if (Settings.verifyHpBar)
             {
-                x.LowerLog($"MISSING: Resource Resolver");
-            }
-            if (CACEntries.Count == 0)
-            {
-                x.LowerLog($"MISSING: Contextual Action Data");
-            }
-            if (AnimEntries.Count == 0)
-            {
-                x.LowerLog($"MISSING: Animations Definitions");
+                if (RREntries.Count == 0)
+                {
+                    x.LowerLog($"[MISS] Resource Resolver", CLR_ERR);
+                }
+                if (CACEntries.Count == 0)
+                {
+                    x.LowerLog($"[MISS] Contextual Action Data", CLR_ERR);
+                }
+                if (AnimEntries.Count == 0)
+                {
+                    x.LowerLog($"[MISS] Animations Definitions", CLR_ERR);
+                }
             }
             Validate(GearEntries, GearUpgrades);
 
@@ -1455,6 +1268,12 @@ namespace ModManager
         {
             private FixerSettings _settings;
             public FixerUI x;
+
+            // Reusing log colors from parent
+            private const string CLR_ACT = "#2a84d2";
+            private const string CLR_GOOD = "#2dc55e";
+            private const string CLR_MOD = "#5350b9";
+
 
             public WadExtractor(FixerSettings settings)
             {
@@ -1754,14 +1573,19 @@ namespace ModManager
                                 if (job.Target.BinStringRef != null)
                                 {
                                     string left = job.Target.OriginalPath.Length > 55
-    ? job.Target.OriginalPath[..55]
+    ? $"{job.Target.OriginalPath[..26]}...{job.Target.OriginalPath[^26..]}"
     : job.Target.OriginalPath;
 
                                     string right = final_out.Length > 55
-                                        ? final_out[..55]
+                                        ? $"{final_out[..26]}...{final_out[^26..]}"
                                         : final_out;
 
-                                    x.UpperLog($"[GOOD] {left,-55} --> {right,-55}", "#00801e");
+                                    // Determine if extension changed for color coding
+                                    bool extChanged = !string.Equals(Path.GetExtension(job.Target.OriginalPath), Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
+                                    string logColor = extChanged ? CLR_MOD : CLR_GOOD;
+                                    string logTag = extChanged ? "[FIXD]" : "[GOOD]";
+
+                                    x.UpperLog($"{logTag} {left,-55} --> {right,-55}", logColor);
 
                                     string outRef = final_out;
                                     foreach (BinString s in job.Target.BinStringRef)
@@ -2151,19 +1975,18 @@ namespace ModManager
                     .ToLowerInvariant();
             }
 
-            private static string GetDataRelativePath(string path)
+            private string GetDataRelativePath(string path)
             {
                 string p = path.Replace("\\", "/").ToLowerInvariant();
                 int idx = p.IndexOf("data/", StringComparison.OrdinalIgnoreCase);
 
                 string relative = (idx != -1) ? p.Substring(idx + 5) : p;
-
                 if (relative.Length == 0) return "";
 
-                int cutoff = (relative.Length * 2 + 2) / 3;
-
+                int cutoff = (int)Math.Round(relative.Length * (_settings.percent / 100.0));
                 return relative.Substring(0, cutoff);
             }
+
         }
 
     }

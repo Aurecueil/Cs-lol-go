@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using ModManager;
+using SharpCompress.Common;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -329,21 +330,32 @@ namespace ModManager
 
         private void Fixer_settings_panel_open(object sender, RoutedEventArgs e)
         {
-            if (Fixer == null || !fixerRunning) // Only create it if it doesn’t exist
+            try
             {
-                rep = new Repatheruwu();
-
-                Fixer = new FixerUI(Main, ModElement, rep)
+                if (!File.Exists(Main.settings.gamepath))
                 {
-                    CallerModListEntry = this,
-                };
-                Main.OverlayHost.Children.Add(Fixer);
-            }
-            else
-            {
-                if (!Main.OverlayHost.Children.Contains(Fixer))
+                    CustomMessageBox.Show("Set Gamepath in settings before using Topaz Fixer");
+                    return;
+                }
+                if (Fixer == null || !fixerRunning) // Only create it if it doesn’t exist
+                {
+                    rep = new Repatheruwu();
+
+                    Fixer = new FixerUI(Main, ModElement, rep)
+                    {
+                        CallerModListEntry = this,
+                    };
                     Main.OverlayHost.Children.Add(Fixer);
+                }
+                else
+                {
+                    if (!Main.OverlayHost.Children.Contains(Fixer))
+                        Main.OverlayHost.Children.Add(Fixer);
+                }
             }
+            catch (Exception ex) { 
+                MessageBox.Show(ex.ToString());
+                Logger.LogError("Failed to handle Runeforge protocol", ex); }
         }
         public void null_fixer()
         {
@@ -374,17 +386,21 @@ namespace ModManager
             fixerRunning = running;
             if (running)
             {
+                whenrun.Visibility = Visibility.Visible;
                 block.Text = "Fixer is Running";
-                this.IsEnabled = false;
+                FixingIcon.Visibility = Visibility.Collapsed;
                 FixerOverlay.Visibility = Visibility.Visible;
                 was_enabled = ModElement.isActive;
+                if (was_enabled) MainWindow.ProfileEntries.Remove(ModElement.ModFolder);
                 ModElement.isActive = false;
                 ActiveCheckbox.IsChecked = ModElement.isActive;
             }
             else
             {
-                this.IsEnabled = true;
+                whenrun.Visibility = Visibility.Collapsed;
+                FixingIcon.Visibility = Visibility.Visible;
                 FixerOverlay.Visibility = Visibility.Collapsed;
+                if (was_enabled) MainWindow.ProfileEntries[ModElement.ModFolder] = ModElement.Details.Priority;
                 ModElement.isActive = was_enabled;
                 ActiveCheckbox.IsChecked = ModElement.isActive;
             }
