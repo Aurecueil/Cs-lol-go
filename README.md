@@ -1,5 +1,5 @@
 # cslol-go
-`LtMAO-hai` is my lol custom skin manager.
+`cslol-go` is my lol custom skin manager.
 ![](https://github.com/Aurecueil/Temp/blob/main/images/app1.png)
 
 # Installation
