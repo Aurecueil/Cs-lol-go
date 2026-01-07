@@ -1,13 +1,14 @@
 # cslol-go
 `LtMAO-hai` is my lol custom skin manager.
-![](https://github.com/Aurecueil/Temp/blob/main/images/app1.png)
+
+<img src="https://github.com/Aurecueil/Temp/blob/main/images/app1.png?raw=true" width="800">
 
 # Installation
 1. Download: [0.2.1.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.1/0.2.1.zip)
 2. Extract: `0.2.1.zip`
 3. Run `ModLoader.exe`
 
-![](https://github.com/Aurecueil/Temp/blob/main/images/exe1.png)
+<img src="https://github.com/Aurecueil/Temp/blob/main/images/exe1.png?raw=true" width="520">
 
 # Updates
 1. cslolgo always check for latest version when you open the app. If there is a newer version, the app will display message box.
@@ -18,7 +19,7 @@
 ## cslolgo
 Just `cslol-manager`, but more features and options.
 
-<img src="https://github.com/Aurecueil/Temp/blob/main/images/manager.png?raw=true" width="400">
+<img src="https://github.com/Aurecueil/Temp/blob/main/images/manager.png?raw=true" width="800">
 
 
 ## modtiles
