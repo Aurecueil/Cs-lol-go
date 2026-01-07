@@ -67,7 +67,7 @@ Filter your installed mods. You can use the following flags to better filter sea
 > [!TIP]
 > These keywords can be *anywhere* in the search query, and can be partial (`author:` / `auth:` / `a:`)
 
-- `name:` e.g. `name:Spirit Blossom` or `nam:Spirit Blossom` or `na:Spirit Blossom` or `n:Spirit Blossom`
+- `name:` e.g. `n:Spirit Blossom`
 - `author:` e.g. `a:moga`
 - `wad:` e.g `w:aurora`
 
