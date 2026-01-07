@@ -3184,6 +3184,7 @@ namespace ModManager
             bool isRecursiveModSearch = searchString == "-l";
             bool isFilteredRecursiveModSearch = searchString.StartsWith("-l ");
             string filteredSearchString = isFilteredModSearch ? searchString.Substring(3) :
+                                         isFlatFilteredModSearch ? searchString.Substring(3) :
                                          isFilteredRecursiveModSearch ? searchString.Substring(3) : searchString;
 
             if (isEmptySearch)
@@ -3229,14 +3230,23 @@ namespace ModManager
                     }
                 }
             }
-
             else if (isFlatFullModSearch)
             {
-                CollectAllModsRecursively(root, mods);
+                int loc = 0;
+                if (settings.tft_mode) loc = -1;
+                if(hierarchyById.TryGetValue(loc, out var search_root))
+                {
+                    CollectAllModsRecursively(search_root, mods);
+                }
             }
             else if (isFlatFilteredModSearch)
             {
-                CollectAllModsRecursively(root, mods, filteredSearchString);
+                int loc = 0;
+                if (settings.tft_mode) loc = -1;
+                if (hierarchyById.TryGetValue(loc, out var search_root))
+                {
+                    CollectAllModsRecursively(search_root, mods, filteredSearchString);
+                }
             }
             else if (isRecursiveModSearch)
             {
