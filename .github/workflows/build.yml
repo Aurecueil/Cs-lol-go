@@ -1,0 +1,36 @@
+name: Build ModLoader
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore ModLoader.sln
+
+    - name: Build
+      run: dotnet build ModLoader.sln --configuration Release --no-restore
+
+    - name: Publish
+      run: dotnet publish ModLoader/ModLoader.csproj -c Release -o ./publish
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ModLoader-Build
+        path: ./publish

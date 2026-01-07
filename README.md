@@ -1,74 +1,90 @@
-# cslol-go
-`cslol-go` is my lol custom skin manager.
+<p align="center">
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/manager.png?raw=true" width="800" >
+</p>
 
-<img src="https://github.com/Aurecueil/Temp/blob/main/images/app1.png?raw=true" width="800">
+# cslol-go
+My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueToolkit/cslol-manager), but more features and options.
+
+
+## Features
+- Customizable UI
+- Mod Folders
+- Random mod selection
+- [Runeforge](https://www.runeforge.dev/) one-click downloads
+- Modpkg import/export
+- Mod fixer
+- Mod thumbnails
+- Instant profiles
 
 # Installation
+
+<table align="center">
+  <tr>
+    <td>
+      <p> 
+        
 1. Download: [0.2.1.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.1/0.2.1.zip)
 2. Extract: `0.2.1.zip`
 3. Run `ModLoader.exe`
 
-<img src="https://github.com/Aurecueil/Temp/blob/main/images/exe1.png?raw=true" width="520">
+      </p>
+    </td>
+    <td><img src="https://github.com/Aurecueil/Temp/blob/main/images/exe1.png?raw=true" width="520"></td>
+  </tr>
+</table>
 
 # Updates
-1. cslolgo always check for latest version when you open the app. If there is a newer version, the app will display message box.
-2. To fully update: re-download the whole app from github and extract it to same location.
+cslol-go automatically checks for the latest version when you open the app. If there is a newer version, the app will display a message box.
 
-# Documentation
+To update: download the latest release from GitHub and extract it to the same location (overwriting existing files).
 
-## cslolgo
-Just `cslol-manager`, but more features and options.
+# Usage
+## Mod Tiles
+<p align="center">
+<img src="https://github.com/Aurecueil/Temp/blob/main/images/modtile.png"/>
+</p>
 
-<img src="https://github.com/Aurecueil/Temp/blob/main/images/manager.png?raw=true" width="800">
+To enable a mod, check its checkmark on the left.
 
+The buttons on a mod tile are as follows (left to right):
+1. Topaz mod fixer
+1. Export
+1. Edit
+1. Delete
 
-## modtiles
+## Search
+Filter your installed mods. You can use the following flags to better filter search results.
 
-To enable the mod, check checkmark on the left.
+> [!IMPORTANT]
+> These flags **must** be at the very start of the search query.
 
-Options on right are in order:
-- Topaz mod fixer
-- Export
-- Edit
-- Delete
-
-![](https://github.com/Aurecueil/Temp/blob/main/images/modtile.png)
-
-
-## Searchbar
-In searchbar u can use following to better filter search results.
-
-Following tree must be at the very start of search query:
 - `-g` (global) to show ALL installed mods
 - `-f` (flat) to show ALL mods for current mods (lol/tft)
 - `-l` (local) to show all mods in current folder and subfolders (recursive)
 
-Other search options: (keyword can be partial)
-- `name:` eg `name:Spirit Blossom` or `nam:Spirit Blossom` or `na:Spirit Blossom` or `n:Spirit Blossom`
-- `author:` eg `a:moga`
-- `wad:` eg `w:aurora`
+### Other search options
+
+> [!TIP]
+> These keywords can be *anywhere* in the search query, and can be partial (`author:` / `auth:` / `a:`)
+
+- `name:` e.g. `n:Spirit Blossom`
+- `author:` e.g. `a:moga`
+- `wad:` e.g `w:aurora`
 
 Logic Statements:
-- `||` OR statement, eg. `Briar || Zoe`
+- `||` OR statement, e.g. `Briar || Zoe`
 
-## Cli
-When app is running, u can call the exe with commands to execute actions.
-This will bring app to front.
-Actions are executed in preset order.
-- `--start` to start loader
-- `--sp` to Select (change) selected profile
-- `--stop` to stop loader
-- `--dbu` to prevent app from being brought to front
+## CLI
+While the app is running, you can call the executable again with flags, to execute specific actions.
 
-## Features
-- Folders
-- Random Mods
-- Mod Fixer
-- Modpkg Import/Export
-- Mod Thumbnails
-- Runeforge Protocol Downloads
-- Instant Profiles
-- Customizable Modtiles size and ratio
+> [!TIP]
+> This will bring the app to front.
+
+Actions are executed in a fixed order, the order of the flags do not affect execution order.
+- `--start` to start the mod loader
+- `--sp` to switch the currently selected profile
+- `--stop` to stop the mod loader
+- `--dbu` to prevent the app from being brought to front
 
 # Credits:
 - [Divine skins (HUGE help)](https://divineskins.gg/)
