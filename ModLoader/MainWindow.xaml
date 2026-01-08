@@ -129,7 +129,7 @@ Unchecked="Stop_loader" Style="{StaticResource ButtonTemple}"
     CornerRadius="4"
     Background="Transparent"
     Padding="1"
-    Margin="5,2,5,2">
+    Margin="2,2,2,2">
 
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                 <StackPanel 

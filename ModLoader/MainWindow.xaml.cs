@@ -2052,6 +2052,7 @@ namespace ModManager
 
             if (saveDialog.ShowDialog() != true) {
                 ModElement.set_export(false);
+                if (Additional_Mods is null) return;
                 foreach (var mod in Additional_Mods)
                 { mod.set_export(false); }
                     return;
@@ -3260,7 +3261,7 @@ namespace ModManager
                     FontSize = 12,
                     Height = 19, // slightly smaller than panel height to fit
                     Padding = new Thickness(5, 0, 5, 0),
-                    Margin = new Thickness(2, 1, 2, 1),
+                    Margin = new Thickness(1, 1, 1, 1),
                     HorizontalContentAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     Cursor = Cursors.Hand,
@@ -4942,7 +4943,8 @@ namespace ModManager
         {
             var info = ModPkgLib.GetMetadata(path);
 
-            string installPath = Path.Combine("installed", info.Metadata.Name);
+            string folder = (info.Metadata.Name == "" ? $"{Path.GetFileNameWithoutExtension(path)}_modpkg_import" : info.Metadata.Name);
+            string installPath = Path.Combine("installed", folder);
 
             if (Directory.Exists(installPath) && !override_)
             {
@@ -4982,7 +4984,7 @@ namespace ModManager
             string metaPath = Path.Combine(installPath, "META");
             Directory.CreateDirectory(metaPath);
 
-            if (info.Metadata.Distributor.SiteId == "runeforge")
+            if (info.Metadata.Distributor?.SiteId == "runeforge")
             {
                 var obj = new
                 {
@@ -4997,7 +4999,6 @@ namespace ModManager
 
                 File.WriteAllText(Path.Combine(metaPath, "rf.json"), json_rf);
             }
-
 
             // Prepare authors as comma-separated string
             string authors = info.Metadata.Authors != null

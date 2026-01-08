@@ -12,8 +12,8 @@ namespace ModPkgLibSpace
         public const uint NO_WAD_INDEX = 0xFFFFFFFF;
         public const ulong NO_LAYER_HASH = 0xFFFFFFFFFFFFFFFF;
 
-        // Meta Chunk Paths
-        public const string METADATA_CHUNK_PATH = "_meta_/info.msgpack";
+        // Meta Chunk Paths
+        public const string METADATA_CHUNK_PATH = "_meta_/info.msgpack";
         public const string THUMBNAIL_CHUNK_PATH = "_meta_/thumbnail.webp";
         public const string README_CHUNK_PATH = "_meta_/README.md";
     }
@@ -45,7 +45,7 @@ namespace ModPkgLibSpace
         public uint WadIndex { get; set; }
 
         public const int ChunkHeaderSize = 8 + 8 + 1 + 8 + 8 + 8 + 8 + 4 + 4 + 4; // 77 bytes
-    }
+    }
 
     public class ModpkgLayer
     {
@@ -59,21 +59,21 @@ namespace ModPkgLibSpace
         }
     }
 
-    // Simplified ModpkgAuthor for Msgpack encoding
-    public class ModpkgAuthor
+    // Simplified ModpkgAuthor for Msgpack encoding
+    public class ModpkgAuthor
     {
         public string Name { get; set; }
         public string Role { get; set; } // Nullable string maps to Option<String> in Rust
 
-        public ModpkgAuthor(string name, string role = null)
+        public ModpkgAuthor(string name, string role = null)
         {
             Name = name;
             Role = role;
         }
     }
 
-    // Simplified ModpkgLicense for Msgpack encoding
-    public class ModpkgLicense
+    // Simplified ModpkgLicense for Msgpack encoding
+    public class ModpkgLicense
     {
         public LicenseType Type { get; set; }
         public string SpdxId { get; set; }
@@ -100,8 +100,8 @@ namespace ModPkgLibSpace
         }
     }
 
-    // DistributorInfo structure for Msgpack encoding
-    public class DistributorInfo
+    // DistributorInfo structure for Msgpack encoding
+    public class DistributorInfo
     {
         public string SiteId { get; set; } = "unknown";
         public string SiteName { get; set; } = "Unknown Site";
@@ -110,8 +110,8 @@ namespace ModPkgLibSpace
         public string ReleaseId { get; set; } = "0";
     }
 
-    // Simplified ModpkgMetadata to facilitate Msgpack encoding
-    public class ModpkgMetadata
+    // Simplified ModpkgMetadata to facilitate Msgpack encoding
+    public class ModpkgMetadata
     {
         public uint SchemaVersion { get; set; } = 1;
         public string Name { get; set; }
@@ -120,8 +120,8 @@ namespace ModPkgLibSpace
         public string Version { get; set; }
         public List<ModpkgAuthor> Authors { get; set; }
         public ModpkgLicense License { get; set; }
-        // Default distributor for compatibility
-        public DistributorInfo Distributor { get; set; } = new DistributorInfo();
+        // Default distributor for compatibility
+        public DistributorInfo Distributor { get; set; } = new DistributorInfo();
 
         public ModpkgMetadata()
         {
@@ -163,7 +163,7 @@ namespace ModPkgLibSpace
     }
 
     // WARNING: This entire static class is a conceptual placeholder.
-    // It assumes the existence of types (Bitmap, SimpleEncoder, etc.) from external libraries 
+    // It assumes the existence of types (Bitmap, SimpleEncoder, etc.) from external libraries 
     // (like System.Drawing/ImageSharp/SkiaSharp) which are not available in this single-file environment.
     // Actual execution will fail at runtime unless these dependencies are manually provided externally.
 
@@ -188,8 +188,8 @@ namespace ModPkgLibSpace
 
         public class SimpleEncoder
         {
-            // Decode WebP to PNG
-            public byte[] DecodeWebPToPng(byte[] webpData)
+            // Decode WebP to PNG
+            public byte[] DecodeWebPToPng(byte[] webpData)
             {
                 using (var ms = new MemoryStream(webpData))
                 using (var image = SixLabors.ImageSharp.Image.Load(ms))
@@ -201,8 +201,8 @@ namespace ModPkgLibSpace
                 }
             }
 
-            // Bonus: Decode WebP to JPG
-            public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90)
+            // Bonus: Decode WebP to JPG
+            public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90)
             {
                 using (var ms = new MemoryStream(webpData))
                 using (var image = SixLabors.ImageSharp.Image.Load(ms))
@@ -221,66 +221,66 @@ namespace ModPkgLibSpace
 
     public static class ModPkgLib
     {
-        /// <summary>
-        /// Converts the 8-byte hash array returned by System.IO.Hashing to a ulong value.
-        /// This correctly handles the common case where hash functions return Big Endian bytes
-        /// but BitConverter reads Little Endian bytes on x86/x64 platforms.
-        /// </summary>
-        private static ulong HashToUInt64(byte[] hashBytes)
+        /// <summary>
+        /// Converts the 8-byte hash array returned by System.IO.Hashing to a ulong value.
+        /// This correctly handles the common case where hash functions return Big Endian bytes
+        /// but BitConverter reads Little Endian bytes on x86/x64 platforms.
+        /// </summary>
+        private static ulong HashToUInt64(byte[] hashBytes)
         {
-            // XxHash implementations often return hash bytes in Big Endian order.
-            // On a Little Endian machine (standard for C# runtime), we must reverse the bytes
-            // to correctly reconstruct the ulong value using BitConverter.
-            if (BitConverter.IsLittleEndian)
+            // XxHash implementations often return hash bytes in Big Endian order.
+            // On a Little Endian machine (standard for C# runtime), we must reverse the bytes
+            // to correctly reconstruct the ulong value using BitConverter.
+            if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(hashBytes);
             }
             return BitConverter.ToUInt64(hashBytes, 0);
         }
 
-        // Hashing functions aligned with Rust implementation
+        // Hashing functions aligned with Rust implementation
 
-        /// <summary>
-        /// Hashes a layer name using XXH3_64 (aligned with Rust's xxh3::xxh3_64).
-        /// </summary>
-        public static ulong HashLayerName(string name)
+        /// <summary>
+        /// Hashes a layer name using XXH3_64 (aligned with Rust's xxh3::xxh3_64).
+        /// </summary>
+        public static ulong HashLayerName(string name)
         {
             var bytes = Encoding.UTF8.GetBytes(name.ToLowerInvariant());
             var hash = XxHash3.Hash(bytes);
             return HashToUInt64(hash);
         }
 
-        /// <summary>
-        /// Hashes a chunk name using XXH64 with seed 0 (aligned with Rust's xxh64::xxh64(..., 0)).
-        /// </summary>
-        public static ulong HashChunkName(string name)
+        /// <summary>
+        /// Hashes a chunk name using XXH64 with seed 0 (aligned with Rust's xxh64::xxh64(..., 0)).
+        /// </summary>
+        public static ulong HashChunkName(string name)
         {
             var bytes = Encoding.UTF8.GetBytes(name.ToLowerInvariant());
             var hash = XxHash64.Hash(bytes, 0); // Explicitly use seed 0
-            return HashToUInt64(hash);
+            return HashToUInt64(hash);
         }
 
-        /// <summary>
-        /// Hashes a wad name using XXH3_64 (aligned with Rust's xxh3::xxh3_64).
-        /// </summary>
-        public static ulong HashWadName(string name)
+        /// <summary>
+        /// Hashes a wad name using XXH3_64 (aligned with Rust's xxh3::xxh3_64).
+        /// </summary>
+        public static ulong HashWadName(string name)
         {
             var bytes = Encoding.UTF8.GetBytes(name.ToLowerInvariant());
             var hash = XxHash3.Hash(bytes);
             return HashToUInt64(hash);
         }
 
-        /// <summary>
-        /// Calculates the XXH3_64 checksum for data (aligned with Rust's xxh3_64).
-        /// </summary>
-        public static ulong XXH3_64(byte[] data)
+        /// <summary>
+        /// Calculates the XXH3_64 checksum for data (aligned with Rust's xxh3_64).
+        /// </summary>
+        public static ulong XXH3_64(byte[] data)
         {
             var hash = XxHash3.Hash(data);
             return HashToUInt64(hash);
         }
 
-        // Get metadata and layer information
-        public static ModpkgInfo GetMetadata(string modpkgPath)
+        // Get metadata and layer information
+        public static ModpkgInfo GetMetadata(string modpkgPath)
         {
             using var reader = new ModpkgReader(modpkgPath);
             var info = new ModpkgInfo
@@ -289,8 +289,8 @@ namespace ModPkgLibSpace
                 TotalChunks = reader.Chunks.Count
             };
 
-            // Group chunks by LayerHash to count files per layer
-            var chunksByLayer = reader.Chunks
+            // Group chunks by LayerHash to count files per layer
+            var chunksByLayer = reader.Chunks
         .GroupBy(kvp => kvp.Key.LayerHash)
         .ToDictionary(g => g.Key, g => g.Count());
 
@@ -310,8 +310,8 @@ namespace ModPkgLibSpace
             return info;
         }
 
-        // Extract modpkg to folder
-        public static void Extract(string modpkgPath, string outputDir)
+        // Extract modpkg to folder
+        public static void Extract(string modpkgPath, string outputDir)
         {
             using var reader = new ModpkgReader(modpkgPath);
 
@@ -336,17 +336,17 @@ namespace ModPkgLibSpace
                 }
                 else
                 {
-                    // Fallback for layers not defined in the header but present in chunks (shouldn't happen in v1)
-                    layerName = $"WAD_{layerHash:X16}";
+                    // Fallback for layers not defined in the header but present in chunks (shouldn't happen in v1)
+                    layerName = $"WAD_{layerHash:X16}";
                 }
 
                 foreach (var (key, chunk) in chunks)
                 {
-                    // Use path from ChunkPaths if available, otherwise use hash as filename
-                    var chunkPath = reader.ChunkPaths.GetValueOrDefault(chunk.PathHash, $"{chunk.PathHash:X16}");
+                    // Use path from ChunkPaths if available, otherwise use hash as filename
+                    var chunkPath = reader.ChunkPaths.GetValueOrDefault(chunk.PathHash, $"{chunk.PathHash:X16}");
 
-                    // Skip extracting the metadata chunk, as requested
-                    if (chunkPath.Equals(Constants.METADATA_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
+                    // Skip extracting the metadata chunk, as requested
+                    if (chunkPath.Equals(Constants.METADATA_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -358,28 +358,28 @@ namespace ModPkgLibSpace
 
                     if (chunkPath.Equals(Constants.THUMBNAIL_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Special handling for thumbnail: save as image.png in the root output directory
-                        filePath = Path.Combine(outputDir, "META", "image.png");
+                        // Special handling for thumbnail: save as image.png in the root output directory
+                        filePath = Path.Combine(outputDir, "META", "image.png");
                         conversionRequired = true; // WebP data needs conversion back to PNG
-                    }
+                    }
                     else
                     {
                         var layerDir = Path.Combine(outputDir, layerName);
                         Directory.CreateDirectory(layerDir); // Ensure layer directory exists
-                        filePath = Path.Combine(layerDir, chunkPath);
+                        filePath = Path.Combine(layerDir, chunkPath);
                     }
 
                     if (conversionRequired)
                     {
                         try
                         {
-                            // Attempt WebP -> PNG conversion (will likely fail due to Mock)
-                            finalData = imageConverter.DecodeWebPToPng(data);
+                            // Attempt WebP -> PNG conversion (will likely fail due to Mock)
+                            finalData = imageConverter.DecodeWebPToPng(data);
                             if (finalData == null)
                             {
                                 Console.WriteLine("Warning: WebP to PNG conversion failed (Mock). Saving raw WebP data under .png name.");
                                 finalData = data; // Fallback to saving raw WebP data if conversion fails
-                            }
+                            }
                         }
                         catch (NotImplementedException ex)
                         {
@@ -404,11 +404,11 @@ namespace ModPkgLibSpace
             }
         }
 
-        /// <summary>
-        /// Loads thumbnail data from path. Attempts to read .webp, .png, or .jpg and converts to WebP.
-        /// Conversion for non-WebP files relies on ImageConverterMocks.SimpleEncoder.
-        /// </summary>
-        private static byte[] LoadThumbnailData(string thumbnailPath)
+        /// <summary>
+        /// Loads thumbnail data from path. Attempts to read .webp, .png, or .jpg and converts to WebP.
+        /// Conversion for non-WebP files relies on ImageConverterMocks.SimpleEncoder.
+        /// </summary>
+        private static byte[] LoadThumbnailData(string thumbnailPath)
         {
             if (string.IsNullOrEmpty(thumbnailPath) || !File.Exists(thumbnailPath))
             {
@@ -419,12 +419,12 @@ namespace ModPkgLibSpace
 
             try
             {
-                // Already WebP → return as-is
-                if (extension == ".webp")
+                // Already WebP → return as-is
+                if (extension == ".webp")
                     return File.ReadAllBytes(thumbnailPath);
 
-                // PNG/JPG → load and convert to WebP
-                if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
+                // PNG/JPG → load and convert to WebP
+                if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
                 {
                     using (var image = SixLabors.ImageSharp.Image.Load(thumbnailPath))
                     using (var ms = new MemoryStream())
@@ -448,38 +448,38 @@ namespace ModPkgLibSpace
             }
         }
 
-        // Pack folders into modpkg
-        public static void Pack(List<(string FolderPath, string LayerName, int Priority)> layers,
+        // Pack folders into modpkg
+        public static void Pack(List<(string FolderPath, string LayerName, int Priority)> layers,
                 ModpkgMetadata metadata, string outputPath, string thumbnailPath = null, DistributorInfo distributor = null)
         {
             using var writer = new ModpkgWriter(outputPath);
 
-            // Apply distributor data if provided separately
-            if (distributor != null)
+            // Apply distributor data if provided separately
+            if (distributor != null)
             {
                 metadata.Distributor = distributor;
             }
 
             writer.SetMetadata(metadata);
 
-            // 1. Add layers to header (ModpkgWriter handles deduplication/indexing)
-            foreach (var (folderPath, layerName, priority) in layers)
+            // 1. Add layers to header (ModpkgWriter handles deduplication/indexing)
+            foreach (var (folderPath, layerName, priority) in layers)
             {
                 writer.AddLayer(layerName, priority);
             }
 
-            // 2. Handle Thumbnail Meta Chunk (must be done before writing content chunks)
-            if (!string.IsNullOrEmpty(thumbnailPath))
+            // 2. Handle Thumbnail Meta Chunk (must be done before writing content chunks)
+            if (!string.IsNullOrEmpty(thumbnailPath))
             {
                 var thumbnailData = LoadThumbnailData(thumbnailPath); // Use the new method
-                if (thumbnailData != null)
+                if (thumbnailData != null)
                 {
                     writer.AddMetaChunkData(Constants.THUMBNAIL_CHUNK_PATH, thumbnailData);
                 }
             }
 
-            // 3. Add content chunks
-            foreach (var (folderPath, layerName, priority) in layers)
+            // 3. Add content chunks
+            foreach (var (folderPath, layerName, priority) in layers)
             {
                 if (!Directory.Exists(folderPath))
                 {
@@ -495,8 +495,8 @@ namespace ModPkgLibSpace
                 }
             }
 
-            // 4. Write the final package
-            writer.Write();
+            // 4. Write the final package
+            writer.Write();
         }
     }
 
@@ -519,31 +519,31 @@ namespace ModPkgLibSpace
             ReadModpkg();
         }
 
-        // --- Msgpack Helper Methods for Reading ---
+        // --- Msgpack Helper Methods for Reading ---
 
-        private static string ReadMsgpackString(MemoryStream stream)
+        private static string ReadMsgpackString(MemoryStream stream)
         {
             var header = stream.ReadByte();
             if (header == -1) throw new EndOfStreamException("Msgpack string header expected.");
 
             int len;
             if ((header & 0xE0) == 0xA0) // Fixstr (0xa0 to 0xbf)
-            {
+            {
                 len = header & 0x1F;
             }
             else if (header == 0xD9) // Str 8
-            {
+            {
                 len = stream.ReadByte();
             }
             else if (header == 0xDA) // Str 16
-            {
+            {
                 var bytes = new byte[2];
                 stream.Read(bytes, 0, 2);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
                 len = BitConverter.ToUInt16(bytes, 0);
             }
             else if (header == 0xDB) // Str 32
-            {
+            {
                 var bytes = new byte[4];
                 stream.Read(bytes, 0, 4);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
@@ -565,29 +565,29 @@ namespace ModPkgLibSpace
             if (header == -1) throw new EndOfStreamException("Msgpack unsigned int header expected.");
 
             if ((header & 0x80) == 0x00) // Positive fixint (0x00 to 0x7f)
-            {
+            {
                 return (ulong)header;
             }
             else if (header == 0xCC) // uint 8
-            {
+            {
                 return (ulong)stream.ReadByte();
             }
             else if (header == 0xCD) // uint 16
-            {
+            {
                 var bytes = new byte[2];
                 stream.Read(bytes, 0, 2);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
                 return BitConverter.ToUInt16(bytes, 0);
             }
             else if (header == 0xCE) // uint 32
-            {
+            {
                 var bytes = new byte[4];
                 stream.Read(bytes, 0, 4);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
                 return BitConverter.ToUInt32(bytes, 0);
             }
             else if (header == 0xCF) // uint 64
-            {
+            {
                 var bytes = new byte[8];
                 stream.Read(bytes, 0, 8);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
@@ -605,18 +605,18 @@ namespace ModPkgLibSpace
             if (header == -1) throw new EndOfStreamException("Msgpack map header expected.");
 
             if ((header & 0xF0) == 0x80) // Fixmap (0x80 to 0x8f)
-            {
+            {
                 return (uint)(header & 0x0F);
             }
             else if (header == 0xDE) // Map 16
-            {
+            {
                 var bytes = new byte[2];
                 stream.Read(bytes, 0, 2);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
                 return BitConverter.ToUInt16(bytes, 0);
             }
             else if (header == 0xDF) // Map 32
-            {
+            {
                 var bytes = new byte[4];
                 stream.Read(bytes, 0, 4);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
@@ -634,18 +634,18 @@ namespace ModPkgLibSpace
             if (header == -1) throw new EndOfStreamException("Msgpack array header expected.");
 
             if ((header & 0xF0) == 0x90) // Fixarray (0x90 to 0x9f)
-            {
+            {
                 return (uint)(header & 0x0F);
             }
             else if (header == 0xDC) // Array 16
-            {
+            {
                 var bytes = new byte[2];
                 stream.Read(bytes, 0, 2);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
                 return BitConverter.ToUInt16(bytes, 0);
             }
             else if (header == 0xDD) // Array 32
-            {
+            {
                 var bytes = new byte[4];
                 stream.Read(bytes, 0, 4);
                 if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
@@ -664,36 +664,36 @@ namespace ModPkgLibSpace
 
             if (header == 0xC0) return true; // Nil
 
-            // If not Nil, put the byte back and return false
-            stream.Seek(-1, SeekOrigin.Current);
+            // If not Nil, put the byte back and return false
+            stream.Seek(-1, SeekOrigin.Current);
             return false;
         }
 
-        // --- End Msgpack Helper Methods ---
+        // --- End Msgpack Helper Methods ---
 
-        private void ReadModpkg()
+        private void ReadModpkg()
         {
-            // Read magic
-            var magic = _reader.ReadBytes(8);
+            // Read magic
+            var magic = _reader.ReadBytes(8);
             if (!magic.SequenceEqual(Constants.MAGIC))
                 throw new InvalidDataException("Invalid magic");
 
-            // Read version
-            var version = _reader.ReadUInt32();
+            // Read version
+            var version = _reader.ReadUInt32();
             if (version != Constants.VERSION)
             {
-                // CustomMessageBox is assumed to exist in the environment
-                // ModManager.CustomMessageBox.Show($"Unsupported Modpkg Version: {version}");
-                throw new InvalidDataException($"Unsupported version: {version}");
+                // CustomMessageBox is assumed to exist in the environment
+                // ModManager.CustomMessageBox.Show($"Unsupported Modpkg Version: {version}");
+                throw new InvalidDataException($"Unsupported version: {version}");
             }
 
-            // Read signature size, chunk count, and signature
-            var signatureSize = _reader.ReadUInt32();
+            // Read signature size, chunk count, and signature
+            var signatureSize = _reader.ReadUInt32();
             var chunkCount = _reader.ReadUInt32();
             _reader.ReadBytes((int)signatureSize); // Signature (currently ignored/empty)
 
-            // Read layers
-            var layerCount = _reader.ReadUInt32();
+            // Read layers
+            var layerCount = _reader.ReadUInt32();
             var layerHashes = new List<ulong>();
             for (int i = 0; i < layerCount; i++)
             {
@@ -705,8 +705,8 @@ namespace ModPkgLibSpace
                 layerHashes.Add(layerHash);
             }
 
-            // Read chunk paths
-            var pathCount = _reader.ReadUInt32();
+            // Read chunk paths
+            var pathCount = _reader.ReadUInt32();
             for (int i = 0; i < pathCount; i++)
             {
                 var path = ReadNullTerminatedString();
@@ -714,8 +714,8 @@ namespace ModPkgLibSpace
                 ChunkPaths[pathHash] = path;
             }
 
-            // Read wads
-            var wadCount = _reader.ReadUInt32();
+            // Read wads
+            var wadCount = _reader.ReadUInt32();
             for (int i = 0; i < wadCount; i++)
             {
                 var wad = ReadNullTerminatedString();
@@ -723,13 +723,13 @@ namespace ModPkgLibSpace
                 Wads[wadHash] = wad;
             }
 
-            // Align to 8 bytes before chunk headers (TOC)
-            var currentPos = _reader.BaseStream.Position;
+            // Align to 8 bytes before chunk headers (TOC)
+            var currentPos = _reader.BaseStream.Position;
             var padding = (8 - (currentPos % 8)) % 8;
             _reader.ReadBytes((int)padding);
 
-            // Read chunks (TOC)
-            var chunksHeaderEndPos = _reader.BaseStream.Position + (chunkCount * ModpkgChunk.ChunkHeaderSize);
+            // Read chunks (TOC)
+            var chunksHeaderEndPos = _reader.BaseStream.Position + (chunkCount * ModpkgChunk.ChunkHeaderSize);
             for (int i = 0; i < chunkCount; i++)
             {
                 var chunk = ReadChunk();
@@ -739,32 +739,44 @@ namespace ModPkgLibSpace
                 Chunks[(chunk.PathHash, layerHash)] = chunk;
             }
 
-            // Now load metadata from the chunk.
-            Metadata = ReadMetadataChunk();
+            // Now load metadata from the chunk.
+            Metadata = ReadMetadataChunk();
         }
 
         private ModpkgMetadata ReadMetadataChunk()
         {
             var metadata = new ModpkgMetadata();
-            var metadataPathHash = ModPkgLib.HashChunkName(Constants.METADATA_CHUNK_PATH);
-            var key = (metadataPathHash, Constants.NO_LAYER_HASH);
 
-            if (!Chunks.TryGetValue(key, out var chunk))
+            // Calculate the expected hash for the metadata file
+            var metadataPathHash = ModPkgLib.HashChunkName(Constants.METADATA_CHUNK_PATH);
+
+            // Search for the chunk by PathHash ONLY, ignoring LayerHash.
+            // This fixes issues where some packers assign the metadata file to the "base" layer (or others)
+            // instead of the standard NO_LAYER_INDEX (0xFFFFFFFF).
+            ModpkgChunk chunk = Chunks.Values.FirstOrDefault(c => c.PathHash == metadataPathHash);
+
+            // Fallback: If not found, try replacing forward slashes with backslashes.
+            // Some Windows-based tools might write the internal path as "_meta_\info.msgpack".
+            if (chunk == null)
             {
-                return metadata; // Return empty metadata
-            }
+                var altPath = Constants.METADATA_CHUNK_PATH.Replace('/', '\\');
+                var altHash = ModPkgLib.HashChunkName(altPath);
+                chunk = Chunks.Values.FirstOrDefault(c => c.PathHash == altHash);
+            }
+
+            if (chunk == null)
+            {
+                return metadata; // Return empty metadata if absolutely not found
+            }
 
             var data = ExtractChunk(chunk);
             using var stream = new MemoryStream(data);
 
             try
             {
-                // Read top-level map (9 fields expected)
-                var fieldCount = ReadMsgpackMapHeader(stream);
-                if (fieldCount != 9)
-                {
-                    throw new InvalidDataException($"Expected 9 fields in metadata map, found {fieldCount}");
-                }
+                // Read top-level map (9 fields expected)
+                var fieldCount = ReadMsgpackMapHeader(stream);
+                // Note: We don't strictly enforce fieldCount == 9 here to allow for future schema expansion
 
                 for (int i = 0; i < fieldCount; i++)
                 {
@@ -791,43 +803,64 @@ namespace ModPkgLibSpace
                             metadata.Version = ReadMsgpackString(stream);
                             break;
                         case "distributor":
-                            // Consume distributor map (4 fields expected in C# writer)
-                            var distMapCount = ReadMsgpackMapHeader(stream);
-                            if (distMapCount > 5)
+                            if (ReadMsgpackNil(stream))
                             {
-                                // If map count is wrong, attempt to skip fields based on expected types (simplification)
-                                for (int j = 0; j < distMapCount; j++) { stream.ReadByte(); ReadMsgpackString(stream); } // Skip key and value
-                            }
+                                metadata.Distributor = null;
+                            }
                             else
                             {
-                                for (int j = 0; j < distMapCount; j++)
+                                // Consume distributor map (4 fields expected in C# writer)
+                                var distMapCount = ReadMsgpackMapHeader(stream);
+                                if (distMapCount > 5)
                                 {
-                                    var distFieldName = ReadMsgpackString(stream); // Read field name
-                                    var distValue = ReadMsgpackString(stream); // Read string value (simplification)
-
-                                    switch (distFieldName)
+                                    // If map count is wrong, attempt to skip fields based on expected types (simplification)
+                                    for (int j = 0; j < distMapCount; j++) { stream.ReadByte(); ReadMsgpackString(stream); } // Skip key and value
+                                }
+                                else
+                                {
+                                    for (int j = 0; j < distMapCount; j++)
                                     {
-                                        case "site_id": metadata.Distributor.SiteId = distValue; break;
-                                        case "site_name": metadata.Distributor.SiteName = distValue; break;
-                                        case "site_url": metadata.Distributor.SiteUrl = distValue; break;
-                                        case "mod_id": metadata.Distributor.ModId = distValue; break;
-                                        case "release_id": metadata.Distributor.ReleaseId = distValue; break;
+                                        var distFieldName = ReadMsgpackString(stream); // Read field name
+                                        var distValue = ReadMsgpackString(stream); // Read string value (simplification)
+
+                                        switch (distFieldName)
+                                        {
+                                            case "site_id": metadata.Distributor.SiteId = distValue; break;
+                                            case "site_name": metadata.Distributor.SiteName = distValue; break;
+                                            case "site_url": metadata.Distributor.SiteUrl = distValue; break;
+                                            case "mod_id": metadata.Distributor.ModId = distValue; break;
+                                            case "release_id": metadata.Distributor.ReleaseId = distValue; break;
+                                        }
                                     }
                                 }
                             }
                             break;
                         case "authors":
-                            ReadAuthors(stream, metadata.Authors);
+                            if (ReadMsgpackNil(stream))
+                            {
+                                metadata.Authors = new List<ModpkgAuthor>();
+                            }
+                            else
+                            {
+                                ReadAuthors(stream, metadata.Authors);
+                            }
                             break;
                         case "license":
-                            metadata.License = ReadLicense(stream);
+                            if (ReadMsgpackNil(stream))
+                            {
+                                metadata.License = new ModpkgLicense(LicenseType.None);
+                            }
+                            else
+                            {
+                                metadata.License = ReadLicense(stream);
+                            }
                             break;
                         case "layers":
                             ReadMsgpackArrayHeader(stream); // Skip layer array header (always 0 in C# writer)
-                            break;
+                            break;
                         default:
-                            // Skip unknown fields by consuming the next value type (simplification)
-                            stream.ReadByte();
+                            // Skip unknown fields by consuming the next value type (simplification)
+                            stream.ReadByte();
                             break;
                     }
                 }
@@ -835,8 +868,8 @@ namespace ModPkgLibSpace
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading Msgpack metadata: {ex.Message}");
-                // Return partial metadata on error
-            }
+                // Return partial metadata on error
+            }
 
             return metadata;
         }
@@ -846,20 +879,33 @@ namespace ModPkgLibSpace
             var authorCount = ReadMsgpackArrayHeader(stream);
             for (int i = 0; i < authorCount; i++)
             {
-                ReadMsgpackMapHeader(stream); // Author map header (2 fields: name, role)
-
-                string name = null;
+                var fieldCount = ReadMsgpackMapHeader(stream);
+                string name = string.Empty;
                 string role = null;
 
-                // Read name
-                ReadMsgpackString(stream); // "name"
-                name = ReadMsgpackString(stream);
-
-                // Read role
-                ReadMsgpackString(stream); // "role"
-                if (!ReadMsgpackNil(stream))
+                for (int j = 0; j < fieldCount; j++)
                 {
-                    role = ReadMsgpackString(stream);
+                    var key = ReadMsgpackString(stream);
+                    switch (key)
+                    {
+                        case "name":
+                            name = ReadMsgpackString(stream);
+                            break;
+                        case "role":
+                            if (!ReadMsgpackNil(stream))
+                            {
+                                role = ReadMsgpackString(stream);
+                            }
+                            break;
+                        default:
+                            // Attempt to skip unknown field. 
+                            // Since we don't have a full recursive skipper, we assume value is either nil or string as per schema.
+                            if (!ReadMsgpackNil(stream))
+                            {
+                                try { ReadMsgpackString(stream); } catch { /* Ignore/Consume byte if not string to avoid infinite loop on crash? No, strict fail is better usually, but strict fail is what caused the issue. */ }
+                            }
+                            break;
+                    }
                 }
 
                 authors.Add(new ModpkgAuthor(name, role));
@@ -868,35 +914,60 @@ namespace ModPkgLibSpace
 
         private static ModpkgLicense ReadLicense(MemoryStream stream)
         {
-            ReadMsgpackMapHeader(stream); // License outer map header (1, 2, or 3 fields total)
+            var fieldCount = ReadMsgpackMapHeader(stream);
+            var license = new ModpkgLicense(LicenseType.None);
 
-            ReadMsgpackString(stream); // "type" key
-            var tag = ReadMsgpackString(stream); // "none", "spdx", or "custom"
+            // Temporary variables to hold data since we might read them out of order
+            string typeStr = null;
+            string spdxId = null;
+            string name = null;
+            string url = null;
 
-            var license = new ModpkgLicense(LicenseType.None);
-
-            switch (tag)
+            for (int i = 0; i < fieldCount; i++)
             {
-                case "none":
-                    license.Type = LicenseType.None;
-                    break;
-                case "spdx":
-                    license.Type = LicenseType.Spdx;
-                    ReadMsgpackString(stream); // "spdx_id" key
-                    license.SpdxId = ReadMsgpackString(stream);
-                    break;
-                case "custom":
-                    license.Type = LicenseType.Custom;
-                    ReadMsgpackString(stream); // "name" key
-                    license.Name = ReadMsgpackString(stream);
-                    ReadMsgpackString(stream); // "url" key
-                    license.Url = ReadMsgpackString(stream);
-                    break;
+                var key = ReadMsgpackString(stream);
+                switch (key)
+                {
+                    case "type":
+                        typeStr = ReadMsgpackString(stream);
+                        break;
+                    case "spdx_id":
+                        spdxId = ReadMsgpackString(stream);
+                        break;
+                    case "name":
+                        name = ReadMsgpackString(stream);
+                        break;
+                    case "url":
+                        url = ReadMsgpackString(stream);
+                        break;
+                    default:
+                        if (!ReadMsgpackNil(stream)) try { ReadMsgpackString(stream); } catch { }
+                        break;
+                }
             }
+
+            // Construct license object based on read fields
+            if (typeStr != null)
+            {
+                switch (typeStr)
+                {
+                    case "none":
+                        license.Type = LicenseType.None;
+                        break;
+                    case "spdx":
+                        license.Type = LicenseType.Spdx;
+                        license.SpdxId = spdxId;
+                        break;
+                    case "custom":
+                        license.Type = LicenseType.Custom;
+                        license.Name = name;
+                        license.Url = url;
+                        break;
+                }
+            }
+
             return license;
         }
-
-
 
         private string ReadNullTerminatedString()
         {
@@ -931,8 +1002,8 @@ namespace ModPkgLibSpace
             _reader.BaseStream.Seek((long)chunk.DataOffset, SeekOrigin.Begin);
             var compressedData = _reader.ReadBytes((int)chunk.CompressedSize);
 
-            // Verify compressed checksum
-            var actualChecksum = ModPkgLib.XXH3_64(compressedData);
+            // Verify compressed checksum
+            var actualChecksum = ModPkgLib.XXH3_64(compressedData);
             if (actualChecksum != chunk.CompressedChecksum)
                 throw new InvalidDataException($"Compressed checksum mismatch for chunk 0x{chunk.PathHash:X16}");
 
@@ -951,8 +1022,8 @@ namespace ModPkgLibSpace
                 throw new NotSupportedException($"Unsupported compression: {chunk.Compression}");
             }
 
-            // Verify uncompressed checksum
-            actualChecksum = ModPkgLib.XXH3_64(data);
+            // Verify uncompressed checksum
+            actualChecksum = ModPkgLib.XXH3_64(data);
             if (actualChecksum != chunk.UncompressedChecksum)
                 throw new InvalidDataException($"Uncompressed checksum mismatch for chunk 0x{chunk.PathHash:X16}");
 
@@ -970,12 +1041,12 @@ namespace ModPkgLibSpace
         private readonly string _outputPath;
         private ModpkgMetadata _metadata;
         private readonly List<ModpkgLayer> _layers = new();
-        // Stores content chunks to be processed: (Path, Data, LayerName)
-        private readonly List<(string Path, byte[] Data, string LayerName)> _chunksToProcess = new();
-        // Stores other meta chunks to be processed: (Path, Data)
-        private readonly List<(string Path, byte[] Data)> _otherMetaChunks = new();
-        // Stores data needed for the final chunk headers list
-        private readonly List<ModpkgChunk> _finalChunks = new();
+        // Stores content chunks to be processed: (Path, Data, LayerName)
+        private readonly List<(string Path, byte[] Data, string LayerName)> _chunksToProcess = new();
+        // Stores other meta chunks to be processed: (Path, Data)
+        private readonly List<(string Path, byte[] Data)> _otherMetaChunks = new();
+        // Stores data needed for the final chunk headers list
+        private readonly List<ModpkgChunk> _finalChunks = new();
 
         public ModpkgWriter(string outputPath)
         {
@@ -987,14 +1058,14 @@ namespace ModPkgLibSpace
             _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         }
 
-        /// <summary>
-        /// Adds data for a meta chunk (like thumbnail or readme). Meta chunks are stored uncompressed.
-        /// </summary>
-        public void AddMetaChunkData(string path, byte[] data)
+        /// <summary>
+        /// Adds data for a meta chunk (like thumbnail or readme). Meta chunks are stored uncompressed.
+        /// </summary>
+        public void AddMetaChunkData(string path, byte[] data)
         {
-            // Meta chunks are always path-hashed and don't belong to a layer or wad.
-            // Check if meta chunk with this path already exists and replace it.
-            var existingIndex = _otherMetaChunks.FindIndex(c => c.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
+            // Meta chunks are always path-hashed and don't belong to a layer or wad.
+            // Check if meta chunk with this path already exists and replace it.
+            var existingIndex = _otherMetaChunks.FindIndex(c => c.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
 
             if (existingIndex >= 0)
             {
@@ -1008,8 +1079,8 @@ namespace ModPkgLibSpace
 
         public void AddLayer(string name, int priority)
         {
-            // Only add unique layers
-            if (!_layers.Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            // Only add unique layers
+            if (!_layers.Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
             {
                 _layers.Add(new ModpkgLayer(name, priority));
             }
@@ -1020,36 +1091,36 @@ namespace ModPkgLibSpace
             _chunksToProcess.Add((path, data, layerName));
         }
 
-        // --- Msgpack Helper Methods ---
+        // --- Msgpack Helper Methods ---
 
-        private static void WriteMsgpackString(MemoryStream stream, string value)
+        private static void WriteMsgpackString(MemoryStream stream, string value)
         {
             var bytes = Encoding.UTF8.GetBytes(value);
             var len = bytes.Length;
 
             if (len < 32)
             {
-                // Fixstr format (0xa0 | len)
-                stream.WriteByte((byte)(0xa0 | len));
+                // Fixstr format (0xa0 | len)
+                stream.WriteByte((byte)(0xa0 | len));
             }
             else if (len < 256)
             {
-                // Str 8 format (0xd9)
-                stream.WriteByte(0xd9);
+                // Str 8 format (0xd9)
+                stream.WriteByte(0xd9);
                 stream.WriteByte((byte)len);
             }
             else if (len < 65536)
             {
-                // Str 16 format (0xda)
-                stream.WriteByte(0xda);
+                // Str 16 format (0xda)
+                stream.WriteByte(0xda);
                 stream.Write(BitConverter.GetBytes((ushort)len).Reverse().ToArray(), 0, 2); // Big Endian
-            }
+            }
             else
             {
-                // Str 32 format (0xdb) - unlikely needed but robust
-                stream.WriteByte(0xdb);
+                // Str 32 format (0xdb) - unlikely needed but robust
+                stream.WriteByte(0xdb);
                 stream.Write(BitConverter.GetBytes((uint)len).Reverse().ToArray(), 0, 4); // Big Endian
-            }
+            }
             stream.Write(bytes, 0, len);
         }
 
@@ -1057,28 +1128,28 @@ namespace ModPkgLibSpace
         {
             if (value <= 127)
             {
-                // Positive fixint
-                stream.WriteByte((byte)value);
+                // Positive fixint
+                stream.WriteByte((byte)value);
             }
             else if (value <= 0xFF) // uint 8
-            {
+            {
                 stream.WriteByte(0xcc);
                 stream.WriteByte((byte)value);
             }
             else if (value <= 0xFFFF) // uint 16
-            {
+            {
                 stream.WriteByte(0xcd);
                 stream.Write(BitConverter.GetBytes((ushort)value).Reverse().ToArray(), 0, 2);
             }
             else if (value <= 0xFFFFFFFF) // uint 32
-            {
+            {
                 stream.WriteByte(0xce);
                 stream.Write(BitConverter.GetBytes((uint)value).Reverse().ToArray(), 0, 4);
             }
             else
             {
-                // uint 64
-                stream.WriteByte(0xcf);
+                // uint 64
+                stream.WriteByte(0xcf);
                 stream.Write(BitConverter.GetBytes(value).Reverse().ToArray(), 0, 8);
             }
         }
@@ -1087,19 +1158,19 @@ namespace ModPkgLibSpace
         {
             if (count <= 15)
             {
-                // Fixmap (0x80 | count)
-                stream.WriteByte((byte)(0x80 | count));
+                // Fixmap (0x80 | count)
+                stream.WriteByte((byte)(0x80 | count));
             }
             else if (count <= 0xFFFF)
             {
-                // Map 16
-                stream.WriteByte(0xde);
+                // Map 16
+                stream.WriteByte(0xde);
                 stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2);
             }
             else
             {
-                // Map 32
-                stream.WriteByte(0xdf);
+                // Map 32
+                stream.WriteByte(0xdf);
                 stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4);
             }
         }
@@ -1113,70 +1184,70 @@ namespace ModPkgLibSpace
         {
             if (count <= 15)
             {
-                // Fixarray (0x90 | count)
-                stream.WriteByte((byte)(0x90 | count));
+                // Fixarray (0x90 | count)
+                stream.WriteByte((byte)(0x90 | count));
             }
             else if (count <= 0xFFFF)
             {
-                // Array 16
-                stream.WriteByte(0xdc);
+                // Array 16
+                stream.WriteByte(0xdc);
                 stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2);
             }
             else
             {
-                // Array 32
-                stream.WriteByte(0xdd);
+                // Array 32
+                stream.WriteByte(0xdd);
                 stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4);
             }
         }
 
-        /// <summary>
-        /// Manually serializes the ModpkgMetadata object into Msgpack format bytes.
-        /// This is necessary for compatibility with the Rust application's rmp_serde deserializer.
-        /// </summary>
-        private byte[] SerializeMetadataMsgpack(ModpkgMetadata metadata)
+        /// <summary>
+        /// Manually serializes the ModpkgMetadata object into Msgpack format bytes.
+        /// This is necessary for compatibility with the Rust application's rmp_serde deserializer.
+        /// </summary>
+        private byte[] SerializeMetadataMsgpack(ModpkgMetadata metadata)
         {
-            // This is a complex manual serialization focusing on the snake_case keys and types expected by Rust.
-            using var stream = new MemoryStream();
+            // This is a complex manual serialization focusing on the snake_case keys and types expected by Rust.
+            using var stream = new MemoryStream();
 
-            // Fixed fields count (9 mandatory keys used in the Msgpack structure)
-            // schema_version, name, display_name, description, version, distributor, authors, license, layers
-            WriteMsgpackMapHeader(stream, 9);
+            // Fixed fields count (9 mandatory keys used in the Msgpack structure)
+            // schema_version, name, display_name, description, version, distributor, authors, license, layers
+            WriteMsgpackMapHeader(stream, 9);
 
-            // 1. schema_version (u32)
-            WriteMsgpackString(stream, "schema_version");
+            // 1. schema_version (u32)
+            WriteMsgpackString(stream, "schema_version");
             WriteMsgpackUInt(stream, metadata.SchemaVersion);
 
-            // 2. name (String)
-            WriteMsgpackString(stream, "name");
+            // 2. name (String)
+            WriteMsgpackString(stream, "name");
             WriteMsgpackString(stream, metadata.Name);
 
-            // 3. display_name (String)
-            WriteMsgpackString(stream, "display_name");
+            // 3. display_name (String)
+            WriteMsgpackString(stream, "display_name");
             WriteMsgpackString(stream, metadata.DisplayName);
 
-            // 4. description (Option<String>)
-            WriteMsgpackString(stream, "description");
+            // 4. description (Option<String>)
+            WriteMsgpackString(stream, "description");
             if (string.IsNullOrEmpty(metadata.Description))
             {
                 WriteMsgpackNil(stream); // Null
-            }
+            }
             else
             {
                 WriteMsgpackString(stream, metadata.Description);
             }
 
-            // 5. version (String - Rust Version is serialised as a String)
-            WriteMsgpackString(stream, "version");
+            // 5. version (String - Rust Version is serialised as a String)
+            WriteMsgpackString(stream, "version");
             WriteMsgpackString(stream, metadata.Version);
 
-            // 6. distributor (DistributorInfo - now mandatory structure with defaults)
-            WriteMsgpackString(stream, "distributor");
+            // 6. distributor (DistributorInfo - now mandatory structure with defaults)
+            WriteMsgpackString(stream, "distributor");
 
             var distributor = metadata.Distributor ?? new DistributorInfo();
 
-            // Distributor is mandatory in Msgpack structure (4 fields)
-            WriteMsgpackMapHeader(stream, 5);
+            // Distributor is mandatory in Msgpack structure (4 fields)
+            WriteMsgpackMapHeader(stream, 5);
 
             WriteMsgpackString(stream, "site_id");
             WriteMsgpackString(stream, distributor.SiteId);
@@ -1193,20 +1264,20 @@ namespace ModPkgLibSpace
             WriteMsgpackString(stream, "release_id");
             WriteMsgpackString(stream, distributor.ReleaseId);
 
-            // 7. authors (Vec<ModpkgAuthor>)
-            WriteMsgpackString(stream, "authors");
+            // 7. authors (Vec<ModpkgAuthor>)
+            WriteMsgpackString(stream, "authors");
             WriteMsgpackArrayHeader(stream, (uint)metadata.Authors.Count);
             foreach (var author in metadata.Authors)
             {
-                // ModpkgAuthor is a map with 'name' and 'role'
-                WriteMsgpackMapHeader(stream, 2);
+                // ModpkgAuthor is a map with 'name' and 'role'
+                WriteMsgpackMapHeader(stream, 2);
 
-                // name
-                WriteMsgpackString(stream, "name");
+                // name
+                WriteMsgpackString(stream, "name");
                 WriteMsgpackString(stream, author.Name);
 
-                // role (Option<String>)
-                WriteMsgpackString(stream, "role");
+                // role (Option<String>)
+                WriteMsgpackString(stream, "role");
                 if (string.IsNullOrEmpty(author.Role))
                 {
                     WriteMsgpackNil(stream);
@@ -1217,11 +1288,11 @@ namespace ModPkgLibSpace
                 }
             }
 
-            // 8. license (Tagged Enum)
-            WriteMsgpackString(stream, "license");
+            // 8. license (Tagged Enum)
+            WriteMsgpackString(stream, "license");
 
-            // Rust Tagged Enum serialization uses a single map containing the tag and the data.
-            string tag;
+            // Rust Tagged Enum serialization uses a single map containing the tag and the data.
+            string tag;
             uint mapSize;
 
             switch (metadata.License.Type)
@@ -1229,30 +1300,30 @@ namespace ModPkgLibSpace
                 case LicenseType.None:
                     tag = "none";
                     mapSize = 1; // Only 'type' field
-                    break;
+                    break;
                 case LicenseType.Spdx:
                     tag = "spdx";
                     mapSize = 2; // 'type' + 'spdx_id'
-                    break;
+                    break;
                 case LicenseType.Custom:
                     tag = "custom";
                     mapSize = 3; // 'type' + 'name' + 'url'
-                    break;
+                    break;
                 default:
                     tag = "none";
                     mapSize = 1;
                     break;
             }
 
-            // Write the license map header
-            WriteMsgpackMapHeader(stream, mapSize);
+            // Write the license map header
+            WriteMsgpackMapHeader(stream, mapSize);
 
-            // Write the tag: "type"
-            WriteMsgpackString(stream, "type");
+            // Write the tag: "type"
+            WriteMsgpackString(stream, "type");
             WriteMsgpackString(stream, tag);
 
-            // Write the data fields
-            switch (metadata.License.Type)
+            // Write the data fields
+            switch (metadata.License.Type)
             {
                 case LicenseType.Spdx:
                     WriteMsgpackString(stream, "spdx_id");
@@ -1264,14 +1335,14 @@ namespace ModPkgLibSpace
 
                     WriteMsgpackString(stream, "url");
                     WriteMsgpackString(stream, metadata.License.Url ?? ""); // URL is non-optional in Rust struct but can be empty string
-                    break;
+                    break;
             }
 
-            // 9. layers (Vec<ModpkgLayerMetadata>) - currently unsupported/empty in C# structure
-            WriteMsgpackString(stream, "layers");
+            // 9. layers (Vec<ModpkgLayerMetadata>) - currently unsupported/empty in C# structure
+            WriteMsgpackString(stream, "layers");
             WriteMsgpackArrayHeader(stream, 0); // Always empty for now
 
-            return stream.ToArray();
+            return stream.ToArray();
         }
 
         public void Write()
@@ -1279,34 +1350,34 @@ namespace ModPkgLibSpace
             if (_metadata == null)
                 throw new InvalidOperationException("Metadata not set");
 
-            // Use File.Create to get a seekable stream for BinaryWriter
-            using var fileStream = File.Create(_outputPath);
+            // Use File.Create to get a seekable stream for BinaryWriter
+            using var fileStream = File.Create(_outputPath);
             using var writer = new BinaryWriter(fileStream);
 
-            // Prepare index structures and write header (Pass 1 - Header/Index)
-            var chunkPaths = _chunksToProcess.Select(c => c.Path)
+            // Prepare index structures and write header (Pass 1 - Header/Index)
+            var chunkPaths = _chunksToProcess.Select(c => c.Path)
                       .Concat(new[] { Constants.METADATA_CHUNK_PATH }) // Include METADATA PATH
-                                             .Concat(_otherMetaChunks.Select(c => c.Path))
+                                                                       .Concat(_otherMetaChunks.Select(c => c.Path))
                       .Distinct()
                       .ToList();
             var pathToIndex = chunkPaths.Select((p, i) => (p, i)).ToDictionary(x => x.p, x => (uint)x.i);
 
-            // Total chunks includes content chunks + metadata (1) + other meta chunks
-            var totalChunks = _chunksToProcess.Count + 1 + _otherMetaChunks.Count;
+            // Total chunks includes content chunks + metadata (1) + other meta chunks
+            var totalChunks = _chunksToProcess.Count + 1 + _otherMetaChunks.Count;
 
-            // --- Header ---
-            writer.Write(Constants.MAGIC);
+            // --- Header ---
+            writer.Write(Constants.MAGIC);
             writer.Write(Constants.VERSION);
             var signatureSizePos = writer.BaseStream.Position;
             writer.Write(0U); // signature size placeholder
-            var chunkCountPos = writer.BaseStream.Position;
+            var chunkCountPos = writer.BaseStream.Position;
             writer.Write((uint)totalChunks); // chunk count
 
-            // Signature (empty for now)
-            writer.Write(Array.Empty<byte>());
+            // Signature (empty for now)
+            writer.Write(Array.Empty<byte>());
 
-            // --- Layers ---
-            writer.Write((uint)_layers.Count);
+            // --- Layers ---
+            writer.Write((uint)_layers.Count);
             foreach (var layer in _layers)
             {
                 var nameBytes = Encoding.UTF8.GetBytes(layer.Name);
@@ -1315,42 +1386,42 @@ namespace ModPkgLibSpace
                 writer.Write(layer.Priority);
             }
 
-            // --- Chunk Paths ---
-            writer.Write((uint)chunkPaths.Count);
+            // --- Chunk Paths ---
+            writer.Write((uint)chunkPaths.Count);
             foreach (var path in chunkPaths)
             {
                 writer.Write(Encoding.UTF8.GetBytes(path));
                 writer.Write((byte)0); // Null terminator
-            }
+            }
 
-            // --- Wads (Empty for now, but index tables must be present) ---
-            writer.Write(0U); // wad count
+            // --- Wads (Empty for now, but index tables must be present) ---
+            writer.Write(0U); // wad count
 
-            // Align to 8 bytes
-            var currentPos = writer.BaseStream.Position;
+            // Align to 8 bytes
+            var currentPos = writer.BaseStream.Position;
             var padding = (8 - (currentPos % 8)) % 8;
             for (int i = 0; i < padding; i++)
                 writer.Write((byte)0);
 
-            // Reserve space for chunk headers (TOC)
-            var chunksHeaderPos = writer.BaseStream.Position;
+            // Reserve space for chunk headers (TOC)
+            var chunksHeaderPos = writer.BaseStream.Position;
             writer.BaseStream.Seek(totalChunks * ModpkgChunk.ChunkHeaderSize, SeekOrigin.Current);
 
-            // --- Write Chunk Data (Pass 2 - Data) ---
+            // --- Write Chunk Data (Pass 2 - Data) ---
 
-            // 0. Write Mandatory Meta Chunk (Metadata)
-            var metadataBytes = SerializeMetadataMsgpack(_metadata);
+            // 0. Write Mandatory Meta Chunk (Metadata)
+            var metadataBytes = SerializeMetadataMsgpack(_metadata);
             ProcessAndWriteChunk(writer, Constants.METADATA_CHUNK_PATH, metadataBytes, null, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_LAYER_HASH, true);
 
-            // 1. Write Other Meta Chunks (Thumbnail, README)
-            foreach (var (path, data) in _otherMetaChunks)
+            // 1. Write Other Meta Chunks (Thumbnail, README)
+            foreach (var (path, data) in _otherMetaChunks)
             {
-                // Meta chunks are always written uncompressed (isMetaChunk=true)
-                ProcessAndWriteChunk(writer, path, data, null, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_LAYER_HASH, true);
+                // Meta chunks are always written uncompressed (isMetaChunk=true)
+                ProcessAndWriteChunk(writer, path, data, null, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_LAYER_HASH, true);
             }
 
-            // 2. Write Content Chunks
-            foreach (var (path, data, layerName) in _chunksToProcess)
+            // 2. Write Content Chunks
+            foreach (var (path, data, layerName) in _chunksToProcess)
             {
                 var layerIndex = string.IsNullOrEmpty(layerName)
                   ? Constants.NO_LAYER_INDEX
@@ -1362,8 +1433,8 @@ namespace ModPkgLibSpace
                 ProcessAndWriteChunk(writer, path, data, layerName, pathToIndex, layerIndex, layerHash, false);
             }
 
-            // --- Write Chunk Headers (Pass 3 - TOC Update) ---
-            writer.BaseStream.Seek(chunksHeaderPos, SeekOrigin.Begin);
+            // --- Write Chunk Headers (Pass 3 - TOC Update) ---
+            writer.BaseStream.Seek(chunksHeaderPos, SeekOrigin.Begin);
             foreach (var chunk in _finalChunks)
             {
                 writer.Write(chunk.PathHash);
@@ -1378,8 +1449,8 @@ namespace ModPkgLibSpace
                 writer.Write(chunk.WadIndex);
             }
 
-            // Ensure all buffered content is written to the underlying file stream
-            writer.Flush();
+            // Ensure all buffered content is written to the underlying file stream
+            writer.Flush();
         }
 
         private void ProcessAndWriteChunk(BinaryWriter writer, string path, byte[] data, string layerName,
@@ -1387,14 +1458,14 @@ namespace ModPkgLibSpace
         {
             var dataOffset = (ulong)writer.BaseStream.Position;
 
-            // Determine compression
-            byte[] compressedData;
+            // Determine compression
+            byte[] compressedData;
             CompressionType compression;
 
             if (isMetaChunk)
             {
-                // Meta chunks are stored uncompressed.
-                compressedData = data;
+                // Meta chunks are stored uncompressed.
+                compressedData = data;
                 compression = CompressionType.None;
             }
             else
@@ -1414,11 +1485,11 @@ namespace ModPkgLibSpace
                 }
             }
 
-            // Write chunk data payload
-            writer.Write(compressedData);
+            // Write chunk data payload
+            writer.Write(compressedData);
 
-            // Build ModpkgChunk record
-            var chunk = new ModpkgChunk
+            // Build ModpkgChunk record
+            var chunk = new ModpkgChunk
             {
                 PathHash = ModPkgLib.HashChunkName(path),
                 DataOffset = dataOffset,
@@ -1430,7 +1501,7 @@ namespace ModPkgLibSpace
                 PathIndex = pathToIndex[path],
                 LayerIndex = layerIndex,
                 WadIndex = Constants.NO_WAD_INDEX // WAD support currently not fully implemented in Pack flow
-            };
+            };
 
             _finalChunks.Add(chunk);
         }
