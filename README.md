@@ -47,10 +47,10 @@ To update: download the latest release from GitHub and extract it to the same lo
 To enable a mod, check its checkmark on the left.
 
 The buttons on a mod tile are as follows (left to right):
-1. Topaz mod fixer
-1. Export
-1. Edit
-1. Delete
+1. 🔧Topaz mod fixer
+1. 📄Export
+1. ✏️Edit
+1. ❌Delete
 
 ## Search
 Filter your installed mods. You can use the following flags to better filter search results.
