@@ -884,10 +884,12 @@ namespace ModManager
                     if (item.IsMod && item.ModElement != null)
                     {
                         draggedElements.Add((item.ModElement.ModFolder, true));
+                        item.SetSelection(false);
                     }
                     else if (!item.IsMod && !item.IsParentFolder && item.FolderElement != null)
                     {
                         draggedElements.Add((item.FolderElement.ID.ToString(), false));
+                        item.SetSelection(false);
                     }
                 }
 
@@ -913,7 +915,6 @@ namespace ModManager
                     MainWindowInstance.DragHandler(draggedElements, dropTargetElement.Value);
                 }
             }
-
             // Keep selections after drop - don't clear them
 
             // Also trigger the static event for backward compatibility

@@ -1,4 +1,5 @@
-﻿using Microsoft.Win32;
+﻿using Microsoft.VisualBasic;
+using Microsoft.Win32;
 using ModLoader;
 using ModPkgLibSpace;
 using System.ComponentModel;
@@ -162,6 +163,12 @@ namespace ModManager
         public float thumb_opacity { get; set; } = 0.4f;
         public bool auto_update_hashes { get; set; } = true;
         public int Ailgment { get; set; } = 1;
+        public int game_version_major { get; set; } = 0;
+        public int game_version_minor { get; set; } = 0;
+        public int game_version_tetrary { get; set; } = 0;
+        public int PBE_game_version_major { get; set; } = 0;
+        public int PBE_game_version_minor { get; set; } = 0;
+        public int PBE_game_version_tetrary { get; set; } = 0;
     }
     public class Folder
     {
@@ -1419,7 +1426,7 @@ namespace ModManager
 
                 SetLoading("Leagus Path", 1, 0.34);
                 detectGamePath();
-
+                CheckGameVersion();
                 var root_folder = new HierarchyElement
                 {
                     Name = "LOL",
@@ -2430,6 +2437,8 @@ namespace ModManager
                 return;
             }
             ToggleOverlay(true);
+            Feed.Text = "[INF] Checking Game Version";
+            await CheckGameVersion();
             currentProgress = 0;
             SetProgress();
             ProfileComboBox.IsEnabled = false;
@@ -2739,10 +2748,12 @@ namespace ModManager
                 if (item.IsMod && item.ModElement != null)
                 {
                     draggedElements.Add((item.ModElement.ModFolder, true));
+                    item.SetSelection(false);
                 }
                 else if (!item.IsMod && !item.IsParentFolder && item.FolderElement != null)
                 {
                     draggedElements.Add((item.FolderElement.ID.ToString(), false));
+                    item.SetSelection(false);
                 }
             }
 
@@ -2789,6 +2800,118 @@ namespace ModManager
                 }
             }
         }
+
+        private async Task CheckGameVersion()
+        {
+            if (File.Exists(settings.gamepath))
+            {
+                try
+                {
+                    int old_major = settings.game_version_major;
+                    int old_minor = settings.game_version_minor;
+                    int old_tetrary = settings.game_version_tetrary;
+                    bool pbe = settings.gamepath.Contains("(PBE)", StringComparison.OrdinalIgnoreCase);
+                    if (pbe)
+                    {
+                        old_major = settings.PBE_game_version_major;
+                        old_minor = settings.PBE_game_version_minor;
+                        old_tetrary = settings.PBE_game_version_tetrary;
+                    }
+
+                    var parentDir = Directory.GetParent(settings.gamepath);
+                    if (parentDir == null)
+                        return;
+
+                    string VersionJson = Path.Combine(parentDir.FullName, "content-metadata.json");
+
+                    string json = File.ReadAllText(VersionJson);
+
+                    using JsonDocument doc = JsonDocument.Parse(json);
+                    string version = doc.RootElement.GetProperty("version").GetString()!;
+
+                    string[] parts = version.Split('.', StringSplitOptions.RemoveEmptyEntries);
+
+                    int major = int.Parse(parts[0]);
+                    int minor = int.Parse(parts[1]);
+                    int tetrary = int.Parse(parts[2].Split('+', StringSplitOptions.RemoveEmptyEntries)[0]);
+                    if (old_major == 0 && old_minor == 0 && old_tetrary == 0)
+                    {
+                        if (pbe)
+                        {
+                            settings.PBE_game_version_major = major;
+                            settings.PBE_game_version_minor = minor;
+                            settings.PBE_game_version_tetrary = tetrary;
+                        }
+                        else
+                        {
+                            settings.game_version_major = major;
+                            settings.game_version_minor = minor;
+                            settings.game_version_tetrary = tetrary;
+                        }
+                        return;
+                    }
+                    if (old_major != major || old_minor != minor || old_tetrary != tetrary)
+                    {
+                        string profilesPath = "profiles";
+
+                        if (!Directory.Exists(profilesPath))
+                            return;
+                        if (pbe)
+                        {
+                            foreach (var dir in Directory.GetDirectories(profilesPath))
+                            {
+                                if (dir.Contains("‗PBE‗profile", StringComparison.OrdinalIgnoreCase)){
+
+                                    try
+                                    {
+                                        Directory.Delete(dir, recursive: true);
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            foreach (var dir2 in Directory.GetDirectories(profilesPath))
+                            {
+                                if (!dir2.Contains("‗PBE‗profile", StringComparison.OrdinalIgnoreCase))
+                                {
+
+                                    try
+                                    {
+                                        Directory.Delete(dir2, recursive: true);
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                            }
+                        }
+
+                        if (old_major != major || old_minor != minor)
+                        {
+                            CustomMessageBox.Show("Due to new patch, some mods might have broken now.");
+                        }
+                        if (pbe)
+                        {
+                            settings.PBE_game_version_major = major;
+                            settings.PBE_game_version_minor = minor;
+                            settings.PBE_game_version_tetrary = tetrary;
+                        }
+                        else
+                        {
+                            settings.game_version_major = major;
+                            settings.game_version_minor = minor;
+                            settings.game_version_tetrary = tetrary;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
         private ModToolsRunner _currentRunner;
 
         HashSet<string> mods_loaded_in = new HashSet<string>();
@@ -3293,7 +3416,7 @@ namespace ModManager
                 }
             }
 
-
+            
 
             folders.Sort((a, b) => string.Compare(a.element.Name, b.element.Name, StringComparison.OrdinalIgnoreCase));
             mods.Sort((a, b) => string.Compare(a.element.Info.Name, b.element.Info.Name, StringComparison.OrdinalIgnoreCase));

@@ -670,7 +670,7 @@ namespace ModManager
             List<string> returning = new List<string>();
             foreach (WadExtractor.Target tar in bins_hashed)
             {
-                Settings.Missing_Bins.Add($"[Missing]{tar.OriginalPath}");
+                Settings.Missing_Bins.Add($"[Missing] {tar.OriginalPath}");
                 returning.Add(tar.OriginalPath);
             }
             return returning;
@@ -783,7 +783,7 @@ namespace ModManager
                 {
                     bin = LoadBin(path);
                 }
-                catch (Exception) {
+                catch {
                     x.UpperLog($"[FAIL] Failed to read {trimmedPath}", CLR_ERR);
                     Settings.Missing_Bins.Add($"[Read Error] {path}");
                     continue; }
