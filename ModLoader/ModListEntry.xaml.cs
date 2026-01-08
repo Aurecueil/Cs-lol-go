@@ -287,15 +287,38 @@ namespace ModManager
 
         private async void Export_Item(object sender, RoutedEventArgs e)
         {
-            if (IsMod)
+            if (IsSelected)
             {
+                List<ModListEntry> meow = new List<ModListEntry>();
+                foreach (var entry in selectedEntries)
+                {
+                    if (entry.ModElement == ModElement) continue;
+                    if (entry.fixerRunning) continue;
+                    if (entry.exporter) continue;
+
+                    if (entry.IsMod)
+                    {
+                        entry.block.Text = "Exporting Mod";
+                        meow.Add(entry);
+                        entry.set_export(true);
+                    }
+                }
                 block.Text = "Exporting Mod";
                 set_export(true);
-                await Main.Export_Mod(ModElement);
-                set_export(false);
+                await Main.Export_Mod(this, meow);
+            }
+            else
+            {
+                if (IsMod)
+                {
+                    block.Text = "Exporting Mod";
+                    set_export(true);
+                    await Main.Export_Mod(this);
+                }
             }
         }
-        private void Open_details_page(object sender, RoutedEventArgs e)
+
+        private void Open_details_page(object _, RoutedEventArgs e)
         {
             MetaEdior metaEdior = new MetaEdior
             {

@@ -1990,13 +1990,13 @@ namespace ModManager
 
             }
 
-        public async Task Export_Mod(Mod ModElement)
+        public async Task Export_Mod(ModListEntry ModElement, List<ModListEntry> Additional_Mods = null)
         {
             // --- UI THREAD WORK ---
             // 1. Prepare strings and Dialog (Must happen on UI thread)
-            string rawName = string.IsNullOrWhiteSpace(ModElement.Info.Author)
-                ? ModElement.Info.Name
-                : $"{ModElement.Info.Name} by {ModElement.Info.Author}";
+            string rawName = string.IsNullOrWhiteSpace(ModElement.ModElement.Info.Author)
+                ? ModElement.ModElement.Info.Name
+                : $"{ModElement.ModElement.Info.Name} by {ModElement.ModElement.Info.Author}";
 
             string sanitized = new string(rawName
                 .Where(c => !Path.GetInvalidFileNameChars().Contains(c))
@@ -2011,152 +2011,183 @@ namespace ModManager
                 DefaultExt = ".fantome"
             };
 
-            if (saveDialog.ShowDialog() != true)
-                return;
+            if (saveDialog.ShowDialog() != true) {
+                ModElement.set_export(false);
+                foreach (var mod in Additional_Mods)
+                { mod.set_export(false); }
+                    return;
+            }
 
+                
             string targetPath = saveDialog.FileName;
 
             // Capture simple variables needed for the background thread to avoid 
             // threading issues if ModElement accesses UI controls.
             bool isFantome = Path.GetExtension(targetPath).Equals(".fantome", StringComparison.OrdinalIgnoreCase);
-            string sourceFolder = Path.Combine("installed", ModElement.ModFolder);
+            string sourceFolder = Path.Combine("installed", ModElement.ModElement.ModFolder);
 
-            // --- BACKGROUND THREAD WORK ---
-            // 2. Run heavy IO on a background thread
             await Task.Run(() =>
             {
-                try
+                actually_export_mod(targetPath, isFantome, sourceFolder, ModElement.ModElement);
+            });
+            ModElement.set_export(false);
+            if (Additional_Mods is not null)
+            {
+                string directoryPath = Path.GetDirectoryName(targetPath);
+                foreach (var mod in Additional_Mods)
                 {
-                    string wadSource = Path.Combine(sourceFolder, "wad");
-                    string metaSource = Path.Combine(sourceFolder, "meta");
+                    rawName = string.IsNullOrWhiteSpace(mod.ModElement.Info.Author)
+                ? mod.ModElement.Info.Name
+                : $"{mod.ModElement.Info.Name} by {mod.ModElement.Info.Author}";
 
-                    if (isFantome)
+                    sanitized = new string(rawName
+                        .Where(c => !Path.GetInvalidFileNameChars().Contains(c))
+                        .ToArray())
+                        .Trim();
+                    sourceFolder = Path.Combine("installed", mod.ModElement.ModFolder);
+                    targetPath = Path.Combine(directoryPath,$"{sanitized}.{(isFantome ? "fantome" : "modpkg")}");
+                    await Task.Run(() =>
                     {
-                        string tempExportDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                        Directory.CreateDirectory(tempExportDir);
+                        actually_export_mod(targetPath, isFantome, sourceFolder, mod.ModElement);
+                    });
+                    mod.set_export(false);
+                }
+            }
+        }
 
-                        // 1️⃣ META folder
-                        string metaTarget = Path.Combine(tempExportDir, "META");
-                        Directory.CreateDirectory(metaTarget);
-                        if (Directory.Exists(metaSource))
-                            CopyDirectory(metaSource, metaTarget);
+        private async void actually_export_mod(string targetPath, bool isFantome, string sourceFolder, Mod ModElement)
+        {
+            try
+            {
+                string wadSource = Path.Combine(sourceFolder, "wad");
+                string metaSource = Path.Combine(sourceFolder, "meta");
 
-                        string wadTarget = Path.Combine(tempExportDir, "WAD");
-                        Directory.CreateDirectory(wadTarget);
+                if (isFantome)
+                {
+                    string tempExportDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(tempExportDir);
 
-                        if (Directory.Exists(wadSource))
-                        {
-                            CopyDirectory(wadSource, wadTarget);
-                        }
-                        else
-                        {
-                            string? copiedBaseFolder = Directory.GetDirectories(sourceFolder, "WAD_base")
-                                .OrderBy(d => d)
-                                .FirstOrDefault();
-                            if (copiedBaseFolder != null)
-                            {
-                                CopyDirectory(copiedBaseFolder, wadTarget);
-                            }
-                        }
+                    // 1️⃣ META folder
+                    string metaTarget = Path.Combine(tempExportDir, "META");
+                    Directory.CreateDirectory(metaTarget);
+                    if (Directory.Exists(metaSource))
+                        CopyDirectory(metaSource, metaTarget);
 
-                        foreach (var layer in ModElement.Details.Layers)
-                        {
-                            if (layer.Name == "base") continue;
-                            string dir = Path.Combine(sourceFolder, layer.folder_name);
-                            string dest = Path.Combine(tempExportDir, layer.folder_name);
-                            CopyDirectory(dir, dest);
-                        }
+                    string wadTarget = Path.Combine(tempExportDir, "WAD");
+                    Directory.CreateDirectory(wadTarget);
 
-                        var exportDetails = new ModDetails();
-                        exportDetails.Layers = ModElement.Details.Layers;
-                        exportDetails.Priority = ModElement.Details.Priority;
-                        exportDetails.override_ = false;
-                        exportDetails.InnerPath = "";
-                        exportDetails.Random = false;
-
-                        string detailsJsonTarget = Path.Combine(metaTarget, "details.json");
-                        File.WriteAllText(detailsJsonTarget, JsonSerializer.Serialize(exportDetails, new JsonSerializerOptions
-                        {
-                            WriteIndented = true
-                        }));
-
-                        string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
-                        ZipFile.CreateFromDirectory(tempExportDir, tempZip);
-
-                        if (File.Exists(targetPath))
-                            File.Delete(targetPath);
-                        File.Move(tempZip, targetPath);
-
-                        if (Directory.Exists(tempExportDir))
-                        {
-                            try { Directory.Delete(tempExportDir, true); }
-                            catch (Exception ex) { Logger.LogError("Error cleanup: --> ", ex); }
-                        }
+                    if (Directory.Exists(wadSource))
+                    {
+                        CopyDirectory(wadSource, wadTarget);
                     }
                     else
                     {
-                        // .modpkg export
-                        var layers = new List<(string relativePath, string folderName, int number)>();
-                        foreach (var layer in ModElement.Details.Layers)
+                        string? copiedBaseFolder = Directory.GetDirectories(sourceFolder, "WAD_base")
+                            .OrderBy(d => d)
+                            .FirstOrDefault();
+                        if (copiedBaseFolder != null)
                         {
-                            layers.Add(($"installed/{ModElement.ModFolder}/{layer.folder_name}", layer.Name, layer.Priority));
+                            CopyDirectory(copiedBaseFolder, wadTarget);
                         }
+                    }
 
-                        var metadata = new ModpkgMetadata
-                        {
-                            Name = ModElement.ModFolder,
-                            DisplayName = ModElement.Info.Name,
-                            Description = ModElement.Info.Description,
-                            Version = NormalizeVersion(ModElement.Info.Version),
-                        };
+                    foreach (var layer in ModElement.Details.Layers)
+                    {
+                        if (layer.Name == "base") continue;
+                        string dir = Path.Combine(sourceFolder, layer.folder_name);
+                        string dest = Path.Combine(tempExportDir, layer.folder_name);
+                        CopyDirectory(dir, dest);
+                    }
 
-                        if (!string.IsNullOrWhiteSpace(ModElement.Info.Author))
-                        {
-                            var authorNames = ModElement.Info.Author.Split(',')
-                                .Select(a => a.Trim())
-                                .Where(a => !string.IsNullOrEmpty(a));
-                            foreach (var name in authorNames)
-                            {
-                                metadata.Authors.Add(new ModpkgAuthor(name));
-                            }
-                        }
+                    var exportDetails = new ModDetails();
+                    exportDetails.Layers = ModElement.Details.Layers;
+                    exportDetails.Priority = ModElement.Details.Priority;
+                    exportDetails.override_ = false;
+                    exportDetails.InnerPath = "";
+                    exportDetails.Random = false;
 
-                        string thumb_path = Path.GetFullPath(Path.Combine(metaSource, "image.png"));
-                        var dyustry = new DistributorInfo
-                        {
-                            SiteId = "cslol-go",
-                            SiteName = "cslol-go manager",
-                            SiteUrl = "https://github.com/Aurecueil/Cs-lol-go/releases/latest",
-                            ModId = "0",
-                            ReleaseId = "0",
-                        };
+                    string detailsJsonTarget = Path.Combine(metaTarget, "details.json");
+                    File.WriteAllText(detailsJsonTarget, JsonSerializer.Serialize(exportDetails, new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    }));
 
-                        string rf_path = Path.Combine(metaSource, "rf.json");
-                        if (File.Exists(rf_path))
-                        {
-                            string json = File.ReadAllText(rf_path);
-                            using var doc = System.Text.Json.JsonDocument.Parse(json);
-                            JsonElement root = doc.RootElement;
-                            dyustry.ModId = root.GetProperty("modId").GetString();
-                            dyustry.ReleaseId = root.GetProperty("releaseId").GetString();
-                            dyustry.SiteName = "RuneForge";
-                            dyustry.SiteUrl = "https://runeforge.dev/mods/";
-                            dyustry.SiteId = "runeforge";
-                        }
+                    string tempZip = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
+                    ZipFile.CreateFromDirectory(tempExportDir, tempZip);
 
-                        ModPkgLib.Pack(layers, metadata, targetPath, thumb_path, dyustry);
+                    if (File.Exists(targetPath))
+                        File.Delete(targetPath);
+                    File.Move(tempZip, targetPath);
+
+                    if (Directory.Exists(tempExportDir))
+                    {
+                        try { Directory.Delete(tempExportDir, true); }
+                        catch (Exception ex) { Logger.LogError("Error cleanup: --> ", ex); }
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    // Use Application.Current.Dispatcher to show UI elements from background thread
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    // .modpkg export
+                    var layers = new List<(string relativePath, string folderName, int number)>();
+                    foreach (var layer in ModElement.Details.Layers)
                     {
-                        MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    });
-                    Logger.LogError("Export Fail: -->   ", ex);
+                        layers.Add(($"installed/{ModElement.ModFolder}/{layer.folder_name}", layer.Name, layer.Priority));
+                    }
+
+                    var metadata = new ModpkgMetadata
+                    {
+                        Name = ModElement.ModFolder,
+                        DisplayName = ModElement.Info.Name,
+                        Description = ModElement.Info.Description,
+                        Version = NormalizeVersion(ModElement.Info.Version),
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(ModElement.Info.Author))
+                    {
+                        var authorNames = ModElement.Info.Author.Split(',')
+                            .Select(a => a.Trim())
+                            .Where(a => !string.IsNullOrEmpty(a));
+                        foreach (var name in authorNames)
+                        {
+                            metadata.Authors.Add(new ModpkgAuthor(name));
+                        }
+                    }
+
+                    string thumb_path = Path.GetFullPath(Path.Combine(metaSource, "image.png"));
+                    var dyustry = new DistributorInfo
+                    {
+                        SiteId = "cslol-go",
+                        SiteName = "cslol-go manager",
+                        SiteUrl = "https://github.com/Aurecueil/Cs-lol-go/releases/latest",
+                        ModId = "0",
+                        ReleaseId = "0",
+                    };
+
+                    string rf_path = Path.Combine(metaSource, "rf.json");
+                    if (File.Exists(rf_path))
+                    {
+                        string json = File.ReadAllText(rf_path);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        JsonElement root = doc.RootElement;
+                        dyustry.ModId = root.GetProperty("modId").GetString();
+                        dyustry.ReleaseId = root.GetProperty("releaseId").GetString();
+                        dyustry.SiteName = "RuneForge";
+                        dyustry.SiteUrl = "https://runeforge.dev/mods/";
+                        dyustry.SiteId = "runeforge";
+                    }
+
+                    ModPkgLib.Pack(layers, metadata, targetPath, thumb_path, dyustry);
                 }
-            });
+            }
+            catch (Exception ex)
+            {
+                // Use Application.Current.Dispatcher to show UI elements from background thread
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show($"Export failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+                Logger.LogError("Export Fail: -->   ", ex);
+            }
         }
 
         public void CloseSettingsOverlay()
