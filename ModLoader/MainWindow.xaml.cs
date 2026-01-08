@@ -289,7 +289,37 @@ namespace ModManager
 
 
         }
+        public async void open_ds(object sender, RoutedEventArgs e)
 
+        {
+
+            try
+
+            {
+
+                // Open website in default browser
+
+                Process.Start(new ProcessStartInfo
+
+                {
+
+                    FileName = "https://divineskins.gg/explore-mods",
+
+                    UseShellExecute = true
+
+                });
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Failed to open Runeforge website: " + ex.Message);
+
+            }
+
+        }
         public static async void open_rf()
 
         {
@@ -1311,13 +1341,13 @@ namespace ModManager
 
                     if (!cleanContent.Equals("GOOD", StringComparison.OrdinalIgnoreCase))
                     {
-                        CustomMessageBox.Show($"Cslolgo is out of date, and so will now close. Please download an update");
+                        CustomMessageBox.Show($"Cslolgo is out of date, and so will now close. Please download an update", null, "New Version Aviable!");
                         Environment.Exit(0);
                     }
                 }
                 catch (Exception)
                 {
-                    MessageBox.Show($"Cannot verify version, app will now close. Get internet connection and try again");
+                    CustomMessageBox.Show($"Cannot verify version, app will now close. Get internet connection and try again", null, "Connection failed :sob:");
                     Environment.Exit(0);
                 }
             }
@@ -1383,8 +1413,10 @@ namespace ModManager
             var fontFamily = new System.Windows.Media.FontFamily(new Uri(fontPath), "./#Untitled1");
 
             Rf_Button_Icon.FontFamily = fontFamily;
+            DS_Button_Icon.FontFamily = fontFamily;
             deleteteProfileFont.FontFamily = fontFamily;
             SettingsFont.FontFamily = fontFamily;
+            tftModButton.FontFamily = fontFamily;
 
             Loaded += MainWindow_Loaded;
         }
@@ -2892,7 +2924,7 @@ namespace ModManager
 
                         if (old_major != major || old_minor != minor)
                         {
-                            CustomMessageBox.Show("Due to new patch, some mods might have broken now.");
+                            CustomMessageBox.Show($"Due to new {(pbe ? "PBE " : "")}patch, some mods might have broken now. Check in pratice tool if everything works, before playing rankeds.\n\nMods that are very likely broken are:\n- ALL map mods\n- Emerald gains (or other gold retextures)\n- Moga's UI mods\n- No-skin", null, $"New {(pbe ? "PBE " : "")}Patch {major}.{minor}, check ur mods");
                         }
                         if (pbe)
                         {
@@ -4717,7 +4749,7 @@ namespace ModManager
                                 if (newmod == null)
                                 {
                                     Application.Current.Dispatcher.Invoke(() =>
-                                        CustomMessageBox.Show("skinhacks are not supported, get lost"));
+                                        CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
                                     return;
                                 }
                                 SaveModDetails(newmod);
@@ -4822,7 +4854,7 @@ namespace ModManager
                             if (newmod == null)
                             {
                                 Application.Current.Dispatcher.Invoke(() =>
-                                   CustomMessageBox.Show("skinhacks are not supported, get lost"));
+                                   CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
                                 return;
                             }
 

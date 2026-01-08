@@ -760,7 +760,7 @@
 
             <Setter Property="Width" Value="80"/>
             <Setter Property="Height" Value="40"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="23"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Background" Value="#1E1E1E"/>
             <Setter Property="BorderBrush" Value="#444"/>
@@ -780,20 +780,22 @@
                             BorderThickness="{TemplateBinding BorderThickness}"/>
 
                             <!-- Labels -->
-                            <Grid Margin="11,0,11,2">
+                            <Grid Margin="10,0,10,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
                                     <ColumnDefinition/>
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock x:Name="LeftText"
-                                   Text="LOL"
+                                   Text="L"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Left"
-                                   Foreground="#FFF"/>
+                                   Foreground="#FFF"
+    SnapsToDevicePixels="True"
+    RenderOptions.ClearTypeHint="Enabled"/>
 
                                 <TextBlock x:Name="RightText"
-                                   Text="TFT"
+                                   Text="T"
                                    Grid.Column="1"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Right"
@@ -820,14 +822,16 @@
                                 <Setter TargetName="Knob"
                                 Property="HorizontalAlignment"
                                 Value="Right"/>
-
+                                <Setter TargetName="Knob"
+Property="BorderBrush"
+Value="#E9B55C"/>
                                 <Setter TargetName="LeftText"
                                 Property="Foreground"
                                 Value="#666"/>
 
                                 <Setter TargetName="RightText"
                                 Property="Foreground"
-                                Value="{DynamicResource AccentBrush}"/>
+                                Value="#E9B55C"/>
                             </Trigger>
 
                             <!-- LOL selected -->
@@ -835,10 +839,13 @@
                                 <Setter TargetName="Knob"
                                 Property="HorizontalAlignment"
                                 Value="Left"/>
+                                <Setter TargetName="Knob"
+Property="BorderBrush"
+Value="#C28F2C"/>
 
                                 <Setter TargetName="LeftText"
                                 Property="Foreground"
-                                Value="{DynamicResource AccentBrush}"/>
+                                Value="#C28F2C"/>
 
                                 <Setter TargetName="RightText"
                                 Property="Foreground"

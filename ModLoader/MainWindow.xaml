@@ -96,8 +96,16 @@ Click="YasuoButtons_click">
 
             <Button DockPanel.Dock="Left" 
 Style="{StaticResource IconButtonStyle}" 
+ToolTip="Enable Runeforge Fas Download" x:Name="DS_Button"
+Margin="40,5,10,5" Visibility="Collapsed"
+Click="open_ds">
+                <TextBlock x:Name="DS_Button_Icon" FontSize="40" Text="S" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
+            </Button>
+
+            <Button DockPanel.Dock="Left" 
+Style="{StaticResource IconButtonStyle}" 
 ToolTip="Enable Runeforge Fas Download" x:Name="Rf_Button"
-Margin="10,5,40,5"
+Margin="10,5,10,5"
 Click="Runeforge_protocol_add">
                 <TextBlock x:Name="Rf_Button_Icon" FontSize="40" Text="R" Foreground="LightGray" Style="{StaticResource IconTextBlockStyle}" Margin="0,-4,0,0"/>
             </Button>
