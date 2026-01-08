@@ -1,16 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.IO.Hashing;
-using System.Linq;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization; // Added for JSON snake_case alignment
-using ZstdSharp;
-
-// Note: ModManager.CustomMessageBox is assumed to be available from the ModManager dependency.
-// For metadata serialization, System.Text.Json is used as a standard replacement for the Rust's Msgpack,
-// as external NuGet dependencies cannot be added here.
 
 namespace ModPkgLibSpace
 {

@@ -1,28 +1,14 @@
-﻿using ModManager;
-using System.Collections.Concurrent;
-using System.Configuration;
-using System.Data;
-using System.Diagnostics;
+﻿using System.Collections.Concurrent;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.IO.Pipes;
-using System.Net;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Application = System.Windows.Application;
 using Cursors = System.Windows.Input.Cursors;
-using Image = System.Drawing.Image;
-using SystemColors = System.Windows.SystemColors;
 
 namespace ModManager
 {

@@ -20,4 +20,6 @@ Thumbs.db
 # Unused
 ModLoader/exploreros.xaml
 ModLoader/exploreros.xaml.cs
+ModLoader/RFModEntry.xaml
+ModLoader/RFModEntry.xaml.cs
 /ModLoader/Properties/PublishProfiles

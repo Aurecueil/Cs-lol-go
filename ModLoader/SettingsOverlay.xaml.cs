@@ -1,6 +1,4 @@
-﻿using Microsoft.Win32;
-using ModManager;
-using System;
+﻿using ModManager;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Windows;
-using System.Windows.Media.Media3D;
+﻿using System.Runtime.InteropServices;
 
 namespace ModManager
 {
