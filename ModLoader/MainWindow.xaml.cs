@@ -169,6 +169,9 @@ namespace ModManager
         public int PBE_game_version_major { get; set; } = 0;
         public int PBE_game_version_minor { get; set; } = 0;
         public int PBE_game_version_tetrary { get; set; } = 0;
+        public double WindowWidth { get; set; } = 1000;
+        public double WindowHeight { get; set; } = 700;
+        public WindowState WindowState { get; set; } = WindowState.Normal;
     }
     public class Folder
     {
@@ -1086,6 +1089,14 @@ namespace ModManager
         {
             _trayIcon?.Dispose();
             _contextMenuWindow?.Close();
+            var bounds = RestoreBounds;
+            if (WindowState == WindowState.Normal)
+            {
+                settings.WindowWidth = Width;
+                settings.WindowHeight = Height;
+            }
+            settings.WindowState = WindowState;
+            save_settings();
             base.OnClosed(e);
         }
 
@@ -1408,6 +1419,10 @@ namespace ModManager
             load_settings();
             colorManager = new Color_menager(settings);
             Application.Current.Resources["AccentColor"] = settings.theme_color;
+
+            Width = settings.WindowWidth;
+            Height = settings.WindowHeight;
+            WindowState = settings.WindowState;
 
             string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "runtimes", "RuneforgeFont.ttf");
             var fontFamily = new System.Windows.Media.FontFamily(new Uri(fontPath), "./#Untitled1");
@@ -2347,10 +2362,28 @@ namespace ModManager
             // Sort based on depth of inner_path
             folders.Sort((a, b) =>
             {
-                int depthA = string.IsNullOrEmpty(a.InnerPath) ? 0 : a.InnerPath.Split('/').Length;
-                int depthB = string.IsNullOrEmpty(b.InnerPath) ? 0 : b.InnerPath.Split('/').Length;
+                int GetDepth(string innerPath) // TFT mode folder fallback
+                {
+                    if (string.IsNullOrEmpty(innerPath))
+                        return 0;
+
+                    var parts = innerPath.Split('/');
+
+                    int depth = parts.Length;
+
+                    // add +1 if first part is NOT "0" or "-1"
+                    if (parts[0] != "0" && parts[0] != "-1")
+                        depth += 1;
+
+                    return depth;
+                }
+
+                int depthA = GetDepth(a.InnerPath);
+                int depthB = GetDepth(b.InnerPath);
+
                 return depthA.CompareTo(depthB);
             });
+
 
             // Iterate
             foreach (var folder in folders)
@@ -4113,9 +4146,14 @@ namespace ModManager
             List<int> pathSegments = new();
             int currentId = parentId;
 
-            while (currentId > 0 && hierarchyById.TryGetValue(currentId, out var parentElement))
+            while (hierarchyById.TryGetValue(currentId, out var parentElement))
             {
                 pathSegments.Add(parentElement.ID);
+                if (currentId > 0)
+                {
+                    pathSegments.Add(parentElement.parent);
+                    break;
+                }
                 currentId = parentElement.parent;
             }
 

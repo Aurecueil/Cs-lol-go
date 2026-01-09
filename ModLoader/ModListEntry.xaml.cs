@@ -336,7 +336,7 @@ namespace ModManager
         Repatheruwu rep = null;
         FixerUI Fixer = null;
         public bool fixerRunning = false;
-        bool exporter = false;
+        public bool exporter = false;
         bool was_enabled;
 
         private void Fixer_settings_panel_open(object sender, RoutedEventArgs e)
@@ -382,21 +382,24 @@ namespace ModManager
         }
         public void set_export(bool running)
         {
-            exporter = running;
             if (running)
             {
+                SetSelected(false);
+                exporter = running;
                 FixerOverlay.Visibility = Visibility.Visible;
             }
             else
             {
+                exporter = running;
                 FixerOverlay.Visibility = Visibility.Collapsed;
             }
         }
         public void set_fixer(bool running)
         {
-            fixerRunning = running;
             if (running)
             {
+                SetSelected(false);
+                fixerRunning = running;
                 whenrun.Visibility = Visibility.Visible;
                 block.Text = "Fixer is Running";
                 FixingIcon.Visibility = Visibility.Collapsed;
@@ -408,6 +411,7 @@ namespace ModManager
             }
             else
             {
+                fixerRunning = running;
                 whenrun.Visibility = Visibility.Collapsed;
                 FixingIcon.Visibility = Visibility.Visible;
                 FixerOverlay.Visibility = Visibility.Collapsed;
@@ -808,6 +812,12 @@ namespace ModManager
 
         private void SetSelected(bool selected)
         {
+
+            if (fixerRunning || exporter)
+            {
+                return;
+            }
+
             if (IsSelected != selected)
             {
                 IsSelected = selected;
