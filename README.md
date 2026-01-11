@@ -53,10 +53,14 @@ The buttons on a mod tile are as follows (left to right):
 1. ❌Delete
 
 ## Topaz Mod Fixer
-<p align="center">
-  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_menu.png?raw=true" width="500" >
-  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_log.png?raw=true" width="900" >
-</p>
+<div align="center" style="display: flex; justify-content: center; gap: 20px;">
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_menu.png?raw=true"
+       style="height: 600px; width: auto;" />
+
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_log.png?raw=true"
+       style="height: 600px; width: auto;" />
+</div>
+
 
 > [!IMPORTANT]
 > Fixer will attempt to autofill settings, but remember to check if both character and skin number are correct
