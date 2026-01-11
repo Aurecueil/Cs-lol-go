@@ -618,6 +618,44 @@ namespace ModManager
             if (IsValidGamePath(settings.gamepath))
                 return;
 
+            // If not valid, try to parse the path from 'ProgramData\Riot Games\RiotClientInstalls.json'
+            string riotInstallsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "Riot Games",
+                "RiotClientInstalls.json"
+            );
+
+            if (File.Exists(riotInstallsPath))
+            {
+                try
+                {
+                    var jsonContents = File.ReadAllText(riotInstallsPath);
+                    using var document = JsonDocument.Parse(jsonContents);
+
+                    var path = document.RootElement
+                        .GetProperty("associated_client")
+                        .EnumerateObject()
+                        .FirstOrDefault()
+                        .Name;
+
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        path = path.Replace('/', '\\'); // Normalize to Windows path format for consistency.
+                        path = Path.Combine(path, @"Game\League of Legends.exe");
+                    }
+
+                    if (IsValidGamePath(path))
+                    {
+                        settings.gamepath = path;
+                        save_settings();
+                        return;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
             // If not valid, scan running processes
             var targetNames = new[] { "LeagueClient.exe", "League of Legends.exe" };
 
