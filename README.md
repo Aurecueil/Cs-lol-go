@@ -61,17 +61,20 @@ The buttons on a mod tile are as follows (left to right):
 1. ❌Delete
 
 ## Topaz Mod Fixer
-<div align="center" style="display: flex; justify-content: center; gap: 20px;">
-  <a href="#topaz-mod-fixer">
-    <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_menu.png?raw=true"
-       style="height: 600px; width: auto;" />
-  </a>
-
-  <a href="#topaz-mod-fixer">
-    <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_log.png?raw=true"
-       style="height: 600px; width: auto;" />
-  </a>
-</div>
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="#topaz-mod-fixer">
+        <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_menu.png?raw=true" height="600" alt="Fixer Menu" />
+      </a>
+    </td>
+    <td align="center">
+      <a href="#topaz-mod-fixer">
+        <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_log.png?raw=true" height="600" alt="Fixer Log" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 
 > [!IMPORTANT]
