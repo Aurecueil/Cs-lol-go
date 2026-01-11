@@ -46,6 +46,7 @@ namespace ModManager
         public static bool StartWithLoaded = false;
         public static bool StartMinimized = false;
         public static bool is_startup = false;
+        public static bool _hasMutexOwnership = false;
 
         public static bool IsMainLoaded = false;
         public static ConcurrentQueue<string> ProtocolQueue = new ConcurrentQueue<string>();
@@ -55,13 +56,12 @@ namespace ModManager
     {
         const string PipeName = "ModdoLoudaDA_paipu";
         private static Mutex _mutex;
-
         protected override void OnStartup(StartupEventArgs e)
         {
             // System.Diagnostics.Debugger.Launch();
             bool isNewInstance;
             _mutex = new Mutex(true, @"Global\ModdoLoudaDA", out isNewInstance);
-
+            Globals._hasMutexOwnership = isNewInstance;
             if (!isNewInstance)
             {
                 SendArgsToExistingInstance(e.Args);
@@ -173,7 +173,10 @@ namespace ModManager
 
         protected override void OnExit(ExitEventArgs e)
         {
-            _mutex?.ReleaseMutex();
+            if (Globals._hasMutexOwnership)
+            {
+                _mutex?.ReleaseMutex();
+            }
             _mutex?.Dispose();
             base.OnExit(e);
         }

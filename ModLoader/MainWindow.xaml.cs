@@ -1403,6 +1403,7 @@ namespace ModManager
         public MainWindow()
         {
             InitializeComponent();
+            if (!Globals._hasMutexOwnership) return;
             _trayIcon = new TrayIcon();
             _trayIcon.ShowTrayIcon("Yamete, mitenai de yo, onii-san!", OnTrayIconDoubleClick, OnTrayIconRightClick, "animegurl.ico");
             this.StateChanged += MainWindow_StateChanged;
