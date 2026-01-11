@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Aurecueil/Temp/blob/main/images/manager.png?raw=true" width="800" >
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/cslolgo_0.2.2.png?raw=true" width="800" >
 </p>
 
 # cslol-go
@@ -51,6 +51,29 @@ The buttons on a mod tile are as follows (left to right):
 1. 📄Export
 1. ✏️Edit
 1. ❌Delete
+
+## Topaz Mod Fixer
+<p align="center">
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_menu.png?raw=true" width="500" >
+  <img src="https://github.com/Aurecueil/Temp/blob/main/images/fixer_log.png?raw=true" width="900" >
+</p>
+
+> [!IMPORTANT]
+> Fixer will attempt to autofill settings, but remember to check if both character and skin number are correct
+
+Current features of Topaz Mod Fixer:
+- Repath
+- Fix outdated path
+- Fix HP bar style
+- Delete Unused definitions and assets
+- Fix VO events.bnk with newest version and correct language
+- Creates Backup of the mod, in case things go south
+
+Opotional features:
+- Manifest (use older game files to fill in stuff missing in newer versions)
+- No-skin (Apply to all skins)
+- Binless (output mod without .bin files)
+- Kill static materials (disabled static materials, as outdated ones can crash the game)
 
 ## Search
 Filter your installed mods. You can use the following flags to better filter search results.
