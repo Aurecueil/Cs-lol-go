@@ -700,11 +700,13 @@ namespace ModManager
                         {
                             string manifestFilePath = Path.Combine(manifestFolder, "this.manifest");
 
-                            // Use await here instead of .Result to be truly async
-                            using (var client = new HttpClient())
+                            if (!File.Exists(manifestFilePath))
                             {
-                                var data = await client.GetByteArrayAsync(selectedManifest.Link);
-                                await File.WriteAllBytesAsync(manifestFilePath, data);
+                                using (var client = new HttpClient())
+                                {
+                                    var data = await client.GetByteArrayAsync(selectedManifest.Link);
+                                    await File.WriteAllBytesAsync(manifestFilePath, data);
+                                }
                             }
 
                             var psi = new ProcessStartInfo

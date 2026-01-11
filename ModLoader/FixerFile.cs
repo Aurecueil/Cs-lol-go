@@ -6,9 +6,12 @@ using System.Drawing.Text;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
+using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Windows;
 using ZstdSharp;
+using static ModManager.Repatheruwu;
 using Path = System.IO.Path;
 using SearchOption = System.IO.SearchOption;
 
@@ -49,6 +52,8 @@ namespace ModManager
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
         public List<string> CharraBlackList = ["viegowraith"];
+        public uint bnk_version { get; set; } = 145; 
+        public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
     }
 
     public class Repatheruwu
@@ -188,6 +193,31 @@ namespace ModManager
             AnimationGraphData = 4126869447
         }
 
+        public enum lang_id : uint
+        {
+            ar_AE = 3254137205,
+            cs_CZ = 877555794,
+            de_DE = 4290373403,
+            el_GR = 4147287991,
+            en_US = 684519430,
+            es_ES = 235381821,
+            es_MX = 3671217401,
+            fr_FR = 323458483,
+            hu_HU = 370126848,
+            it_IT = 1238911111,
+            ja_JP = 2008704848,
+            ko_KR = 3391026937,
+            pl_PL = 559547786,
+            pt_BR = 960403217,
+            ro_RO = 4111048996,
+            ru_RU = 2577776572,
+            th_TH = 3325617959,
+            tr_TR = 4036333791,
+            vi_VN = 2847887552,
+            zh_CN = 3948448560,
+            zh_TW = 2983963595
+        }
+
         private Queue<(string, int, bool)> Characters = new Queue<(string, int, bool)>();
         public (int, bool) getSkinInts(string charra)
         {
@@ -304,7 +334,7 @@ namespace ModManager
             while (Characters.Count > 0)
             {
                 var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
-                x.LowerLog($"[FIXI]  Fixing {Current_Char} skin {skinNo}", CLR_ACT);
+                x.LowerLog($"[FIXI] Fixing {Current_Char} skin {skinNo}", CLR_ACT);
 
                 Settings.Character = Current_Char;
                 Settings.skinNo = skinNo;
@@ -344,7 +374,7 @@ namespace ModManager
                     foreach (var name in CharacterCases[key])
                     {
                         Characters.Enqueue((name, skinNo, false));
-                        // linkedList.Items.Add(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
+                        // linkedList.Items.AdFd(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
                     }
                 }
 
@@ -381,7 +411,7 @@ namespace ModManager
                 Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
                 if (Settings.noskinni && Settings.skinNo == 0)
                 {
-                    x.LowerLog($"[SKIN]  Creating No Skinni Lightinni Italini", CLR_MOD);
+                    x.LowerLog($"[SKIN] Creating No Skinni Lightinni Italini", CLR_MOD);
 
                     var skinEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.SkinCharacterDataProperties);
                     var skinKeyRef = (BinHash)skinEntry.Key;
@@ -477,6 +507,95 @@ namespace ModManager
 
         public List<WadExtractor.Target> process(List<WadExtractor.Target> processing)
         {
+            Dictionary<WadExtractor.Target, uint> Event_bnk_lang = new Dictionary<WadExtractor.Target, uint>();
+            void check_n_fix_vo()
+            {
+                Dictionary<string, List<WadExtractor.Target>> Audio_to_dl = new Dictionary<string, List<WadExtractor.Target>>();
+                foreach (var kvp in Event_bnk_lang)
+                {
+                    string wwise_file = Path.Combine(Settings.outputDir, kvp.Key.OutputString);
+                    if (!File.Exists(wwise_file)) continue;
+                    uint langID = 0;
+
+                    using (var fs = new FileStream(wwise_file, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var br = new BinaryReader(fs))
+                    {
+                        if (fs.Length >= 20)
+                        {
+                            fs.Seek(16, SeekOrigin.Begin); // TODO
+                            langID = br.ReadUInt32();
+                        }
+                    }
+                    if (kvp.Value != langID)
+                    {
+                        var new_lang = (lang_id)kvp.Value;
+                        if (!Audio_to_dl.ContainsKey(new_lang.ToString()))
+                        {
+                            Audio_to_dl[new_lang.ToString()] = new List<WadExtractor.Target>();
+                        }
+                        Audio_to_dl[new_lang.ToString()].Add(kvp.Key);
+
+                        x.LowerLog($"[WRNG] Expected {(lang_id)kvp.Value} but found {(lang_id)langID} in {kvp.Key.OriginalPath}", CLR_WARN);
+                    }
+                    else
+                    {
+                        x.LowerLog($"[GOOD] {(lang_id)langID} in {kvp.Key.OriginalPath}", CLR_GOOD);
+                    }
+                }
+                if (Audio_to_dl.Count > 0)
+                {
+                    foreach (var kv in Audio_to_dl)
+                    {
+                        string VO_path = Path.Combine("manifest", $".lang_{Settings.bnk_version}_{kv.Key}");
+                        string VO_wad = Path.Combine(VO_path, "DATA","FINAL","Champions",$"{Settings.Character}.{kv.Key}.wad.client");
+                        if (!File.Exists(VO_wad))
+                        {
+                            x.LowerLog($"[WAIT] Downloading {Settings.Character}.{kv.Key}.wad.client to fix events.bnk", CLR_MOD);
+                            string manifestFilePath = Path.Combine(VO_path, "this.manifest");
+                            if (!File.Exists(manifestFilePath))
+                            {
+                                using (var client = new HttpClient())
+                                {
+                                    var data = client
+                                        .GetByteArrayAsync(Settings.manifest_145)
+                                        .GetAwaiter()
+                                        .GetResult();
+                                    Directory.CreateDirectory(Path.GetDirectoryName(manifestFilePath));
+                                    File.WriteAllBytes(manifestFilePath, data);
+                                }
+                            }
+
+
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = Path.Combine("cslol-tools", "ManifestDownloader.exe"),
+                                Arguments = $"\"{manifestFilePath}\" -f {Settings.Character}.{kv.Key}.wad.client -o \"{VO_path}\"",
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            };
+
+                            using (var process = Process.Start(psi))
+                            {
+                                process.WaitForExit();
+                            }
+                        }
+                        if (File.Exists(VO_wad))
+                        {
+                            x.LowerLog($"[FIXI] Fixing VO", CLR_ACT);
+                            var left = _wadExtractor.ExtractAndSwapReferences([VO_wad], kv.Value);
+                            if( left.Count != 0)
+                            {
+                                left = _hashes.FindMatches(left);
+                                left = _wadExtractor.ExtractAndSwapReferences([VO_wad], kv.Value);
+                            }
+                            foreach (var tar in left)
+                            {
+                                x.LowerLog($"[FAIL] Failed to fill up {kv.Key} events {tar.OriginalPath}", CLR_ERR);
+                            }
+                        }
+                    }
+                }
+            }
             var allPaths = new HashSet<string>(
                     processing.Select(t => t.OriginalPath),
                     StringComparer.OrdinalIgnoreCase
@@ -487,29 +606,43 @@ namespace ModManager
 
             if (Settings.SoundOption == 0)
             {
-                foreach (var target in processing.Where(t => t.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0))
+                foreach (var target in processing
+                    .Where(t => t.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0)
+                    .ToList())
                 {
-                    string partnerWpk = Regex.Replace(
-                        target.OriginalPath,
-                        "_vo_events.bnk",
-                        "_vo_audio.wpk",
-                        RegexOptions.IgnoreCase
-                    );
-
-                    if (allPaths.Contains(partnerWpk))
+                    var (ver, id) = _wadExtractor.CheckLanguageID(Settings.base_wad_path, target.OriginalPath);
+                    if (ver == 0)
                     {
-                        bnkToWpkMap.Add(target, partnerWpk);
+                        processing.Remove(target);
+                        continue;
+                    }
+                    if (ver < Settings.bnk_version)
+                    {
+                        Event_bnk_lang.Add(target, id);
+
+                        string partnerWpk = Regex.Replace(
+                            target.OriginalPath,
+                            "_vo_events.bnk",
+                            "_vo_audio.wpk",
+                            RegexOptions.IgnoreCase
+                        );
+
+                        if (allPaths.Contains(partnerWpk))
+                        {
+                            bnkToWpkMap.Add(target, partnerWpk);
+                        }
+
+                        processing.Remove(target);
+                    }else if (ver > Settings.bnk_version)
+                    {
+                        x.LowerLog("[INFO] UR APP NEED UPDATE BTW, DID U KNOW THAT?????", CLR_GOOD);
                     }
                 }
+
                 if (!Settings.sfx_events)
                 {
                     processing.RemoveAll(target =>
-                        target.OriginalPath.IndexOf("_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
-                }
-                else
-                {
-                    processing.RemoveAll(target =>
-                        target.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
+                        target.OriginalPath.IndexOf("_sfx_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
                 }
 
             }
@@ -520,6 +653,17 @@ namespace ModManager
                 processing.RemoveAll(target =>
                     string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
             }
+            else
+            {
+                foreach (var target in processing.Where(t => t.OriginalPath.IndexOf("_vo_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    var (ver, id) = _wadExtractor.CheckLanguageID(Settings.base_wad_path, target.OriginalPath);
+                    if (ver < Settings.bnk_version)
+                    {
+                        Event_bnk_lang.Add(target, id);
+                    }
+                }
+            }
 
             if (Settings.AnimOption == 2)
             {
@@ -528,10 +672,20 @@ namespace ModManager
             }
             // Use _wadExtractor instance
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
-            if (processing.Count == 0) return processing;
+            if (processing.Count == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
+
+            var remainingPaths = new HashSet<string>(
+                processing.Select(t => t.OriginalPath),
+                StringComparer.OrdinalIgnoreCase
+                );
+
             if (Settings.binless)
             {
-                x.UpperLog("[CHEK] Double checking files . . .", CLR_ACT);
+                x.LowerLog("[CHEK] Double checking files . . .", CLR_ACT);
                 processing = _hashes.FindMatches(processing);
                 processing.RemoveAll(t =>
                 {
@@ -542,19 +696,46 @@ namespace ModManager
                     return false;
                 });
                 processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
+                processing.Clear();
+                if (Settings.SoundOption != 2)
+                {
+                    foreach (var pair in bnkToWpkMap)
+                    {
+                        WadExtractor.Target bnkTarget = pair.Key;
+                        string wpkPath = pair.Value;
+
+                        if (!remainingPaths.Contains(wpkPath))
+                        {
+                            processing.Add(bnkTarget);
+                        }
+                    }
+                }
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
+                check_n_fix_vo();
                 return new List<WadExtractor.Target>();
             }
-
             if (Settings.SoundOption == 0)
             {
-                var remainingPaths = new HashSet<string>(
-                processing.Select(t => t.OriginalPath),
-                StringComparer.OrdinalIgnoreCase
-            );
                 processing.RemoveAll(target =>
                     string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
                 processing.RemoveAll(target =>
                     string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (Settings.AnimOption == 0)
+            {
+                processing.RemoveAll(target =>
+                string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
+            }
+
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            if (processing.Count() == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
+            if (Settings.SoundOption == 0)
+            {
                 foreach (var pair in bnkToWpkMap)
                 {
                     WadExtractor.Target bnkTarget = pair.Key;
@@ -567,22 +748,12 @@ namespace ModManager
                 }
             }
 
-            if (Settings.AnimOption == 0)
-            {
-                processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
-            }
-
-            // if (Settings.Lang)                                                                                   //uwu
-            // {
-            //      processing = _wadExtractor.ExtractAndSwapReferences(Settings.LangLookUp, processing);
-            //      if (processing.Count() == 0) return processing;
-            // }
-
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
-            if (processing.Count() == 0) return processing;
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
-            if (processing.Count() == 0) return processing;
+            if (processing.Count() == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
 
             // Use _hashes instance
             processing = _hashes.FindMatches(processing);
@@ -596,18 +767,31 @@ namespace ModManager
                 return false;
             });
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
-            if (processing.Count() == 0) return processing;
+            if (processing.Count() == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
-            if (processing.Count() == 0) return processing;
+            if (processing.Count() == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
-            if (processing.Count() == 0) return processing;
+            if (processing.Count() == 0)
+            {
+                check_n_fix_vo();
+                return processing;
+            }
             foreach (var item in processing)
             {
                 Settings.Missing_Files.Add(item.OriginalPath);
             }
+
+            check_n_fix_vo();
             return processing;
         }
-
 
         Bin LoadBin(string path)
         {
@@ -1421,6 +1605,78 @@ namespace ModManager
                 }
             }
 
+            public (uint version, uint id) CheckLanguageID(List<string> wadPaths, string target)
+            {
+                ulong targetHash = Repatheruwu.HashPath(target);
+                byte[] entryBuffer = new byte[32];
+
+                foreach (var wadPath in wadPaths)
+                {
+                    if (!File.Exists(wadPath)) continue;
+
+                    using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var br = new BinaryReader(fs))
+                    {
+                        if (fs.Length < 272) continue;
+
+                        // Read File Count
+                        fs.Seek(268, SeekOrigin.Begin);
+                        uint fileCount = br.ReadUInt32();
+
+                        for (int i = 0; i < fileCount; i++)
+                        {
+                            if (fs.Read(entryBuffer, 0, 32) != 32) break;
+
+                            ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
+
+                            if (pathHash == targetHash)
+                            {
+                                // Found the specific file entry
+                                uint offset = BitConverter.ToUInt32(entryBuffer, 8);
+                                uint compressedSize = BitConverter.ToUInt32(entryBuffer, 12);
+                                byte type = entryBuffer[20];
+
+                                // Read the file data
+                                fs.Seek(offset, SeekOrigin.Begin);
+                                byte[] fileData = new byte[compressedSize];
+                                if (fs.Read(fileData, 0, (int)compressedSize) != compressedSize) continue;
+
+                                // Handle Decompression (Zstd/Gzip/Raw)
+                                byte[] rawData;
+                                var rawSpan = new ReadOnlySpan<byte>(fileData);
+
+                                if (IsZstd(rawSpan) || type == 3)
+                                {
+                                    try { rawData = DecompressZstd(fileData, fileData.Length); }
+                                    catch { continue; }
+                                }
+                                else if (IsGzip(rawSpan) || type == 1)
+                                {
+                                    try { rawData = DecompressGzip(fileData, fileData.Length); }
+                                    catch { continue; }
+                                }
+                                else
+                                {
+                                    rawData = fileData;
+                                }
+
+                                // --- READ VERSION AND ID ---
+                                // We need at least 20 bytes (reading up to offset 16 + 4 bytes)
+                                if (rawData.Length >= 20)
+                                {
+                                    uint version = BitConverter.ToUInt32(rawData, 8);  // 0x08
+                                    uint id = BitConverter.ToUInt32(rawData, 16);      // 0x10
+                                    return (version, id);
+                                }
+
+                                return (0, 0); // Found but too small
+                            }
+                        }
+                    }
+                }
+
+                return (0, 0);
+            }
             public class Target
             {
                 public List<BinString> BinStringRef { get; set; }
@@ -1444,6 +1700,7 @@ namespace ModManager
             public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets)
             {
                 if (targets == null || targets.Count == 0) return targets;
+                if (wadPaths.Count == 0) return targets;
 
                 var lookup = new Dictionary<ulong, (Target target, string ext, int priority)>();
                 int pendingCount = 0;
@@ -1597,6 +1854,7 @@ namespace ModManager
                         }
                     }
                 }
+
 
                 return targets;
             }

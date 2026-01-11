@@ -607,7 +607,7 @@
                       StrokeThickness="3"
                       StrokeLineJoin="Round"
                       Stretch="Uniform"
-                      Margin="2"
+                      Margin="4"
                       Opacity="0"/>
                             </Border>
 
@@ -631,6 +631,7 @@
                                 <Setter TargetName="CheckboxBorder" Property="Background" Value="{DynamicResource  AccentBrush}"/>
                                 <Setter TargetName="CheckboxBorder" Property="BorderBrush" Value="{DynamicResource  AccentBrush}"/>
                                 <Setter TargetName="CheckMark" Property="Opacity" Value="1"/>
+                                <Setter TargetName="CheckboxBorder" Property="BorderThickness" Value="0" />
                             </Trigger>
 
                             <!-- Unchecked state -->
