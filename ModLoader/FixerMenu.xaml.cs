@@ -239,7 +239,13 @@ namespace ModManager
             foreach (var kvp in Main.Wad_champs_dict)
             {
                 bool matchFound = fileSysEntries.Any(entryPath =>
-                    Path.GetFileName(entryPath).IndexOf(kvp.Value, StringComparison.OrdinalIgnoreCase) >= 0);
+                string.Equals(
+                    Path.GetFileName(entryPath).Split(".")[0],
+                    kvp.Value,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
 
                 if (matchFound)
                 {
@@ -593,8 +599,6 @@ namespace ModManager
             // We await the Task.Run, which keeps the UI responsive while waiting.
             await Task.Run(async () =>
             {
-                try
-                {
                     string modMeta = Path.Combine(modDir, "META");
                     string modWad = Path.Combine(modDir, "WAD");
                     string bakMeta = Path.Combine(backupDir, "META");
@@ -731,11 +735,7 @@ namespace ModManager
                     // Since this runs on the background thread now, FixiniYoursSkini MUST use 
                     // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
                     Fixer.FixiniYoursSkini(this);
-                }
-                catch (Exception ex)
-                {
-                    LowerLog($"Error: {ex.Message}");
-                }
+                
             });
             close_txt.IsEnabled = true;
             close_txt.Content = "Fixing done, Close Fixer";

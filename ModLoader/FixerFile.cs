@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Drawing.Text;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -47,6 +48,7 @@ namespace ModManager
 
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
+        public List<string> CharraBlackList = ["viegowraith"];
     }
 
     public class Repatheruwu
@@ -299,11 +301,9 @@ namespace ModManager
                 Characters.Enqueue((Settings.Character, Settings.skinNo, true));
             }
 
-
             while (Characters.Count > 0)
             {
                 var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
-
                 x.LowerLog($"[FIXI]  Fixing {Current_Char} skin {skinNo}", CLR_ACT);
 
                 Settings.Character = Current_Char;
@@ -323,6 +323,11 @@ namespace ModManager
 
 
                 var (binentries, concat, staticMat, allStrings, linkedList) = LoadAllBins(binPath);
+                if (binentries is null)
+                {
+                    x.LowerLog($"[SKIP] Coudnt Find SkinCharacterProperties, Skipping {Settings.Character} skin {Settings.skinNo}", CLR_WARN);
+
+                }
                 x.LowerLog($"[PROC] Processing Assets", CLR_ACT);
 
                 allStrings = process(allStrings);
@@ -379,11 +384,12 @@ namespace ModManager
                     x.LowerLog($"[SKIN]  Creating No Skinni Lightinni Italini", CLR_MOD);
 
                     var skinEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.SkinCharacterDataProperties);
-                    var rrEntry = binentries.Items.First(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver);
-
-                    var rrLinkRef = ((BinEmbed)skinEntry.Value).Items.First(x => x.Key.Hash == 0x62286e7e).Value as BinLink;
                     var skinKeyRef = (BinHash)skinEntry.Key;
-                    var rrKeyRef = (BinHash)rrEntry.Key;
+
+                    var rrLinkRef = ((BinEmbed)skinEntry.Value).Items.FirstOrDefault(x => x.Key.Hash == 0x62286e7e)?.Value as BinLink;
+
+                    var rrEntry = binentries.Items.FirstOrDefault(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver);
+                    var rrKeyRef = rrEntry.Key != null ? (BinHash)rrEntry.Key : null;
 
                     foreach (int i in Enumerable.Range(1, 99))
                     {
@@ -393,8 +399,8 @@ namespace ModManager
                         uint newRRHash = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{i}/Resources");
 
                         skinKeyRef.Value = new FNV1a(newSkinHash);
-                        rrKeyRef.Value = new FNV1a(newRRHash);
-                        rrLinkRef.Value = new FNV1a(newRRHash);
+                        if(rrLinkRef?.Value != null) rrLinkRef.Value = new FNV1a(newRRHash);
+                        if(rrKeyRef != null) rrKeyRef.Value = new FNV1a(newRRHash);
 
                         Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
                     }
@@ -890,7 +896,6 @@ namespace ModManager
 
                 }
             }
-
             if (SkinDataEntries.Count > 1)
             {
                 Validate(SkinDataEntries, [FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}")]);
@@ -899,6 +904,7 @@ namespace ModManager
             if (SkinDataEntries.Count == 0)
             {
                 x.LowerLog($"[MISS] SkinCharacterDataProperties", CLR_ERR);
+                return (null, null, null, null, null);
             }
             var mainEntry = (BinEmbed)SkinDataEntries.Values.First().Value;
 
@@ -906,9 +912,13 @@ namespace ModManager
                 => embed.Items.FirstOrDefault(f => f.Key.Hash == hash)?.Value;
 
             uint CAC_name = (GetField(mainEntry, 0xd8f64a0d) as BinLink)?.Value.Hash ?? 0;
-            uint RR_name = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}/Resources"); // 
+            uint RR_name = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{Settings.skinNo}/Resources");
             BinLink? rrLinkRef = GetField(mainEntry, 0x62286e7e) as BinLink;
-            rrLinkRef.Value = new FNV1a(RR_name);
+            if (rrLinkRef != null)
+            {
+                rrLinkRef.Value = new FNV1a(RR_name);
+            }
+
             var GearUpgrades = new List<uint>();
             uint anmgraph_name = 0;
 
@@ -1081,7 +1091,7 @@ namespace ModManager
 
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
-                Characters.Enqueue((characterToLoad, Settings.skinNo, false));
+                if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false));  
             }
 
             var finalMap = new BinMap(BinType.Hash, BinType.Embed);
