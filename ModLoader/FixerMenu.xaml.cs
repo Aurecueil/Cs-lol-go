@@ -44,12 +44,11 @@ namespace ModManager
 
             // Set Default UI states based on Fixer default settings (optional, but good for sync)
             chkKeepIcons.IsChecked = true;
-            chkKillStatic.IsChecked = true;
+            chkKillStatic.IsChecked = false;
 
             CheckSkinNo();
             CheckInitialBackupState();
             LoadManifests();
-            LoadLanguages();
 
             HookUpEvents();
 
@@ -93,20 +92,6 @@ namespace ModManager
                 Y = int.Parse(parts[1]);
                 Z = int.Parse(parts[2]);
             }
-        }
-        private void LoadLanguages()
-        {
-            string[] languages = new[]
-            {
-    "ar_AE","cs_CZ","de_DE","el_GR","en_US","es_ES","es_MX",
-    "fr_FR","hu_HU","it_IT","ja_JP","ko_KR","pl_PL","pt_BR",
-    "ro_RO","ru_RU","th_TH","tr_TR","vi_VN"
-};
-
-            cmbManifestLanguage.ItemsSource = languages;
-
-            // default
-            cmbManifestLanguage.SelectedItem = "en_US";
         }
 
         private Manifest? GetSelectedManifest()
@@ -196,23 +181,34 @@ namespace ModManager
 
         private void UpdateNoSkinLightVisibility()
         {
-            // Logic: Collapse if SkinNumber != 0 || Binless || All Skins || Character Index logic
+            // 1. Get the actual selected string object
+            var selectedItem = cmbCharacter.SelectedItem as string;
 
-            int charIdx = cmbCharacter.SelectedIndex;
-            int totalItems = cmbCharacter.Items.Count;
+            // 2. Find the index in the ORIGINAL, UNFILTERED list (_characterList)
+            // If _characterList is null, default to -1
+            int realIndex = (_characterList != null && selectedItem != null)
+                            ? _characterList.IndexOf(selectedItem)
+                            : -1;
 
-            // "index is 0, max or max-1"
-            // max index is (Count - 1). So max-1 is (Count - 2).
-            bool isSpecialIndex = (charIdx == 0) || (charIdx == totalItems - 1) || (charIdx == totalItems - 2);
+            // 3. Get the total count from the original list
+            int totalItems = _characterList?.Count ?? 0;
+
+            // 4. Perform your logic using the REAL index
+            // Check realIndex != -1 to ensure we actually found the item
+            bool isSpecialIndex = (realIndex != -1) && (
+                                  (realIndex == 0) ||
+                                  (realIndex == totalItems - 1) ||
+                                  (realIndex == totalItems - 2));
 
             bool shouldCollapse = (SkinNumberValue != 0) ||
                                   (chkBinsless.IsChecked == true) ||
                                   (chkAllSkins.IsChecked == true) ||
                                   isSpecialIndex;
 
+            // MessageBox.Show($"{shouldCollapse} - RealIdx: {realIndex} - Total: {totalItems}");
+
             chkNoSkinLight.Visibility = shouldCollapse ? Visibility.Collapsed : Visibility.Visible;
 
-            // Also ensure the setting itself is false if collapsed (optional safety)
             if (shouldCollapse) chkNoSkinLight.IsChecked = false;
         }
 
@@ -579,7 +575,7 @@ namespace ModManager
             bool isNoSkinLightVisible = chkNoSkinLight.Visibility == Visibility.Visible;
             Fixer.Settings.noskinni = isNoSkinLightVisible && (chkNoSkinLight.IsChecked == true);
 
-            Fixer.Settings.folder = chkKeepFolder.IsChecked == true;
+            Fixer.Settings.folder = chkKeepFolder.IsChecked == false;
             Fixer.Settings.sfx_events = chkKeepSFX.IsChecked == true;
             Fixer.Settings.KillStaticMat = chkKillStatic.IsChecked == true;
             Fixer.Settings.keep_Icons = chkKeepIcons.IsChecked == true;

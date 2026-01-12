@@ -618,7 +618,34 @@ namespace ModManager
             if (IsValidGamePath(settings.gamepath))
                 return;
 
-            // If not valid, try to parse the path from 'ProgramData\Riot Games\RiotClientInstalls.json'
+
+            // Try to get path based on current running league process
+            var targetNames = new[] { "LeagueClient.exe", "League of Legends.exe" };
+
+            foreach (var process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!targetNames.Contains(process.ProcessName + ".exe", StringComparer.OrdinalIgnoreCase))
+                        continue;
+
+                    string path = GetMainModuleFilePath(process);
+                    if (path.Contains("LeagueClient.exe"))
+                        path = path.Replace("LeagueClient.exe", "Game\\League of Legends.exe");
+                    if (IsValidGamePath(path))
+                    {
+                        settings.gamepath = path;
+                        save_settings();
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Access denied or other issues, skip
+                }
+            }
+
+            // Fallback: try to parse the path from 'ProgramData\Riot Games\RiotClientInstalls.json'
             string riotInstallsPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "Riot Games",
@@ -653,32 +680,6 @@ namespace ModManager
                 }
                 catch
                 {
-                }
-            }
-
-            // If not valid, scan running processes
-            var targetNames = new[] { "LeagueClient.exe", "League of Legends.exe" };
-
-            foreach (var process in Process.GetProcesses())
-            {
-                try
-                {
-                    if (!targetNames.Contains(process.ProcessName + ".exe", StringComparer.OrdinalIgnoreCase))
-                        continue;
-
-                    string path = GetMainModuleFilePath(process);
-                    if (path.Contains("LeagueClient.exe"))
-                        path = path.Replace("LeagueClient.exe", "Game\\League of Legends.exe");
-                    if (IsValidGamePath(path))
-                    {
-                        settings.gamepath = path;
-                        save_settings();
-                        return;
-                    }
-                }
-                catch
-                {
-                    // Access denied or other issues, skip
                 }
             }
         }
@@ -1365,10 +1366,10 @@ namespace ModManager
                     result.Add(result.Count, Path.GetFileName(entry).Replace(".wad.client", "", StringComparison.OrdinalIgnoreCase));
                 }
             }
-
-            // 2. Add your manual entries
             result.Add(result.Count, "SFX");
             result.Add(result.Count, "Announcer");
+
+            // 2. Add your manual entries
 
             Wad_champs_dict = result;
         }

@@ -327,7 +327,7 @@
                                     </Grid>
 
                                     <UniformGrid Columns="2">
-                                        <CheckBox x:Name="chkKeepFolder" Content="Dont pack into .wad.client" Style="{StaticResource CustomCheckBoxStyle}"/>
+                                        <CheckBox x:Name="chkKeepFolder" Content="Pack into .wad.client" Style="{StaticResource CustomCheckBoxStyle}"/>
                                         <CheckBox x:Name="chkKeepSFX" Content="Keep sfx_events.bnk" Style="{StaticResource CustomCheckBoxStyle}"/>
                                         <CheckBox x:Name="chkKeepIcons" Content="Keep Icons if mod has any" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
                                         <CheckBox x:Name="chkKeepUI" Content="Keep UI.wad" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
