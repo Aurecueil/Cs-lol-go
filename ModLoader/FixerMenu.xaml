@@ -180,7 +180,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
     <Border Width="500" Height="600" x:Name="MainBorder"
@@ -267,6 +267,12 @@
          VerticalContentAlignment="Center" Padding="5" PreviewKeyDown="TextBox_PreviewKeyDown"
          Text="{Binding SkinNumberValue}" DataObject.Pasting="TextBox_Pasting"
          PreviewTextInput="NumberValidationTextBox"/>
+
+                                    <TextBox x:Name="txtSkinNumberProp" IsReadOnly="True" Focusable="False"
+Grid.Column="1" Height="30" Margin="0,0,10,0" Visibility="{Binding ElementName=chkAllSkins, Path=IsChecked, Converter={StaticResource BoolToVis}}"
+Background="#1A1A1A" Foreground="White" BorderBrush="Gray" BorderThickness="1"
+VerticalContentAlignment="Center" Padding="5"
+Text="-"/>
 
                                     <CheckBox x:Name="chkAllSkins" Grid.Column="2" Content="All Available Skins (for chromas)" Margin="20,0,0,0"
                                               Style="{StaticResource CustomCheckBoxStyle}"/>

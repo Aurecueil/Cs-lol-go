@@ -454,6 +454,11 @@ namespace ModManager
             else if (content == "Restore")
             {
                 restore_backup();
+                string backupDir = Path.Combine("backup", ModElement.ModFolder);
+                if (Directory.Exists(backupDir)) Directory.Delete(backupDir, true);
+                UpdateBackupUI(false);
+                CheckSkinNo();
+                CheckInitialBackupState();
             }
             else if (content == "Del")
             {
@@ -463,6 +468,8 @@ namespace ModManager
                     if (Directory.Exists(backupDir)) Directory.Delete(backupDir, true);
                     UpdateBackupUI(false);
                 }
+                CheckSkinNo();
+                CheckInitialBackupState();
             }
         }
 
@@ -541,6 +548,44 @@ namespace ModManager
                 CustomMessageBox.Show("this is not yet implemented TT");
                 return;
             }
+            string modDir = Path.Combine("installed", ModElement.ModFolder);
+            string backupDir = Path.Combine("backup", ModElement.ModFolder);
+
+            string modMeta = Path.Combine(modDir, "META");
+            string modWad = Path.Combine(modDir, "WAD");
+            string bakMeta = Path.Combine(backupDir, "META");
+            string bakWad = Path.Combine(backupDir, "WAD");
+
+            try
+            {
+                if (!Directory.Exists(backupDir))
+                {
+                    Directory.CreateDirectory(backupDir);
+
+                    if (Directory.Exists(modMeta))
+                        CopyDirectory(modMeta, bakMeta);
+
+                    if (Directory.Exists(modWad))
+                    {
+                        if (Directory.Exists(bakWad))
+                            Directory.Delete(bakWad, true);
+
+                        Directory.Move(modWad, bakWad);
+                    }
+                    Directory.CreateDirectory(modWad);
+                    LowerLog("[INFO] Created Backup (just in case)", "#2dc55e");
+                }
+                else
+                {
+                    if (Directory.Exists(modWad)) Directory.Delete(modWad, true);
+                    Directory.CreateDirectory(modWad);
+                }
+            }
+            catch (Exception ex)
+            {
+                return;
+                CustomMessageBox.Show($"{ex}", null, "ERROR");
+            }
             CallerModListEntry.set_fixer(true);
             close.Visibility = Visibility.Visible;
 
@@ -555,8 +600,6 @@ namespace ModManager
             // We cannot access UI elements (CheckBoxes/ComboBoxes) inside Task.Run later.
 
             // Paths
-            string modDir = Path.Combine("installed", ModElement.ModFolder);
-            string backupDir = Path.Combine("backup", ModElement.ModFolder);
 
             // Capture Settings into your Fixer object
 
@@ -595,35 +638,6 @@ namespace ModManager
             // We await the Task.Run, which keeps the UI responsive while waiting.
             await Task.Run(async () =>
             {
-                    string modMeta = Path.Combine(modDir, "META");
-                    string modWad = Path.Combine(modDir, "WAD");
-                    string bakMeta = Path.Combine(backupDir, "META");
-                    string bakWad = Path.Combine(backupDir, "WAD");
-
-                    // Backup Logic
-                    if (!Directory.Exists(backupDir))
-                    {
-                        Directory.CreateDirectory(backupDir);
-
-                        if (Directory.Exists(modMeta))
-                            CopyDirectory(modMeta, bakMeta);
-
-                        if (Directory.Exists(modWad))
-                        {
-                            if (Directory.Exists(bakWad))
-                                Directory.Delete(bakWad, true);
-
-                            Directory.Move(modWad, bakWad);
-                        }
-                        Directory.CreateDirectory(modWad);
-                        LowerLog("[INFO] Created Backup (just in case)", "#2dc55e");
-                    }
-                    else
-                    {
-                        if (Directory.Exists(modWad)) Directory.Delete(modWad, true);
-                        Directory.CreateDirectory(modWad);
-                    }
-
                     // Update UI about backup success safely
                     Dispatcher.Invoke(() => UpdateBackupUI(true));
 

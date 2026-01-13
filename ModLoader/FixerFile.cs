@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Shapes;
 using ZstdSharp;
 using static ModManager.Repatheruwu;
 using Path = System.IO.Path;
@@ -237,16 +238,31 @@ namespace ModManager
                 return (entries[0], false);
             }
 
-            bool isSequential = true;
+            bool isSequential = false;
+
+            var sequenceLengths = new List<int>();
+            int currentLength = 1;
             for (int i = 0; i < entries.Count - 1; i++)
             {
-                if (entries[i + 1] != entries[i] + 1)
+                if (entries[i + 1] == entries[i] + 1)
                 {
-                    isSequential = false;
-                    break;
+                    currentLength++;
+                }
+                else
+                {
+                    sequenceLengths.Add(currentLength);
+                    currentLength = 1;
                 }
             }
-
+            sequenceLengths.Add(currentLength);
+            if (sequenceLengths.Count == 1 && sequenceLengths?[0] > 12)
+            {
+                isSequential = true;
+            }
+            else
+            {
+                isSequential = sequenceLengths.Any(len => len < 4);
+            }
             if (isSequential)
             {
                 return (0, false);
@@ -507,9 +523,29 @@ namespace ModManager
 
         public List<WadExtractor.Target> process(List<WadExtractor.Target> processing)
         {
+            List<WadExtractor.Target> ToCheckup = new List<WadExtractor.Target>();
             Dictionary<WadExtractor.Target, uint> Event_bnk_lang = new Dictionary<WadExtractor.Target, uint>();
             void check_n_fix_vo()
             {
+                ToCheckup = _wadExtractor.FindAndSwapReferences(Settings.AllWadPaths, ToCheckup);
+                if (ToCheckup.Count > 0)
+                {
+                    ToCheckup = _hashes.FindMatches(ToCheckup);
+                    ToCheckup.RemoveAll(t =>
+                    {
+                        if (t.Hashes.Count == 0)
+                        {
+                            return true;
+                        }
+                        return false;
+                    });
+                    ToCheckup = _wadExtractor.FindAndSwapReferences(Settings.AllWadPaths, ToCheckup);
+                }
+                foreach (var chk in ToCheckup)
+                {
+                    x.UpperLog($"[MISS] Could not verify path for {chk.OriginalPath}", CLR_ERR);
+                    Settings.Missing_Files.Add(chk.OriginalPath);
+                }
                 Dictionary<string, List<WadExtractor.Target>> Audio_to_dl = new Dictionary<string, List<WadExtractor.Target>>();
                 foreach (var kvp in Event_bnk_lang)
                 {
@@ -641,17 +677,24 @@ namespace ModManager
 
                 if (!Settings.sfx_events)
                 {
-                    processing.RemoveAll(target =>
-                        target.OriginalPath.IndexOf("_sfx_events.bnk", StringComparison.OrdinalIgnoreCase) >= 0);
+                    bool IsSfxEvents(WadExtractor.Target t) =>
+    string.Equals(Path.GetExtension(t.OriginalPath), "_sfx_events.bnk", StringComparison.OrdinalIgnoreCase);
+                    ToCheckup = processing.Where(IsSfxEvents).ToList();
+                    processing.RemoveAll(IsSfxEvents);
                 }
 
             }
             else if (Settings.SoundOption == 2)
             {
-                processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
-                processing.RemoveAll(target =>
-                    string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
+                bool IsSound(WadExtractor.Target t)
+                {
+                    var ext = Path.GetExtension(t.OriginalPath);
+
+                    return string.Equals(ext, ".wpk", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(ext, ".bnk", StringComparison.OrdinalIgnoreCase);
+                }
+                ToCheckup = processing.Where(IsSound).ToList();
+                processing.RemoveAll(IsSound);
             }
             else
             {
@@ -695,7 +738,7 @@ namespace ModManager
                     }
                     return false;
                 });
-                processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing, CLR_MOD);
                 processing.Clear();
                 if (Settings.SoundOption != 2)
                 {
@@ -716,16 +759,23 @@ namespace ModManager
             }
             if (Settings.SoundOption == 0)
             {
-                processing.RemoveAll(target =>
-                    string.Equals(Path.GetExtension(target.OriginalPath), ".wpk", StringComparison.OrdinalIgnoreCase));
-                processing.RemoveAll(target =>
-                    string.Equals(Path.GetExtension(target.OriginalPath), ".bnk", StringComparison.OrdinalIgnoreCase));
+                bool IsSound(WadExtractor.Target t)
+                {
+                    var ext = Path.GetExtension(t.OriginalPath);
+
+                    return string.Equals(ext, ".wpk", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(ext, ".bnk", StringComparison.OrdinalIgnoreCase);
+                }
+                ToCheckup = processing.Where(IsSound).ToList();
+                processing.RemoveAll(IsSound);
             }
 
             if (Settings.AnimOption == 0)
             {
-                processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
+                bool IsANM(WadExtractor.Target t) =>
+    string.Equals(Path.GetExtension(t.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase);
+                ToCheckup = processing.Where(IsANM).ToList();
+                processing.RemoveAll(IsANM);
             }
 
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
@@ -766,19 +816,19 @@ namespace ModManager
                 }
                 return false;
             });
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing, CLR_MOD);
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
                 return processing;
             }
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing, CLR_MOD);
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
                 return processing;
             }
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
+            processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing, CLR_MOD);
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
@@ -1443,10 +1493,12 @@ namespace ModManager
                 .ToList();
         }
 
+        public static List<string> bonusPaths = [];
         public class WadExtractor
         {
             private FixerSettings _settings;
             public FixerUI x;
+            public Hashes _hash;
 
             // Reusing log colors from parent
             private const string CLR_ACT = "#2a84d2";
@@ -1542,11 +1594,14 @@ namespace ModManager
                 var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
                 var entries = new WadEntryInfo[files.Length];
 
+                var tempPaths = new ConcurrentBag<string>();
+
                 Parallel.For(0, files.Length, i =>
                 {
                     string file = files[i];
                     string relativePath = Path.GetRelativePath(sourceDirectory, file);
                     string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
+                    tempPaths.Add(wadPath);
                     byte[] fileBytes = File.ReadAllBytes(file);
 
                     entries[i] = new WadEntryInfo
@@ -1557,9 +1612,9 @@ namespace ModManager
                         Size = (uint)fileBytes.Length
                     };
                 });
+                bonusPaths.AddRange(tempPaths);
 
                 Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
-
                 ulong tocChecksum = 0;
                 foreach (var e in entries) tocChecksum ^= e.DataChecksum;
 
@@ -1697,7 +1752,7 @@ namespace ModManager
                 public string Extension;
             }
 
-            public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets)
+            public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets, string logColor = CLR_GOOD)
             {
                 if (targets == null || targets.Count == 0) return targets;
                 if (wadPaths.Count == 0) return targets;
@@ -1834,10 +1889,9 @@ namespace ModManager
 
                                     // Determine if extension changed for color coding
                                     bool extChanged = !string.Equals(Path.GetExtension(job.Target.OriginalPath), Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
-                                    string logColor = extChanged ? CLR_MOD : CLR_GOOD;
                                     string logTag = extChanged ? "[FIXD]" : "[GOOD]";
-
-                                    x.UpperLog($"{logTag} {left,-55} --> {right,-55}", logColor);
+                                    string log_c = extChanged ? CLR_MOD : logColor;
+                                    x.UpperLog($"{logTag} {left,-55} --> {right,-55}", log_c);
 
                                     string outRef = final_out;
                                     foreach (BinString s in job.Target.BinStringRef)
@@ -1855,6 +1909,124 @@ namespace ModManager
                     }
                 }
 
+
+                return targets;
+            }
+
+            public List<Target> FindAndSwapReferences(List<string> wadPaths, List<Target> targets)
+            {
+                if (targets == null || targets.Count == 0) return targets;
+                if (wadPaths.Count == 0) return targets;
+
+                // Dictionary to map Hash -> (Target Object, Index in the Hashes List)
+                var lookup = new Dictionary<ulong, (Target target, int index)>();
+                int pendingCount = 0;
+
+                foreach (var t in targets)
+                {
+                    bool added = false;
+                    // Iterate through all possible hashes for this target
+                    for (int i = 0; i < t.Hashes.Count; i++)
+                    {
+                        var h = t.Hashes[i];
+                        ulong hashVal = Repatheruwu.HashPath(h);
+
+                        // Only add if not already present (prioritizing the first occurrence if duplicates exist)
+                        if (!lookup.ContainsKey(hashVal))
+                        {
+                            lookup[hashVal] = (t, i);
+                            added = true;
+                        }
+                    }
+                    if (added) pendingCount++;
+                }
+
+                // Buffer to read directory entries (32 bytes per file entry)
+                byte[] entryBuffer = new byte[32];
+
+                foreach (var wadPath in wadPaths)
+                {
+                    // If we have found everything, stop looking
+                    if (lookup.Count == 0) break;
+                    if (!File.Exists(wadPath)) continue;
+
+                    using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var br = new BinaryReader(fs))
+                    {
+                        if (fs.Length < 272) continue;
+
+                        // Jump to file count in WAD header
+                        fs.Seek(268, SeekOrigin.Begin);
+                        uint fileCount = br.ReadUInt32();
+
+                        // Store the best match found in this specific WAD
+                        // Key: Target, Value: Index in the Hashes list (lower is better priority)
+                        var bestCandidates = new Dictionary<Target, int>();
+
+                        for (int i = 0; i < fileCount; i++)
+                        {
+                            // Read the 32-byte entry
+                            if (fs.Read(entryBuffer, 0, 32) != 32) break;
+
+                            // The first 8 bytes are the Path Hash
+                            ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
+
+                            if (lookup.TryGetValue(pathHash, out var entry))
+                            {
+                                // If this target isn't in candidates yet, OR this new match has a higher priority (lower index)
+                                if (!bestCandidates.ContainsKey(entry.target) || entry.index < bestCandidates[entry.target])
+                                {
+                                    bestCandidates[entry.target] = entry.index;
+                                }
+                            }
+                        }
+
+                        if (bestCandidates.Count == 0) continue;
+
+                        // Process the matches found in this WAD
+                        foreach (var candidate in bestCandidates)
+                        {
+                            Target t = candidate.Key;
+                            int hashIndex = candidate.Value;
+
+                            // Retrieve the actual string that exists in the WAD
+                            string foundString = t.Hashes[hashIndex];
+
+                            // Remove all hashes for this target from lookup so we don't process it again in other WADs
+                            foreach (var h in t.Hashes)
+                            {
+                                lookup.Remove(Repatheruwu.HashPath(h));
+                            }
+
+                            if (t.BinStringRef != null)
+                            {
+                                // Update the references to the string we actually found
+                                foreach (BinString s in t.BinStringRef)
+                                {
+                                    s.Value = foundString;
+                                }
+
+                                // --- Logging (Reusing your style) ---
+                                string left = t.OriginalPath.Length > 55
+                                    ? $"{t.OriginalPath[..26]}...{t.OriginalPath[^26..]}"
+                                    : t.OriginalPath;
+
+                                string right = foundString.Length > 55
+                                    ? $"{foundString[..26]}...{foundString[^26..]}"
+                                    : foundString;
+
+                                // Determine if the path changed (e.g. extension fix or hash fallback)
+                                bool pathChanged = !string.Equals(t.OriginalPath, foundString, StringComparison.OrdinalIgnoreCase);
+
+                                // Assuming 'x' is your logger instance from the original scope
+                                x.UpperLog($"[UPDT] {left,-55} --> {right,-55}", CLR_MOD);
+                            }
+
+                            // Finally, remove the processed target from the list
+                            targets.Remove(t);
+                        }
+                    }
+                }
 
                 return targets;
             }
@@ -2144,6 +2316,7 @@ namespace ModManager
             private FixerSettings _settings;
             // Cached paths are now per-instance to allow settings isolation
             private List<string> _cachedPaths;
+            public FixerUI x;
 
             public Hashes(FixerSettings settings)
             {
@@ -2180,6 +2353,7 @@ namespace ModManager
             public List<WadExtractor.Target> FindMatches(List<WadExtractor.Target> targets, bool useBaseName = true)
             {
                 var loadedPaths = GetCachedPaths();
+                loadedPaths.AddRange(bonusPaths);
 
                 foreach (var target in targets)
                 {
