@@ -1419,7 +1419,7 @@ namespace ModManager
                             {
                                 hashes.Add(Path.ChangeExtension(s, ".tex"));
                             }
-                            WadExtractor.Target found = results.FirstOrDefault(t => t.OriginalPath == s);
+                            WadExtractor.Target found = results.FirstOrDefault(t => string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase));
                             if (found != null)
                             {
                                 found.BinStringRef.Add(str);
