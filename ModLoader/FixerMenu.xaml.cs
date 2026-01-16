@@ -402,7 +402,7 @@ namespace ModManager
 
         private void cmbCharacter_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (cmbCharacter.SelectedItem != null)
+            if (cmbCharacter.SelectedItem is not null)
             {
                 _lastSelection = cmbCharacter.SelectedItem.ToString();
             }
@@ -460,9 +460,9 @@ namespace ModManager
                 CheckSkinNo();
                 CheckInitialBackupState();
             }
-            else if (content == "Del")
+            else if (content == "Delete")
             {
-                if (MessageBox.Show("Delete backup?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                if (CustomMessageBox.Show("Delete backup?", new[] { "Yes", "No" }, "Confirm") == "Yes")
                 {
                     string backupDir = Path.Combine("backup", ModElement.ModFolder);
                     if (Directory.Exists(backupDir)) Directory.Delete(backupDir, true);
@@ -695,7 +695,7 @@ namespace ModManager
                     // Manifest Logic
                     if (doManifest && selectedManifest != null)
                     {
-                        LowerLog("Downloading Manifest");
+                        LowerLog($"Downloading Manifest {selectedManifest.Version}", "#5350b9");
                         List<string> downloadedFiles = new List<string>();
 
                         string manifestFolder = Path.Combine("manifests", selectedManifest.Version);
@@ -739,7 +739,7 @@ namespace ModManager
                         );
 
                         Fixer.Settings.OldLookUp = downloadedFiles;
-                        LowerLog("Manifest Ready");
+                        LowerLog("Manifest Ready", "#2dc55e");
                     }
 
 

@@ -9,6 +9,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
+using System.IO.Packaging;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -43,6 +44,7 @@ namespace ModManager
         public string shaderhashes_path { get; set; } = "cslol-tools\\hashes.shaders.txt";
         public List<string> base_wad_path { get; set; } = [];
         public List<string> OldLookUp { get; set; } = [];
+
         public List<string> LangLookUp { get; set; } = [];
         public bool Lang { get; set; } = true; // good
 
@@ -63,6 +65,7 @@ namespace ModManager
         public uint bnk_version { get; set; } = 145; 
         public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
         public List<ShaderEntry> shaders { get; set; } = null;
+        public string ManfiestDL { get; set; } = Path.Combine("cslol-tools", "ManifestDownloader.exe");
     }
     public class ShaderEntry
     {
@@ -611,19 +614,19 @@ namespace ModManager
                     string static_mat_path = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat.bin";
                     x.LowerLog($"[SAVE] {static_mat_path}", CLR_ACT);
                     Save_Bin(EmptyLinked, staticMat, $"{Settings.outputDir}/{static_mat_path}");
-                    if (Settings.KillStaticMat)
-                    {
-                        string static_mat_path_proxy = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat_proxy.bin";
-                        EmptyLinked.Items.Add(new BinString(static_mat_path));
-                        var EmptyEntries = new BinMap(BinType.Hash, BinType.Embed);
-                        x.LowerLog($"[SAVE] {static_mat_path_proxy}", CLR_ACT);
-                        Save_Bin(EmptyLinked, EmptyEntries, $"{Settings.outputDir}/{static_mat_path_proxy}");
-                        linkedList.Items.Add(new BinString(static_mat_path_proxy));
-                    }
-                    else
+                    if (!Settings.KillStaticMat)
                     {
                         linkedList.Items.Add(new BinString(static_mat_path));
                     }
+                    // else
+                    // {
+                    //     string static_mat_path_proxy = $"data/{Settings.Character}_skin{Settings.skinNo}_StaticMat_proxy.bin";
+                    //     EmptyLinked.Items.Add(new BinString(static_mat_path));
+                    //     var EmptyEntries = new BinMap(BinType.Hash, BinType.Embed);
+                    //     x.LowerLog($"[SAVE] {static_mat_path_proxy}", CLR_ACT);
+                    //     Save_Bin(EmptyLinked, EmptyEntries, $"{Settings.outputDir}/{static_mat_path_proxy}");
+                    //     linkedList.Items.Add(new BinString(static_mat_path_proxy));
+                    // }
                 }
 
                 x.LowerLog($"[SAVE] {binPath}", CLR_ACT);
@@ -640,7 +643,7 @@ namespace ModManager
                     var rrEntry = binentries.Items.FirstOrDefault(x => ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver);
                     var rrKeyRef = rrEntry.Key != null ? (BinHash)rrEntry.Key : null;
 
-                    foreach (int i in Enumerable.Range(1, 99))
+                    foreach (int i in Enumerable.Range(1, 199))
                     {
                         binPath = $"data/characters/{Settings.Character}/skins/skin{i}.bin";
 
@@ -660,22 +663,22 @@ namespace ModManager
             if (!Settings.folder)
             {
                 x.LowerLog("[PACK] Packing WAD", CLR_ACT);
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "cslol-tools/wad-make.exe",
-                    Arguments = $"\"{Settings.outputDir}\"",
-                    CreateNoWindow = true,      // Don't show a console window
-                    UseShellExecute = false,    // Required for redirecting output or hiding window
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = false
-                };
-
-                using (var proc = Process.Start(psi))
-                {
-                    proc.WaitForExit();
-                }
-                //_wadExtractor.PackDirectoryToWadCompressed(Settings.outputDir, $"{Settings.outputDir}.client");
+                // 
+                // var psi = new ProcessStartInfo
+                // {
+                //     FileName = "cslol-tools/wad-make.exe",
+                //     Arguments = $"\"{Settings.outputDir}\"",
+                //     CreateNoWindow = true,      // Don't show a console window
+                //     UseShellExecute = false,    // Required for redirecting output or hiding window
+                //     RedirectStandardOutput = false,
+                //     RedirectStandardError = false
+                // };
+                // 
+                // using (var proc = Process.Start(psi))
+                // {
+                //     proc.WaitForExit();
+                // }
+                _wadExtractor.PackDirectoryToWadCompressed(Settings.outputDir, $"{Settings.outputDir}.client");
                 Directory.Delete(Settings.outputDir, true);
             }
 
@@ -785,7 +788,7 @@ namespace ModManager
                 {
                     foreach (var kv in Audio_to_dl)
                     {
-                        string VO_path = Path.Combine("manifest", $".lang_{Settings.bnk_version}_{kv.Key}");
+                        string VO_path = Path.Combine("manifests", $".lang_{Settings.bnk_version}_{kv.Key}");
                         string VO_wad = Path.Combine(VO_path, "DATA","FINAL","Champions",$"{Settings.Character}.{kv.Key}.wad.client");
                         if (!File.Exists(VO_wad))
                         {
@@ -807,7 +810,7 @@ namespace ModManager
 
                             var psi = new ProcessStartInfo
                             {
-                                FileName = Path.Combine("cslol-tools", "ManifestDownloader.exe"),
+                                FileName = Settings.ManfiestDL,
                                 Arguments = $"\"{manifestFilePath}\" -f {Settings.Character}.{kv.Key}.wad.client -o \"{VO_path}\"",
                                 UseShellExecute = false,
                                 CreateNoWindow = true
@@ -1514,7 +1517,6 @@ namespace ModManager
 
             foreach (var entry in StaticMatEntries)
             {
-                // entry.Value is the BinEmbed for the StaticMaterial
                 if (entry.Value.Value is BinEmbed materialEmbed2)
                 {
                     var embedListField = materialEmbed2.Items.FirstOrDefault(f => f.Key.Hash == 0x0a6f0eb5);
@@ -1599,6 +1601,247 @@ namespace ModManager
                 }
             }
 
+            //        foreach (var entry in VFXEntries)
+            //        {
+            //            // Ensure we are working with a BinEmbed (the root definition)
+            //            if (entry.Value.Value is not BinEmbed vfxEmbed)
+            //                continue;
+            //        
+            //            uint[] validHashes = { 0x6781e762, 0x868eb76a };
+            //        
+            //            // 1. Find the fields that contain the Emitter Lists (0x868eb76a, etc.)
+            //            // The user's snippet iterated Items directly, but the data dump shows these are Lists.
+            //            // We iterate the fields of the main Embed.
+            //            foreach (var listField in vfxEmbed.Items.Where(f => validHashes.Contains(f.Key.Hash)).ToList())
+            //            {
+            //                x.UpperLog($"Found valid list hash: 0x{listField.Key.Hash:x8}");
+            //        
+            //                // We expect the value to be a List of Pointers (The Emitters)
+            //                if (listField.Value is not BinList binList) continue;
+            //        
+            //                // 2. Iterate through every Emitter in that list
+            //                foreach (var emitterValue in binList.Items)
+            //                {
+            //                    if (emitterValue is not BinPointer emitterPointer) continue;
+            //        
+            //                    x.UpperLog($"Processing Emitter Pointer: {emitterPointer.Name}");
+            //        
+            //                    // 3. Find the Shape Attribute (0x9dc3d926) inside the Emitter
+            //                    var shapeField = emitterPointer.Items.FirstOrDefault(f => f.Key.Hash == 0x9dc3d926);
+            //        
+            //                    if (shapeField == null) continue;
+            //        
+            //                    // The shape is typically an Embed or Pointer containing data
+            //                    // We need to check if it has content.
+            //                    List<BinField>? shapeItems = null;
+            //                    if (shapeField.Value is BinEmbed shapeEmbed) shapeItems = shapeEmbed.Items;
+            //                    else if (shapeField.Value is BinPointer shapePtr) shapeItems = shapePtr.Items;
+            //        
+            //                    if (shapeItems == null || shapeItems.Count == 0) continue;
+            //        
+            //                    x.UpperLog($"Found Shape Attribute 0x9dc3d926 with {shapeItems.Count} items.");
+            //        
+            //                    // Initialize the "ShitDict" logic state
+            //                    bool emitRotationAnglesKeyValues = false;
+            //                    bool emitRotationAxesShit = false;
+            //                    bool flags = false;
+            //                    bool keepItAs0x4f4e2ed7 = false;
+            //        
+            //                    float radiusVal = 0;
+            //                    float heightVal = 0;
+            //        
+            //                    // We must iterate a Copy or use a for-loop because we might modify shapeItems inside
+            //                    for (int i = 0; i < shapeItems.Count; i++)
+            //                    {
+            //                        var insideOfShape = shapeItems[i];
+            //        
+            //                        // --- Logic: 0xff7d0e41 (BirthTranslation handling) ---
+            //                        if (insideOfShape.Key.Hash == 0xff7d0e41)
+            //                        {
+            //                            // Check contents of this inner structure
+            //                            List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+            //                            if (innerItems != null)
+            //                            {
+            //                                var vec3Field = innerItems.FirstOrDefault(f => f.Key.Hash == 0xb4b427aa && f.Value.Type == BinType.Vec3);
+            //        
+            //                                if (vec3Field != null && vec3Field.Value is BinVec3 vec3Val)
+            //                                {
+            //                                    x.UpperLog("Moving BirthTranslation to Emitter parent.");
+            //        
+            //                                    // Create new Embed for the Emitter
+            //                                    var birthTranslation = new BinEmbed(new FNV1a(0x68dc32b6)); // hash_type
+            //        
+            //                                    // Add the vec3 to the new embed
+            //                                    birthTranslation.Items.Add(new BinField(vec3Field.Key, new BinVec3(vec3Val.Value)));
+            //        
+            //                                    // Add this new field to the EMITTER (Parent of Shape)
+            //                                    // hash = 0x563d4a22
+            //                                    emitterPointer.Items.Add(new BinField(new FNV1a(0x563d4a22), birthTranslation));
+            //        
+            //                                    // Clear the data of the current shape item (inside_of_shape.data = [])
+            //                                    if (insideOfShape.Value is BinEmbed innerEmbed) innerEmbed.Items.Clear();
+            //                                    else if (insideOfShape.Value is BinPointer innerPtr) innerPtr.Items.Clear();
+            //        
+            //                                    // Python did a break here, implying specific handling for the first match
+            //                                    // logic usually continues to next shape item though.
+            //                                }
+            //                            }
+            //                        }
+            //        
+            //                        // --- Logic: 0xe5f268dd (Extracting Radius/Height) ---
+            //                        else if (insideOfShape.Key.Hash == 0xe5f268dd)
+            //                        {
+            //                            List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+            //                            if (innerItems != null)
+            //                            {
+            //                                foreach (var item in innerItems)
+            //                                {
+            //                                    if (item.Key.Hash == 0xb4b427aa && item.Value is BinVec3 v3)
+            //                                    {
+            //                                        radiusVal = v3.Value.X;
+            //                                        heightVal = v3.Value.Y; // "lmao?"
+            //                                        x.UpperLog($"Extracted Radius: {radiusVal}, Height: {heightVal}");
+            //                                    }
+            //                                    else if (item.Key.Hash == 0xbc037de7)
+            //                                    {
+            //                                        // Drill down: inside_of_emitoffset -> table_data -> shit -> smoll_shit
+            //                                        AnalyzeNestedTable(item.Value, ref flags, ref keepItAs0x4f4e2ed7);
+            //                                    }
+            //                                }
+            //                            }
+            //                        }
+            //        
+            //                        // --- Logic: 0x07f41838 ---
+            //                        else if (insideOfShape.Key.Hash == 0x07f41838)
+            //                        {
+            //                            List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+            //                            if (innerItems != null)
+            //                            {
+            //                                foreach (var valFloat in innerItems)
+            //                                {
+            //                                    // "for stuff in value_float.data" implies structure depth
+            //                                    List<BinField>? stuffItems = GetItemsFromBinValue(valFloat.Value);
+            //                                    if (stuffItems == null) continue;
+            //        
+            //                                    foreach (var stuff in stuffItems)
+            //                                    {
+            //                                        if (stuff.Key.Hash == 0xbc037de7)
+            //                                        {
+            //                                            AnalyzeNestedTableForRotation(stuff.Value, ref emitRotationAnglesKeyValues);
+            //                                        }
+            //                                    }
+            //                                }
+            //                            }
+            //                        }
+            //        
+            //                        // --- Logic: 0xd1789c65 ---
+            //                        else if (insideOfShape.Key.Hash == 0xd1789c65)
+            //                        {
+            //                            List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+            //                            // Looking for list length 2
+            //                            // Python: list[vec3] = { { 0, 1, 0 } { 0, 0, 1 } }
+            //                            // In Ritobin, a List BinValue works differently than Embed items.
+            //                            // If `insideOfShape.Value` is a BinList:
+            //                            if (insideOfShape.Value is BinList vecList && vecList.Items.Count == 2)
+            //                            {
+            //                                if (vecList.Items[0] is BinVec3 v1 && vecList.Items[1] is BinVec3 v2)
+            //                                {
+            //                                    if ((int)v1.Value.Y == 1 && (int)v2.Value.Z == 1)
+            //                                    {
+            //                                        emitRotationAxesShit = true;
+            //                                        x.UpperLog("EmitRotationAxesShit set to True");
+            //                                    }
+            //                                }
+            //                            }
+            //                        }
+            //                    }
+            //        
+            //                    // --- Final Reconstruction Logic ---
+            //        
+            //                    // Python: shape.hash = 0x3bf0b4ed (This actually changes the KEY of the field in the parent list)
+            //                    // But usually in these scripts, it implies transforming the Object Type Hash (Name).
+            //                    // However, looking at the result logic:
+            //                    // It constructs a new Object.
+            //        
+            //                    if (!keepItAs0x4f4e2ed7 && emitRotationAnglesKeyValues && emitRotationAxesShit)
+            //                    {
+            //                        x.UpperLog("Transforming Shape to 0x3dbe415d");
+            //        
+            //                        // Create new Pointer
+            //                        var newPointer = new BinPointer(new FNV1a(0x3dbe415d)); // Hash Type
+            //        
+            //                        // Add Radius (0x0dba4cb3)
+            //                        newPointer.Items.Add(new BinField(new FNV1a(0x0dba4cb3), new BinF32(radiusVal)));
+            //        
+            //                        // Add Height (0xd5bdbb42) if exists (check logic: python says if shit_dict.get("Height"))
+            //                        // Note: heightVal is float, check if non-zero or logic requires specific check? 
+            //                        // Assuming non-zero based on generic extraction logic
+            //                        if (heightVal != 0)
+            //                        {
+            //                            newPointer.Items.Add(new BinField(new FNV1a(0xd5bdbb42), new BinF32(heightVal)));
+            //                        }
+            //        
+            //                        // Add Flags (0x9c677a2c)
+            //                        if (flags)
+            //                        {
+            //                            newPointer.Items.Add(new BinField(new FNV1a(0x9c677a2c), new BinU8(1)));
+            //                        }
+            //        
+            //                        // Update the Field Key and Value
+            //                        shapeField.Key = new FNV1a(0x3bf0b4ed);
+            //                        shapeField.Value = newPointer;
+            //                    }
+            //                    else
+            //                    {
+            //                        // Else logic
+            //                        // Check if shapeItems has 1 item, hash is 0xe5f268dd, and contains a Vector
+            //                        bool isSimpleVec3 = false;
+            //                        BinVec3? constantVec3 = null;
+            //        
+            //                        if (shapeItems.Count == 1 && shapeItems[0].Key.Hash == 0xe5f268dd)
+            //                        {
+            //                            // "isinstance(shape.data[0].data[0].data, Vector)"
+            //                            // We need to check if the INNER item is a Vec3
+            //                            List<BinField>? inner = GetItemsFromBinValue(shapeItems[0].Value);
+            //                            if (inner != null && inner.Count > 0 && inner[0].Value is BinVec3 v3)
+            //                            {
+            //                                isSimpleVec3 = true;
+            //                                constantVec3 = v3;
+            //                            }
+            //                        }
+            //        
+            //                        if (isSimpleVec3 && constantVec3 != null)
+            //                        {
+            //                            x.UpperLog("Transforming Shape to 0xee39916f (Simple Vec3)");
+            //        
+            //                            // Transform to Embed with type ee39916f
+            //                            var newEmbed = new BinEmbed(new FNV1a(0xee39916f));
+            //        
+            //                            // Flatten: The field 0xe5f268dd now directly contains the vec3
+            //                            newEmbed.Items.Add(new BinField(new FNV1a(0xe5f268dd), new BinVec3(constantVec3.Value)));
+            //        
+            //                            shapeField.Value = newEmbed;
+            //                        }
+            //                        else
+            //                        {
+            //                            x.UpperLog("Defaulting Shape to 0x4f4e2ed7");
+            //                            // Default 0x4f4e2ed7
+            //                            // In Ritobin, the "hash_type" is the Name of the Embed/Pointer
+            //                            if (shapeField.Value is BinEmbed existingEmbed)
+            //                            {
+            //                                existingEmbed.Name = new FNV1a(0x4f4e2ed7);
+            //                            }
+            //                            else if (shapeField.Value is BinPointer existingPtr)
+            //                            {
+            //                                existingPtr.Name = new FNV1a(0x4f4e2ed7);
+            //                            }
+            //                        }
+            //                    }
+            //                }
+            //            }
+            //        }
+
+
             void ScanStrings(Dictionary<uint, KeyValuePair<BinValue, BinValue>> source)
             {
                 foreach (var kvp in source.Values)
@@ -1679,6 +1922,100 @@ namespace ModManager
                 RREntries.Remove(key);
             }
         }
+        // private List<BinField>? GetItemsFromBinValue(BinValue value)
+        // {
+        //     if (value is BinEmbed embed) return embed.Items;
+        //     if (value is BinPointer ptr) return ptr.Items;
+        //     return null; // Lists or primitives don't have BinField items directly
+        // }
+
+        // "Drill down" logic for 0xbc037de7 -> 0xa7084719 -> smoll_shit
+        // private void AnalyzeNestedTable(BinValue rootValue, ref bool flags, ref bool keepIt)
+        // {
+        //     // rootValue is the 0xbc037de7 container
+        //     List<BinField>? tableData = GetItemsFromBinValue(rootValue);
+        //     if (tableData == null) return;
+        // 
+        //     foreach (var td in tableData)
+        //     {
+        //         if (td.Key.Hash == 0xa7084719) // "list[pointer]" usually
+        //         {
+        //             // The value here is likely a BinList containing items
+        //             if (td.Value is BinList list)
+        //             {
+        //                 foreach (var shit in list.Items)
+        //                 {
+        //                     List<BinField>? smollShits = GetItemsFromBinValue(shit);
+        //                     if (smollShits == null) continue;
+        // 
+        //                     foreach (var smoll_shit in smollShits)
+        //                     {
+        //                         if (smoll_shit.Key.Hash == 0xe44b7382)
+        //                         {
+        //                             // Check data: python expects list[f32]
+        //                             if (smoll_shit.Value is BinList f32List && f32List.Items.Count >= 2)
+        //                             {
+        //                                 float d0 = (f32List.Items[0] as BinF32)?.Value ?? -999;
+        //                                 float d1 = (f32List.Items[1] as BinF32)?.Value ?? -999;
+        // 
+        //                                 if (d0 == 0 && d1 >= 1)
+        //                                 {
+        //                                     flags = true;
+        //                                     x.UpperLog("Flags detected via nested table");
+        //                                 }
+        //                                 else if (d0 == -1 && d1 == 1)
+        //                                 {
+        //                                     keepIt = true;
+        //                                     x.UpperLog("KeepItAs0x4f4e2ed7 detected via nested table");
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // 
+        // private void AnalyzeNestedTableForRotation(BinValue rootValue, ref bool emitRotation)
+        // {
+        //     // rootValue is 0xbc037de7 container
+        //     List<BinField>? tableData = GetItemsFromBinValue(rootValue);
+        //     if (tableData == null) return;
+        // 
+        //     foreach (var td in tableData)
+        //     {
+        //         if (td.Key.Hash == 0xa7084719)
+        //         {
+        //             if (td.Value is BinList list)
+        //             {
+        //                 foreach (var shit in list.Items)
+        //                 {
+        //                     List<BinField>? smollShits = GetItemsFromBinValue(shit);
+        //                     if (smollShits == null) continue;
+        // 
+        //                     foreach (var smoll_shit in smollShits)
+        //                     {
+        //                         if (smoll_shit.Key.Hash == 0xe44b7382)
+        //                         {
+        //                             if (smoll_shit.Value is BinList f32List && f32List.Items.Count >= 2)
+        //                             {
+        //                                 float d0 = (f32List.Items[0] as BinF32)?.Value ?? -999;
+        //                                 float d1 = (f32List.Items[1] as BinF32)?.Value ?? -999;
+        // 
+        //                                 if (d0 == 0 && d1 > 1)
+        //                                 {
+        //                                     emitRotation = true;
+        //                                     x.UpperLog("EmitRotationAnglesKeyValues detected");
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         public void FindStringsRecursive(BinValue value, List<WadExtractor.Target> results)
         {
@@ -1874,6 +2211,8 @@ namespace ModManager
                 public ulong PathHash;
                 public ulong DataChecksum;
                 public uint Size;
+                public uint UncompressedSize;
+                public byte CompressionType;
             }
 
             public void PackDirectoryToWad(string sourceDirectory, string outputWadPath)
@@ -2312,7 +2651,7 @@ namespace ModManager
                                 bool pathChanged = !string.Equals(t.OriginalPath, foundString, StringComparison.OrdinalIgnoreCase);
 
                                 // Assuming 'x' is your logger instance from the original scope
-                                x.UpperLog($"[UPDT] {left,-55} --> {right,-55}", CLR_MOD);
+                                x.UpperLog($"[UPDT] {left,-55} --> {right,-55}", pathChanged ? CLR_MOD : CLR_GOOD);
                             }
 
                             // Finally, remove the processed target from the list
@@ -2347,138 +2686,169 @@ namespace ModManager
                 var span = new ReadOnlySpan<byte>(data, 0, length);
                 return decompressor.Unwrap(span.ToArray()).ToArray();
             }
+            private class ProcessedEntry
+            {
+                public WadEntryInfo Info;
+                public byte[] Data;
+            }
+
             public void PackDirectoryToWadCompressed(string sourceDirectory, string outputWadPath)
             {
                 if (!Directory.Exists(sourceDirectory))
-                    throw new DirectoryNotFoundException($"Source directory not found: {sourceDirectory}");
+                    throw new DirectoryNotFoundException(sourceDirectory);
 
                 string outputDir = Path.GetDirectoryName(outputWadPath);
-                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+                if (!string.IsNullOrEmpty(outputDir)) Directory.CreateDirectory(outputDir);
 
                 var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
 
-                // We use a temporary container to hold the compressed data in memory 
-                // because we need exact sizes for the TOC before writing the file body.
-                var entryData = new ConcurrentDictionary<ulong, byte[]>();
-                var entries = new WadEntryInfo[files.Length];
+                // FIX: Use an array of objects instead of a Dictionary to avoid threading crashes
+                var processedEntries = new ProcessedEntry[files.Length];
 
-                // 1. Compress and Hash in Parallel
+                // -------------------------------
+                // 1. Compress + hash (parallel)
+                // -------------------------------
                 Parallel.For(0, files.Length, i =>
                 {
                     string file = files[i];
-                    string relativePath = Path.GetRelativePath(sourceDirectory, file);
-                    string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
+                    string relativePath = Path.GetRelativePath(sourceDirectory, file)
+                        .Replace('\\', '/')
+                        .ToLowerInvariant();
 
+                    // cslol-tools uses XXH64 for path hashing
+                    ulong pathHash = Repatheruwu.HashPath(relativePath);
                     byte[] originalBytes = File.ReadAllBytes(file);
-                    ulong pathHash = Repatheruwu.HashPath(wadPath);
-                    ulong dataChecksum = BitConverter.ToUInt64(XxHash64.Hash(originalBytes)); // Checksum is usually of the original data
+
+                    // Logic matches cslol-tools (Magic bytes are safer, but extension works for basic mods)
+                    bool rawOnly = relativePath.EndsWith(".bnk") || relativePath.EndsWith(".wpk");
 
                     byte[] finalData;
+                    byte compressionType;
 
-                    byte type;
-
-                    // Attempt Compression (Zstd Level 22 is usually 'Ultra')
-                    // Using a disposable compressor context if your library requires it
-                    using (var compressor = new Compressor(22))
+                    if (rawOnly)
                     {
-                        byte[] compressedBytes = compressor.Wrap(originalBytes).ToArray();
-
-                        // If compression actually saves space, use it. Otherwise, store raw.
-                        if (compressedBytes.Length < originalBytes.Length)
-                        {
-                            finalData = compressedBytes;
-                            type = 3; // ZSTD Type
-                        }
-                        else
-                        {
-                            finalData = originalBytes;
-                            type = 0; // Uncompressed
-                        }
+                        finalData = originalBytes;
+                        compressionType = 0; // Raw
+                    }
+                    else
+                    {
+                        // Zstd Level 0 in C++ maps to default level 3
+                        using var compressor = new Compressor(3);
+                        finalData = compressor.Wrap(originalBytes).ToArray();
+                        compressionType = 3; // Zstd
                     }
 
-                    // Store the data for the writing phase
-                    entryData[pathHash] = finalData;
+                    // XXH3 Checksum of the FINAL (compressed) data
+                    ulong checksum = XxHash3.HashToUInt64(finalData);
 
-                    // Fill metadata (Size = Compressed Size, UncompressedSize = Original)
-                    entries[i] = new WadEntryInfo
+                    // Store directly in array slot 'i' (Thread-Safe)
+                    processedEntries[i] = new ProcessedEntry
                     {
-                        FilePath = file, // Kept for reference, though we use entryData now
-                        PathHash = pathHash,
-                        DataChecksum = dataChecksum,
-                        Size = (uint)finalData.Length,
-                        // We'll store the Type in the unused high bits or just handle it during write. 
-                        // Since the struct doesn't have a Type field, let's piggyback or just rely on the logic below.
-                        // However, the cleanest way without changing your struct is to assume 
-                        // if Size < OriginalSize (we need to track OriginalSize somewhere).
-                        // Let's assume we modify WadEntryInfo or use a Tuple. 
-                        // For this snippet, I will modify the write logic to look up the type from the data comparison
-                        // or simpler: I'll assume you add a 'Type' field or 'UncompressedSize' to WadEntryInfo. 
-                        // But sticking to your provided struct:
+                        Info = new WadEntryInfo
+                        {
+                            FilePath = file,
+                            PathHash = pathHash,
+                            Size = (uint)finalData.Length,
+                            UncompressedSize = (uint)originalBytes.Length,
+                            CompressionType = compressionType,
+                            DataChecksum = checksum
+                        },
+                        Data = finalData
                     };
-
-                    // HACK: Since WadEntryInfo definition in your snippet is fixed, 
-                    // and we need to pass UncompressedSize and Type to the writer:
-                    // I will use a local dictionary to store the extra metadata needed for the TOC.
                 });
 
-                // 2. Sort entries to match standard WAD structure (by PathHash)
-                Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
+                // -------------------------------
+                // 2. Sort by hash (WAD standard)
+                // -------------------------------
+                // We sort the combined array so Data stays with Info
+                Array.Sort(processedEntries, (a, b) => a.Info.PathHash.CompareTo(b.Info.PathHash));
 
-                ulong tocChecksum = 0;
-                foreach (var e in entries) tocChecksum ^= e.DataChecksum;
+                // -------------------------------
+                // 3.4 Requirement: TOC Checksum
+                // -------------------------------
+                ulong headerChecksum = CalculateTocChecksum(processedEntries);
 
-                using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
-                using (var bw = new BinaryWriter(fs))
+                // -------------------------------
+                // 3. Write WAD (Version 3.4)
+                // -------------------------------
+                using var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write);
+                using var bw = new BinaryWriter(fs);
+
+                // ---- Header (v3.4) ----
+                bw.Write(new[] { 'R', 'W' });
+                bw.Write((byte)3); // Major
+                bw.Write((byte)4); // Minor (Updated to 4)
+                bw.Write(new byte[256]); // ECDSA Signature (Empty)
+                bw.Write(headerChecksum); // 3.4 Required Checksum
+                bw.Write((uint)processedEntries.Length);
+
+                // Calculate Data Start Offset
+                // Header (272) + Entries (Count * 32 bytes)
+                uint currentOffset = 272 + (uint)(processedEntries.Length * 32);
+
+                // Deduplication Map: Maps DataChecksum -> FileOffset
+                var writtenOffsets = new Dictionary<ulong, uint>();
+
+                // ---- TOC ----
+                foreach (var entry in processedEntries)
                 {
-                    // --- Header ---
-                    bw.Write(new char[] { 'R', 'W' });
-                    bw.Write((byte)3);
-                    bw.Write((byte)4);
-                    bw.Write(new byte[256]);
-                    bw.Write(tocChecksum);
-                    bw.Write((uint)entries.Length);
-
-                    // Calculate Start of Data Area
-                    uint dataStartOffset = 272 + ((uint)entries.Length * 32);
-                    uint absoluteOffset = dataStartOffset;
-
-                    // --- Write TOC ---
-                    foreach (var entry in entries)
+                    // Deduplication: If we already wrote this data, point to it
+                    if (!writtenOffsets.TryGetValue(entry.Info.DataChecksum, out uint entryOffset))
                     {
-                        byte[] data = entryData[entry.PathHash];
-
-                        // We need to retrieve the uncompressed size. 
-                        // Since we don't have it in the struct, we can infer it or (better) 
-                        // re-read the original file size or store it in a parallel list. 
-                        // For safety/speed here, let's grab the file info.
-                        uint uncompressedSize = (uint)new FileInfo(entry.FilePath).Length;
-
-                        // Determine type based on data comparison
-                        byte compressionType = (data.Length < uncompressedSize) ? (byte)3 : (byte)0;
-
-                        bw.Write(entry.PathHash);        // 0-7
-                        bw.Write(absoluteOffset);        // 8-11: Offset
-                        bw.Write((uint)data.Length);     // 12-15: Compressed Size
-                        bw.Write(uncompressedSize);      // 16-19: Uncompressed Size
-                        bw.Write(compressionType);       // 20: Type (3 = Zstd, 0 = None)
-                        bw.Write((byte)0);               // 21
-                        bw.Write((ushort)0);             // 22-23
-                        bw.Write(entry.DataChecksum);    // 24-31
-
-                        absoluteOffset += (uint)data.Length;
+                        entryOffset = currentOffset;
+                        writtenOffsets[entry.Info.DataChecksum] = currentOffset;
+                        currentOffset += entry.Info.Size;
                     }
 
-                    // --- Write Data ---
-                    foreach (var entry in entries)
-                    {
-                        byte[] data = entryData[entry.PathHash];
-                        bw.Write(data);
+                    bw.Write(entry.Info.PathHash);
+                    bw.Write(entryOffset);
+                    bw.Write(entry.Info.Size);
+                    bw.Write(entry.Info.UncompressedSize);
 
-                        // Help GC slightly by removing reference (optional)
-                        entryData.TryRemove(entry.PathHash, out _);
+                    // v3.4 Entry: Type (4 bits) | SubChunkCount (4 bits)
+                    // Usually count is 0.
+                    bw.Write((byte)(entry.Info.CompressionType & 0xF));
+
+                    // v3.4 Entry: SubChunkIndex (3 bytes / 24-bit)
+                    // Writing 3 zeros
+                    bw.Write((byte)0);
+                    bw.Write((byte)0);
+                    bw.Write((byte)0);
+
+                    bw.Write(entry.Info.DataChecksum);
+                }
+
+                // ---- Data ----
+                // Write distinct data chunks
+                var writtenChecksums = new HashSet<ulong>();
+                foreach (var entry in processedEntries)
+                {
+                    if (writtenChecksums.Add(entry.Info.DataChecksum))
+                    {
+                        bw.Write(entry.Data);
                     }
                 }
             }
+
+            // -------------------------------
+            // Helper for WAD 3.4 Checksum
+            // -------------------------------
+            private ulong CalculateTocChecksum(ProcessedEntry[] sortedEntries)
+            {
+                var hasher = new XxHash3();
+                // 3.4 Header Magic+Ver
+                hasher.Append(new byte[] { (byte)'R', (byte)'W', 3, 4 });
+
+                foreach (var e in sortedEntries)
+                {
+                    hasher.Append(BitConverter.GetBytes(e.Info.PathHash));
+                    hasher.Append(BitConverter.GetBytes(e.Info.DataChecksum));
+                }
+
+                // GetCurrentHash() returns byte[], convert to ulong
+                return BitConverter.ToUInt64(hasher.GetCurrentHash());
+            }
+
         }
 
         public class PathFixer
