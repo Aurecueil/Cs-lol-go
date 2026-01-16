@@ -138,7 +138,7 @@ namespace ModManager
         public bool catch_updated { get; set; } = false;
         public int import_override { get; set; } = 0;
 
-        public double Tile_height { get; set; } = 60;
+        public double Tile_height { get; set; } = 50;
         public int Tile_width { get; set; } = 620;
 
         public bool reinitialize { get; set; } = false;
@@ -1191,7 +1191,8 @@ namespace ModManager
         private static readonly string[] GitHubUrls =
         {
         "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.0",
-        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.1"
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.1",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.binentries.txt"
         };
 
         private const string DownloadUrl = "https://raw.communitydragon.org/binviewer/hashes/hashes.game.txt";
@@ -1199,6 +1200,8 @@ namespace ModManager
         private static readonly string HashesFilePath = Path.Combine(BasePath, "hashes.game.txt");
         private static readonly string CheckFilePath = Path.Combine(BasePath, "hashes.check.txt");
 
+        private const string BinEntriesDownloadUrl = "https://raw.githubusercontent.com/CommunityDragon/Data/refs/heads/master/hashes/lol/hashes.binentries.txt";
+        private static readonly string BinEntriesFilePath = Path.Combine(BasePath, "hashes.shaders.txt");
         public async Task<string> RunCurlCommandAsync(string url)
         {
             var curlCommand = $"curl -I -H \"User-Agent: cslol-tools\" -H \"Accept: application/vnd.github.v3+json\" \"{url}\"";
@@ -1284,20 +1287,58 @@ namespace ModManager
 
 
                     }
+                    if (!File.Exists(BinEntriesFilePath) || needsUpdate)
+                    {
+                        using var httpClient = new HttpClient();
+
+                        Dispatcher.Invoke(() => Feed2.Text = "Downloading and filtering shaders...");
+
+                        try
+                        {
+                            // 1. Download the raw content
+                            var binEntriesContent = await httpClient.GetStringAsync(BinEntriesDownloadUrl);
+
+                            // 2. Split into lines
+                            var lines = binEntriesContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+                            // 3. Filter: Keep only lines where the path (after the hash) starts with "Shaders/"
+                            var filteredLines = lines.Where(line =>
+                            {
+                                // Format is usually: "HASH PATH" (e.g., "12345678 Shaders/MyShader.prop")
+                                int spaceIndex = line.IndexOf(' ');
+                                if (spaceIndex > -1 && spaceIndex + 1 < line.Length)
+                                {
+                                    // check the part after the space
+                                    string pathPart = line.Substring(spaceIndex + 1);
+                                    return pathPart.StartsWith("Shaders/", StringComparison.OrdinalIgnoreCase);
+                                }
+                                return false;
+                            });
+
+                            // 4. Save the filtered result
+                            await File.WriteAllLinesAsync(BinEntriesFilePath, filteredLines);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Optional: Log specific error for the binentries part so it doesn't fail the whole update
+                            Dispatcher.Invoke(() => Feed2.Text = $"Warning: Failed to update shaders. {ex.Message}");
+                        }
+                    }
                     if (needsUpdate)
                     {
-
                         using var httpClient = new HttpClient();
-                        Dispatcher.Invoke(() => Feed2.Text = "Downloading latest hashes...");
+
+                        // --- Existing Logic: Download Game Hashes ---
+                        Dispatcher.Invoke(() => Feed2.Text = "Downloading game hashes...");
                         var content = await httpClient.GetStringAsync(DownloadUrl);
                         await File.WriteAllTextAsync(HashesFilePath, content);
+
+
+                        // --- Finalize ---
                         await File.WriteAllTextAsync(CheckFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
                         Dispatcher.Invoke(() => Feed2.Text = "Hashes updated successfully.");
                     }
-                    else
-                    {
-                        Dispatcher.Invoke(() => Feed2.Text = "Hashes are up-to-date.");
-                    }
+                    Dispatcher.Invoke(() => Feed2.Text = "Hashes are up-to-date.");
                 }
                 catch (Exception ex)
                 {

@@ -288,10 +288,9 @@ Text="-"/>
                                     <CheckBox x:Name="chkBinsless" Grid.Column="0" Content="Binless" ToolTip="Assets only mod"
                                               Style="{StaticResource CustomCheckBoxStyle}"/>
 
-                                    <CheckBox x:Name="chkNoSkinLight" Grid.Column="2" Content="Apply to all skins" IsChecked="True"
+                                    <CheckBox x:Name="chkNoSkinLight" Grid.Column="1" Content="Apply to all skins" IsChecked="True"
                                               Style="{StaticResource CustomCheckBoxStyle}" Visibility="Visible"/>
 
-                                    <CheckBox x:Name="chkKillStatic" Grid.Column="1" Content="Kill Static Mats"  Style="{StaticResource CustomCheckBoxStyle}" ToolTip="outdated static mats can often crash mods, but some mod look ass without them"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -338,6 +337,7 @@ Text="-"/>
                                         <CheckBox x:Name="chkKeepIcons" Content="Keep Icons if mod has any" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
                                         <CheckBox x:Name="chkKeepUI" Content="Keep UI.wad" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
                                         <CheckBox x:Name="chkAddStuff" Content="Keep bonus Stuff" Style="{StaticResource CustomCheckBoxStyle}" IsChecked="True"/>
+                                        <CheckBox x:Name="chkKillStatic" Grid.Column="1" Content="Kill Static Mats"  Style="{StaticResource CustomCheckBoxStyle}" ToolTip="outdated static mats can often crash mods, but some mod look ass without them"/>
                                         <Grid Height="30">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>

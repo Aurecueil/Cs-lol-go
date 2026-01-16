@@ -1,16 +1,22 @@
 ﻿using Jade.Ritobin;
+using SharpCompress.Common;
+using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing.Text;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Markup;
 using System.Windows.Shapes;
+using Xceed.Wpf.Toolkit.PropertyGrid.Attributes;
 using ZstdSharp;
 using static ModManager.Repatheruwu;
 using Path = System.IO.Path;
@@ -34,6 +40,7 @@ namespace ModManager
         public bool in_file_path { get; set; } = true;
         public bool cls_assets { get; set; } = true;
         public string gamehashes_path { get; set; } = "cslol-tools\\hashes.game.txt";
+        public string shaderhashes_path { get; set; } = "cslol-tools\\hashes.shaders.txt";
         public List<string> base_wad_path { get; set; } = [];
         public List<string> OldLookUp { get; set; } = [];
         public List<string> LangLookUp { get; set; } = [];
@@ -55,8 +62,14 @@ namespace ModManager
         public List<string> CharraBlackList = ["viegowraith"];
         public uint bnk_version { get; set; } = 145; 
         public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
+        public List<ShaderEntry> shaders { get; set; } = null;
     }
-
+    public class ShaderEntry
+    {
+        public uint Hash { get; set; }
+        public string Path { get; set; }
+        public bool Exists { get; set; } = false; // Default to false until verified
+    }
     public class Repatheruwu
     {
         Dictionary<string, List<string>> CharacterCases = new Dictionary<string, List<string>>
@@ -309,6 +322,191 @@ namespace ModManager
                 }
             }
         }
+        private Dictionary<uint, ShaderEntry> _byHash = new Dictionary<uint, ShaderEntry>();
+        private Dictionary<string, List<(string, ShaderEntry)>> _byPath = new Dictionary<string, List<(string, ShaderEntry)>>();
+        private void FetchShaders()
+        {
+            string shaderbinpath = "data/shaders/shaders.bin";
+            Settings.shaders = new List<ShaderEntry>();
+
+            if (!File.Exists(Settings.shaderhashes_path))
+            {
+                Console.WriteLine($"[EROR] Shader Hashes are Missing");
+                return;
+            }
+
+            // Read all lines at once
+            string[] lines = File.ReadAllLines(Settings.shaderhashes_path);
+
+            foreach (string line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // Split into [HashString, Path]
+                string[] parts = line.Trim().Split(new[] { ' ' }, 2);
+                if (parts.Length < 2) continue;
+
+                if (!uint.TryParse(parts[0], NumberStyles.HexNumber, null, out uint hash))
+                {
+                    // Skip if the hash isn't a valid hex number
+                    continue;
+                }
+
+                string path = parts[1];
+
+                var entry = new ShaderEntry { Hash = hash, Path = path, Exists = false };
+
+                // 3. STORE
+                if (!_byHash.ContainsKey(hash)) _byHash.Add(hash, entry);
+            }
+
+
+
+
+            WadExtractor.Target Shader = new WadExtractor.Target
+            {
+                Hashes = new List<string> { shaderbinpath },
+                OutputPath = Settings.inputDir,
+                OutputString = $"{HashPath(shaderbinpath).ToString("x16")}.bin",
+                BinStringRef = null,
+                OriginalPath = shaderbinpath,
+            };
+            _wadExtractor.ExtractAndSwapReferences([Path.Combine(Settings.WADpath, "Shaders", "Shaders.wad.client")], [Shader]);
+            Bin bin = null;
+            try
+            {
+                bin = LoadBin(shaderbinpath);
+            }
+            catch (Exception e)
+            {
+                x.UpperLog($"[FAIL] Failed to load {shaderbinpath}, {e}", CLR_WARN);
+                return;
+            }
+            if (bin == null) return;
+
+            HashSet<uint> existingHashes = new HashSet<uint>();
+            if (bin.Sections.TryGetValue("entries", out BinValue entriesSection) && entriesSection is BinMap entriesMap)
+            {
+                foreach (var kvp in entriesMap.Items)
+                {
+                    var entryKey = (BinHash)kvp.Key;
+                    var entryData = (BinEmbed)kvp.Value;
+                    uint hash = entryKey.Value.Hash;
+                
+                    if (hash == 0) continue;
+                
+                    if (entryData.Name.Hash == 0x205255d6) // CustomShaderDef
+                    {
+                        existingHashes.Add(entryKey.Value.Hash);
+                    }
+                }
+            }
+            foreach (var kvp in _byHash)
+            {
+                if (existingHashes.Contains(kvp.Key))
+                {
+                    kvp.Value.Exists = true;
+                    string[] parts = kvp.Value.Path.Split("/");
+                    if (parts.Length < 3) continue;
+                    if (!_byPath.ContainsKey(parts[1]))
+                    {
+                        _byPath.Add(parts[1], [(parts[2], kvp.Value)]);
+                    }
+                    else
+                    {
+                        _byPath[parts[1]].Add((parts[2], kvp.Value));
+                    }
+                }
+            }
+        }
+
+        public (uint, string, string) GetShaderOrFallback(uint targetHash)
+        {
+            if (!_byHash.TryGetValue(targetHash, out ShaderEntry originalPath))
+            {
+                x.LowerLog($"[FAIL] Unknown Shader hash uint:{targetHash}");
+                return (targetHash, "", "");
+            }
+            if (originalPath.Exists)
+            {
+                return (targetHash, originalPath.Path, ""); ;
+            }
+            else
+            {
+                x.LowerLog($"[FIXI] Updating Shader: {originalPath.Path}", CLR_MOD);
+                return FindFallbackHash(originalPath);
+            }
+
+        }
+
+        public (uint, string, string) FindFallbackHash(ShaderEntry Shader)
+        {
+            string[] parts = Shader.Path.Split("/");
+            if (parts.Length < 3) return (Shader.Hash, Shader.Path, "");
+
+            if (!_byPath.TryGetValue(parts[1], out var candidates))
+            {
+                return (Shader.Hash, Shader.Path, "");
+            }
+
+            HashSet<string> targetTokens = new HashSet<string>(parts[2].Split('_'));
+
+            ShaderEntry bestMatch = null;
+            int bestMutualCount = -1;
+            int bestNonMutualCount = int.MaxValue;
+
+            foreach (var (candName, candEntry) in candidates)
+            {
+                string[] candidateTokens = candName.Split('_');
+
+                int mutual = 0;
+                int nonMutual = 0;
+
+                foreach (var token in candidateTokens)
+                {
+                    if (targetTokens.Contains(token))
+                    {
+                        mutual++;
+                    }
+                    else
+                    {
+                        nonMutual++;
+                    }
+                }
+
+                if (mutual == 0) continue;
+
+                bool isBetter = false;
+
+                if (mutual > bestMutualCount)
+                {
+                    isBetter = true;
+                }
+                else if (mutual == bestMutualCount)
+                {
+                    if (nonMutual < bestNonMutualCount)
+                    {
+                        isBetter = true;
+                    }
+                }
+                if (isBetter)
+                {
+                    bestMutualCount = mutual;
+                    bestNonMutualCount = nonMutual;
+                    bestMatch = candEntry;
+                }
+            }
+            if (bestMatch is not null)
+            {
+                return (bestMatch.Hash, Shader.Path, bestMatch.Path);
+            }
+            else
+            {
+                return (Shader.Hash, Shader.Path,"");
+            }
+        }
+
+
 
         public void FixiniYoursSkini(FixerUI ui)
         {
@@ -320,6 +518,7 @@ namespace ModManager
             Directory.CreateDirectory(tmp);
             Settings.inputDir = tmp;
 
+            if (Settings.binless) Settings.percent = 100;
 
             for (int i = 0; i < Settings.base_wad_path.Count; i++)
             {
@@ -346,11 +545,15 @@ namespace ModManager
             {
                 Characters.Enqueue((Settings.Character, Settings.skinNo, true));
             }
-
+            FetchShaders();
+            List<string> seen = new List<string>();
             while (Characters.Count > 0)
             {
                 var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
                 x.LowerLog($"[FIXI] Fixing {Current_Char} skin {skinNo}", CLR_ACT);
+
+                if (seen.Contains($"{Current_Char}{skinNo}", StringComparer.OrdinalIgnoreCase)) continue;
+                seen.Add($"{Current_Char}{skinNo}");
 
                 Settings.Character = Current_Char;
                 Settings.skinNo = skinNo;
@@ -663,7 +866,7 @@ namespace ModManager
                             RegexOptions.IgnoreCase
                         );
 
-                        if (allPaths.Contains(partnerWpk))
+                        if (allPaths.Contains(partnerWpk, StringComparer.OrdinalIgnoreCase))
                         {
                             bnkToWpkMap.Add(target, partnerWpk);
                         }
@@ -678,8 +881,8 @@ namespace ModManager
                 if (!Settings.sfx_events)
                 {
                     bool IsSfxEvents(WadExtractor.Target t) =>
-    string.Equals(Path.GetExtension(t.OriginalPath), "_sfx_events.bnk", StringComparison.OrdinalIgnoreCase);
-                    ToCheckup = processing.Where(IsSfxEvents).ToList();
+    t.OriginalPath.EndsWith("_sfx_events.bnk", StringComparison.OrdinalIgnoreCase);
+                    ToCheckup.AddRange(processing.Where(IsSfxEvents));
                     processing.RemoveAll(IsSfxEvents);
                 }
 
@@ -693,7 +896,7 @@ namespace ModManager
                     return string.Equals(ext, ".wpk", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(ext, ".bnk", StringComparison.OrdinalIgnoreCase);
                 }
-                ToCheckup = processing.Where(IsSound).ToList();
+                ToCheckup.AddRange(processing.Where(IsSound));
                 processing.RemoveAll(IsSound);
             }
             else
@@ -710,8 +913,10 @@ namespace ModManager
 
             if (Settings.AnimOption == 2)
             {
-                processing.RemoveAll(target =>
-                string.Equals(Path.GetExtension(target.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase));
+                bool IsANM(WadExtractor.Target t) =>
+    string.Equals(Path.GetExtension(t.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase);
+                ToCheckup.AddRange(processing.Where(IsANM));
+                processing.RemoveAll(IsANM);
             }
             // Use _wadExtractor instance
             processing = _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, processing);
@@ -747,7 +952,7 @@ namespace ModManager
                         WadExtractor.Target bnkTarget = pair.Key;
                         string wpkPath = pair.Value;
 
-                        if (!remainingPaths.Contains(wpkPath))
+                        if (!remainingPaths.Contains(wpkPath, StringComparer.OrdinalIgnoreCase))
                         {
                             processing.Add(bnkTarget);
                         }
@@ -766,7 +971,7 @@ namespace ModManager
                     return string.Equals(ext, ".wpk", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(ext, ".bnk", StringComparison.OrdinalIgnoreCase);
                 }
-                ToCheckup = processing.Where(IsSound).ToList();
+                ToCheckup.AddRange(processing.Where(IsSound));
                 processing.RemoveAll(IsSound);
             }
 
@@ -774,7 +979,7 @@ namespace ModManager
             {
                 bool IsANM(WadExtractor.Target t) =>
     string.Equals(Path.GetExtension(t.OriginalPath), ".anm", StringComparison.OrdinalIgnoreCase);
-                ToCheckup = processing.Where(IsANM).ToList();
+                ToCheckup.AddRange(processing.Where(IsANM));
                 processing.RemoveAll(IsANM);
             }
 
@@ -791,7 +996,7 @@ namespace ModManager
                     WadExtractor.Target bnkTarget = pair.Key;
                     string wpkPath = pair.Value;
 
-                    if (!remainingPaths.Contains(wpkPath))
+                    if (!remainingPaths.Contains(wpkPath, StringComparer.OrdinalIgnoreCase))
                     {
                         processing.Add(bnkTarget);
                     }
@@ -928,13 +1133,13 @@ namespace ModManager
                 return false;
 
             var parent = Path.GetFileName(Path.GetDirectoryName(dir));
-            if (!parent.Equals("characters", StringComparison.OrdinalIgnoreCase))
+            if (parent is null || !parent.Equals("characters", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var grandParent = Path.GetFileName(
                 Path.GetDirectoryName(Path.GetDirectoryName(dir))
             );
-            if (!grandParent.Equals("data", StringComparison.OrdinalIgnoreCase))
+            if (grandParent is null || !grandParent.Equals("data", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var fileStem = Path.GetFileNameWithoutExtension(path);
@@ -998,6 +1203,7 @@ namespace ModManager
 
             var loaded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var loaded_linked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            loaded_linked.Add(rootBinPath);
             var queue = new Queue<string>();
 
             var linkedListtoReturn = new BinList(BinType.String);
@@ -1023,8 +1229,8 @@ namespace ModManager
                 {
                     bin = LoadBin(path);
                 }
-                catch {
-                    x.UpperLog($"[FAIL] Failed to read {trimmedPath}", CLR_ERR);
+                catch (Exception e){
+                    x.UpperLog($"[FAIL] Failed to read {trimmedPath}, {e}", CLR_ERR);
                     Settings.Missing_Bins.Add($"[Read Error] {path}");
                     continue; }
                 if (bin == null) continue;
@@ -1060,9 +1266,9 @@ namespace ModManager
                     var notfound = CheckLinked(bins_to_check);
                     if (notfound != null)
                     {
-                        foreach (var left in notfound)
+                        foreach (string left in notfound)
                         {
-                            x.LowerLog($"[FAIL] Missing: {path}", CLR_ERR);
+                            x.LowerLog($"[FAIL] Missing: {left}", CLR_ERR);
                             linkedListtoReturn.Items.Add(new BinString(left));
                         }
                     }
@@ -1305,6 +1511,93 @@ namespace ModManager
             }
 
             Validate(VFXEntries, rrValues);
+
+            foreach (var entry in StaticMatEntries)
+            {
+                // entry.Value is the BinEmbed for the StaticMaterial
+                if (entry.Value.Value is BinEmbed materialEmbed2)
+                {
+                    var embedListField = materialEmbed2.Items.FirstOrDefault(f => f.Key.Hash == 0x0a6f0eb5);
+
+                    if (embedListField != null && embedListField.Value is BinList2 embedList)
+                    {
+                        // "for each 0x0904b150 in it" -> Iterate the Embeds inside the list
+                        foreach (var listItem in embedList.Items)
+                        {
+                            if (listItem is BinEmbed innerEmbed)
+                            {
+                                // Iterate over the fields in the inner embed to find 0x0904b150
+                                foreach (var field in innerEmbed.Items)
+                                {
+                                    if (field.Value is BinString strVal)
+                                    {
+                                        if (strVal.Value.Contains("."))
+                                        {
+                                            // Set key to 0x02e7fb4c
+                                            field.Key = new FNV1a(0xf0a363e3);
+                                        }
+                                        else
+                                        {
+                                            // Set key to 0xb311d4ef
+                                            field.Key = new FNV1a(0xb311d4ef);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var techniquesField = materialEmbed2.Items.FirstOrDefault(f => f.Key.Hash == 0x844f384e);
+
+                    if (techniquesField?.Value is BinList techniquesList)
+                    {
+                        foreach (var techniqueItem in techniquesList.Items)
+                        {
+                            if (techniqueItem is BinEmbed techniqueEmbed)
+                            {
+                                // 2. Find the "passes" list inside the technique
+                                var passesField = techniqueEmbed.Items.FirstOrDefault(f => f.Key.Hash == 0x623cd25c);
+
+                                if (passesField?.Value is BinList passesList)
+                                {
+                                    foreach (var passItem in passesList.Items)
+                                    {
+                                        if (passItem is BinEmbed passEmbed)
+                                        {
+                                            // 3. Find the "shader" link inside the pass (Hash: 0x355d5568)
+                                            var shaderField = passEmbed.Items.FirstOrDefault(f => f.Key.Hash == 0x355d5568);
+
+                                            if (shaderField?.Value is BinLink shaderLink)
+                                            {
+                                                // Capture the struct
+                                                var fnv = shaderLink.Value;
+
+                                                // Calculate the new hash
+                                                uint originalHash = fnv.Hash;
+                                                var (newHash, oldName, newName) = GetShaderOrFallback(originalHash);
+
+                                                // Apply changes only if necessary
+                                                if (originalHash != newHash)
+                                                {
+                                                    fnv.Hash = newHash;
+                                                    fnv.String = null;
+
+                                                    shaderLink.Value = fnv;
+                                                    x.LowerLog($"[FIXD] Shader link {oldName} to {newName}", CLR_GOOD);
+                                                }
+                                                else
+                                                {
+                                                    x.LowerLog($"[GOOD] Shader link {oldName}", CLR_GOOD);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             void ScanStrings(Dictionary<uint, KeyValuePair<BinValue, BinValue>> source)
             {
@@ -1868,7 +2161,7 @@ namespace ModManager
                                     string outPath = Path.Combine(job.Target.OutputPath, final_out);
                                     string dir = Path.GetDirectoryName(outPath);
 
-                                    if (!createdDirectories.Contains(dir))
+                                    if (!createdDirectories.Contains(dir, StringComparer.OrdinalIgnoreCase))
                                     {
                                         Directory.CreateDirectory(dir);
                                         createdDirectories.Add(dir);
@@ -2295,7 +2588,7 @@ namespace ModManager
                 for (int j = rootIndex + 1; j < parts.Length; j++)
                 {
                     string cleaned = new string(parts[j].Where(char.IsLetter).ToArray());
-                    if (Categories.Contains(cleaned))
+                    if (Categories.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
                     {
                         category = cleaned;
                         categoryIndex = j;
