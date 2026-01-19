@@ -17,7 +17,7 @@ using System.Windows.Media.Imaging;
 
 namespace ModManager
 {
-    public partial class FixerUI : UserControl, INotifyPropertyChanged
+    public partial class FixerUI : UserControl, INotifyPropertyChanged, IFixerLogger
     {
         public ModListEntry CallerModListEntry { get; set; }
         public Mod ModElement { get; private set; }
@@ -695,7 +695,7 @@ namespace ModManager
                     // Manifest Logic
                     if (doManifest && selectedManifest != null)
                     {
-                        LowerLog($"Downloading Manifest {selectedManifest.Version}", "#5350b9");
+                        LowerLog($"[DWNL] Downloading Manifest {selectedManifest.Version}", "#5350b9");
                         List<string> downloadedFiles = new List<string>();
 
                         string manifestFolder = Path.Combine("manifests", selectedManifest.Version);
@@ -739,7 +739,7 @@ namespace ModManager
                         );
 
                         Fixer.Settings.OldLookUp = downloadedFiles;
-                        LowerLog("Manifest Ready", "#2dc55e");
+                        LowerLog("[INFO] Manifest Ready", "#2dc55e");
                     }
 
 

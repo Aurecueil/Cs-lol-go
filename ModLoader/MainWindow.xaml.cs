@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -292,6 +293,56 @@ namespace ModManager
 
 
         }
+        public async void noskin_button_make(object sender, RoutedEventArgs e)
+        {
+            noskin_button.IsEnabled = false;
+            // 1. PREPARATION (Main Thread)
+            // Calculate paths and prepare data here to ensure thread safety for UI objects.
+            string gameDataPath = Path.Combine(Path.GetDirectoryName(settings.gamepath), "DATA", "FINAL");
+            string modDir = Path.Combine("installed", "NoSkin");
+            string wadOutputBase = Path.Combine(modDir, "WAD");
+
+            Directory.CreateDirectory(wadOutputBase);
+
+            if (Wad_champs_dict.Count < 10)
+                load_champ_wad_names();
+
+            // Convert to a List to safely pass to the background threads without modifying the source
+            var championsToProcess = Wad_champs_dict
+    .Skip(1)          // Skips the first element
+    .SkipLast(2)      // Skips the last two elements
+    .ToList();
+
+            // 2. EXECUTION (Background Thread)
+            // Task.Run pushes the work off the UI thread
+            await Task.Run(() =>
+            {
+                // Parallel.ForEach handles splitting the list across multiple CPU cores
+                Parallel.ForEach(championsToProcess, kvp =>
+                {
+                    // Create a NEW instance for each thread (Thread-Local)
+                    // Do not share one 'Fixer' instance across threads!
+                    Repatheruwu Fixer = new Repatheruwu();
+
+                    Fixer.Settings.Character = kvp.Value;
+                    Fixer.Settings.outputDir = Path.Combine(wadOutputBase, $"{Fixer.Settings.Character}.wad");
+                    Fixer.Settings.WADpath = gameDataPath;
+                    Fixer.Settings.skinNo = 0;
+                    Fixer.Settings.SmallMod = true;
+                    Fixer.Settings.SkipCheckup = true;
+                    Fixer.Settings.noskinni = true;
+                    Fixer.Settings.binless = false;
+                    Fixer.Settings.folder = false;
+
+                    // This will use the default DummyLogger since no UI is passed
+                    Fixer.FixiniYoursSkini();
+                    Fixer = null;
+                    GC.Collect();
+                });
+            });
+            MessageBox.Show("le done");
+        }
+
         public async void open_ds(object sender, RoutedEventArgs e)
 
         {
@@ -2908,7 +2959,6 @@ namespace ModManager
             {
                 DragHandler(draggedElements, (lastbeen.ToString(), false));
             }
-
                      
         }
 
@@ -4133,6 +4183,19 @@ namespace ModManager
                         {
                             cchildElement.parent = dropTargetId;
                             SaveOrUpdateHierarchyElement(cchildElement, hierarchyById);
+                            void updt(HierarchyElement childe)
+                            {
+                                foreach (var child in childe.Children)
+                                {
+                                    if (child.Item2 == true) continue;
+                                    if (hierarchyById.TryGetValue(int.Parse(child.Item1), out var kid))
+                                    {
+                                        SaveOrUpdateHierarchyElement(kid, hierarchyById);
+                                        updt(kid);
+                                    }
+                                }
+                            }
+                            updt(cchildElement);
                         }
                     }
 
@@ -4165,21 +4228,9 @@ namespace ModManager
 
                 // Check if this ID exists in folders.json
                 int index = folders.FindIndex(f => f.ID == element.ID);
-                Folder existing = index >= 0 ? folders[index] : null;
 
                 // If parent changed, recalculate InnerPath
-                if (existing != null)
-                {
-                    if (existing.parent != element.parent)
-                    {
-                        element.InnerPath = BuildInnerPath(element.parent, hierarchyById);
-                    }
-                }
-                else
-                {
-                    // New element, always build InnerPath
-                    element.InnerPath = BuildInnerPath(element.parent, hierarchyById);
-                }
+                element.InnerPath = BuildInnerPath(element.parent, hierarchyById);
 
                 // Create updated Folder object with parent
                 Folder updated = new Folder
@@ -4230,11 +4281,7 @@ namespace ModManager
             while (hierarchyById.TryGetValue(currentId, out var parentElement))
             {
                 pathSegments.Add(parentElement.ID);
-                if (currentId > 0)
-                {
-                    pathSegments.Add(parentElement.parent);
-                    break;
-                }
+                if (currentId <= 0) break;
                 currentId = parentElement.parent;
             }
 
@@ -4675,7 +4722,33 @@ namespace ModManager
             string extractTargetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed", fileNameWithoutExt);
             Directory.CreateDirectory(extractTargetDir);
 
-            if(Path.GetExtension(path) == ".fantome")
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+
+            if (ext != ".fantome" && ext != ".modpkg")
+            {
+                ext = ".unk";
+
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+                {
+                    byte[] h = new byte[8];
+                    fs.Read(h, 0, h.Length);
+
+                    // ZIP → fantome (50 4B 03 04)
+                    if (h[0] == 0x50 && h[1] == 0x4B && h[2] == 0x03 && h[3] == 0x04)
+                    {
+                        ext = ".fantome";
+                    }
+                    // "_modpkg_" (5F 6D 6F 64 70 6B 67 5F)
+                    else if (h[0] == 0x5F && h[1] == 0x6D && h[2] == 0x6F && h[3] == 0x64 &&
+                             h[4] == 0x70 && h[5] == 0x6B && h[6] == 0x67 && h[7] == 0x5F)
+                    {
+                        ext = ".modpkg";
+                    }
+                }
+            }
+
+
+            if (ext == ".fantome")
             {
                 try
                 {
@@ -4709,7 +4782,7 @@ namespace ModManager
                 }
                 catch (Exception ex) { Logger.LogError("Error RF importing (extract): -->   ", ex); }
             }
-            else if (Path.GetExtension(path) == ".modpkg")
+            else if (ext == ".modpkg")
             {
                 install_modpkg(path, true);
             }

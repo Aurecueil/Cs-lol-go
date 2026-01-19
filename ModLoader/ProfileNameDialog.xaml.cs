@@ -12,6 +12,11 @@ namespace ModManager
         public ProfileNameDialog()
         {
             InitializeComponent();
+            this.Loaded += (sender, e) =>
+            {
+                ProfileNameBox.Focus();
+                Keyboard.Focus(ProfileNameBox); // Ensures keyboard focus specifically
+            };
         }
 
         public void SetPlaceholderText(string text)
