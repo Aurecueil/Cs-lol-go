@@ -229,6 +229,92 @@ namespace ModManager
             }
 
             List<string> fileSysEntries = Directory.GetFileSystemEntries(Target).ToList();
+
+            //                                                              var pattern = new Regex(@".+\.wad\.client-([a-fA-F0-9]+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            //                                                              string randomFolderName = Path.GetRandomFileName().Replace(".", "");
+            //                                                              string destDir = Path.Combine(Target, $"{randomFolderName}.wad");
+            //                                                              
+            //                                                              Directory.CreateDirectory(destDir);
+            //                                                              
+            //                                                              fileSysEntries.Add(destDir);
+            //                                                              foreach (string entryPath in fileSysEntries.ToList())
+            //                                                              {
+            //                                                                  // Skip directories or non-existent files
+            //                                                                  if (!File.Exists(entryPath)) continue;
+            //                                                              
+            //                                                                  string fileName = Path.GetFileName(entryPath);
+            //                                                                  Match match = pattern.Match(fileName);
+            //                                                              
+            //                                                                  if (match.Success)
+            //                                                                  {
+            //                                                                      string hash = match.Groups[1].Value;
+            //                                                                      string extension = ".bin"; // Default
+            //                                                              
+            //                                                                      try
+            //                                                                      {
+            //                                                                          byte[] buffer = new byte[16];
+            //                                                                          using (FileStream fs = new FileStream(entryPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            //                                                                          {
+            //                                                                              int bytesRead = fs.Read(buffer, 0, buffer.Length);
+            //                                                              
+            //                                                                              string header = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+            //                                                              
+            //                                                                              if (header.TrimStart().StartsWith("["))
+            //                                                                              {
+            //                                                                                  continue;
+            //                                                                              }
+            //                                                                              else if (header.TrimStart().StartsWith("{"))
+            //                                                                              {
+            //                                                                                  extension = ".json";
+            //                                                                              }
+            //                                                                              else if (header.StartsWith("#PROP_text"))
+            //                                                                              {
+            //                                                                                  extension = ".py";
+            //                                                                              }
+            //                                                                          }
+            //                                                              
+            //                                                                          string destFileName = $"{hash}{extension}";
+            //                                                                          string destFilePath = Path.Combine(destDir, destFileName);
+            //                                                                          File.Copy(entryPath, destFilePath);
+            //                                                                          if (extension == ".json" || extension == ".py")
+            //                                                                          {
+            //                                                                              // Define the output path with .bin extension
+            //                                                                              string binOutput = Path.ChangeExtension(destFilePath, ".bin");
+            //                                                              
+            //                                                                              // Path to your executable (ensure this is reachable or provide full path)
+            //                                                                              string cliPath = "cslol-tools/ritobin_cli.exe";
+            //                                                              
+            //                                                                              ProcessStartInfo psi = new ProcessStartInfo
+            //                                                                              {
+            //                                                                                  FileName = cliPath,
+            //                                                                                  // Arguments: "input_path" "output_path"
+            //                                                                                  Arguments = $"\"{destFilePath}\" \"{binOutput}\"",
+            //                                                                                  UseShellExecute = false,
+            //                                                                                  CreateNoWindow = true,
+            //                                                                                  RedirectStandardOutput = true,
+            //                                                                                  RedirectStandardError = true
+            //                                                                              };
+            //                                                              
+            //                                                                              using (Process p = Process.Start(psi))
+            //                                                                              {
+            //                                                                                  p.WaitForExit();
+            //                                                              
+            //                                                                                  // Optional: Check for errors
+            //                                                                                  if (p.ExitCode != 0)
+            //                                                                                  {
+            //                                                                                      string error = p.StandardError.ReadToEnd();
+            //                                                                                      Console.WriteLine($"Error converting {destFileName}: {error}");
+            //                                                                                  }
+            //                                                                              }
+            //                                                                          }
+            //                                                                          File.Delete(destFilePath);
+            //                                                              
+            //                                                                      }
+            //                                                                      catch
+            //                                                                      {
+            //                                                                      }
+            //                                                                  }
+            //                                                              }
             int foundKey = -1;
             string foundValue = null;
 
@@ -608,7 +694,16 @@ namespace ModManager
             string gameDataPath = Path.Combine(Path.GetDirectoryName(Main.settings.gamepath), "DATA", "FINAL");
 
             // Store settings
-            Fixer.Settings.outputDir = Path.Combine(modDir, "WAD", $"{Fixer.Settings.Character}.wad");
+            bool folder = chkKeepFolder.IsChecked == false;
+            Fixer.Settings.folder = folder;
+            if (folder)
+            {
+                Fixer.Settings.outputDir = Path.Combine(modDir, "WAD", $"{Fixer.Settings.Character}.wad.client");
+            }
+            else
+            {
+                Fixer.Settings.outputDir = Path.Combine(modDir, "WAD", $"{Fixer.Settings.Character}.wad");
+            }
             Fixer.Settings.WADpath = gameDataPath;
             Fixer.Settings.skinNo = SkinNumberValue;
             Fixer.Settings.AllAviable = chkAllSkins.IsChecked == true;
@@ -618,13 +713,13 @@ namespace ModManager
             bool isNoSkinLightVisible = chkNoSkinLight.Visibility == Visibility.Visible;
             Fixer.Settings.noskinni = isNoSkinLightVisible && (chkNoSkinLight.IsChecked == true);
 
-            Fixer.Settings.folder = chkKeepFolder.IsChecked == false;
             Fixer.Settings.sfx_events = chkKeepSFX.IsChecked == true;
             Fixer.Settings.KillStaticMat = chkKillStatic.IsChecked == true;
             Fixer.Settings.keep_Icons = chkKeepIcons.IsChecked == true;
             Fixer.Settings.SoundOption = cmbSound.SelectedIndex;
             Fixer.Settings.AnimOption = cmbAnim.SelectedIndex;
             Fixer.Settings.percent = sliderValue.Value;
+            Fixer.Settings.SmallMod = chkSmallMod.IsChecked == true;
 
             // Capture booleans for logic inside the thread
             bool doKeepUI = chkKeepUI.IsChecked == true;
@@ -642,7 +737,7 @@ namespace ModManager
                     Dispatcher.Invoke(() => UpdateBackupUI(true));
 
                     // Reload file entries from backup for the Fixer
-                    List<string> fileSysEntries = Directory.GetFileSystemEntries(bakWad).ToList();
+                    List<string> fileSysEntries = Directory.GetFileSystemEntries(bakWad).Reverse().ToList();
                     Fixer.Settings.base_wad_path = fileSysEntries;
 
                     // Keep UI Logic
@@ -708,6 +803,7 @@ namespace ModManager
 
                         if (expectedFilePath == null)
                         {
+                            var manifestTimer = System.Diagnostics.Stopwatch.StartNew();
                             string manifestFilePath = Path.Combine(manifestFolder, "this.manifest");
 
                             if (!File.Exists(manifestFilePath))
@@ -732,7 +828,9 @@ namespace ModManager
                                 // Wait for exit asynchronously
                                 await process.WaitForExitAsync();
                             }
-                        }
+                        manifestTimer.Stop();
+                        LowerLog($"[INFO] Manifest downloaded in {manifestTimer.Elapsed.TotalSeconds:F2}s", "#2dc55e");
+                    }
 
                         downloadedFiles.AddRange(
                             Directory.EnumerateFiles(manifestFolder, "*.wad.client", SearchOption.AllDirectories)
@@ -743,11 +841,14 @@ namespace ModManager
                     }
 
 
-                    // Finally, run the Fixer logic
-                    // Since this runs on the background thread now, FixiniYoursSkini MUST use 
-                    // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
-                    Fixer.FixiniYoursSkini(this);
-                
+                // Finally, run the Fixer logic
+                // Since this runs on the background thread now, FixiniYoursSkini MUST use 
+                // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
+                var fixerTimer = System.Diagnostics.Stopwatch.StartNew();
+                Fixer.FixiniYoursSkini(this);
+                fixerTimer.Stop();
+                LowerLog($"[INFO] Finished fixing mod in {fixerTimer.Elapsed.TotalSeconds:F2}s", "#2dc55e");
+
             });
             close_txt.IsEnabled = true;
             close_txt.Content = "Fixing done, Close Fixer";

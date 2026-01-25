@@ -16,9 +16,15 @@ namespace ModLoader
                     process.Kill();
                     process.WaitForExit(1000); // Wait up to 1 second
                 }
-                catch (Exception)
+                catch (InvalidOperationException){}
+                catch (System.ComponentModel.Win32Exception ex)
                 {
-                    // Log if needed
+                    // Access denied (e.g. running as Admin vs User). This should be logged.
+                    Console.WriteLine($"Failed to kill process: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Unexpected error killing process: {ex}");
                 }
                 finally
                 {

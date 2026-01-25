@@ -223,6 +223,7 @@ namespace ModManager
         private void InitializeWindow()
         {
             this.WindowStyle = WindowStyle.None;
+            this.ResizeMode = ResizeMode.NoResize;
             this.AllowsTransparency = true;
             this.Background = System.Windows.Media.Brushes.Transparent;
             this.ShowInTaskbar = false;
@@ -305,11 +306,43 @@ namespace ModManager
                 }
             }
         }
-
         public void ShowAt(int x, int y)
         {
-            this.Left = x;
-            this.Top = y - this.Height;
+            // 1. Get the WorkArea (Primary Screen only, excludes taskbar)
+            // This returns coordinates in WPF "Device Independent Pixels" (DIPs)
+            Rect workArea = System.Windows.SystemParameters.WorkArea;
+
+            // 2. Setup initial target position
+            double newLeft = x;
+            double newTop = y - this.Height;
+
+            // 3. Horizontal Clamping (Right Edge)
+            // If the window extends past the right edge of the screen...
+            if (newLeft + this.Width > workArea.Right)
+            {
+                // ...shift it to the left of the cursor instead
+                newLeft = x - this.Width;
+
+                // Safety: If it now goes off the LEFT edge, pin it to the left
+                if (newLeft < workArea.Left) newLeft = workArea.Left;
+            }
+
+            // 4. Vertical Clamping (Top/Bottom Edges)
+            if (newTop < workArea.Top)
+            {
+                // If it goes off the top, show it BELOW the mouse Y
+                newTop = y;
+            }
+            else if (newTop + this.Height > workArea.Bottom)
+            {
+                // If it goes off the bottom, pin it to the bottom edge
+                newTop = workArea.Bottom - this.Height;
+            }
+
+            // 5. Apply
+            this.Left = newLeft;
+            this.Top = newTop;
+
             this.Show();
             this.Activate();
         }

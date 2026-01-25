@@ -15,11 +15,11 @@ using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Shapes;
 using Xceed.Wpf.Toolkit.PropertyGrid.Attributes;
 using ZstdSharp;
-using static ModManager.Repatheruwu;
 using Path = System.IO.Path;
 using SearchOption = System.IO.SearchOption;
 
@@ -48,7 +48,7 @@ namespace ModManager
 
         public void LowerLog(string text, string hexColor = "#FFFFFF")
         {
-            // WriteToFile(text, hexColor);
+            Console.WriteLine(text);
         }
 
         private void WriteToFile(string text, string hexColor)
@@ -91,18 +91,19 @@ namespace ModManager
         public List<string> LangLookUp { get; set; } = [];
         public bool Lang { get; set; } = true; // good
 
-        public bool keep_Icons { get; set; } = true; // good
-        public bool KillStaticMat { get; set; } = false; // good
-        public bool sfx_events { get; set; } = false; // good
-        public bool folder { get; set; } = true; // good
-        public bool binless { get; set; } = false; // good
-        public bool SmallMod { get; set; } = true; // good
-        public bool SkipCheckup { get; set; } = false; // good
-        public bool noskinni { get; set; } = true; // good
-        public bool AllAviable { get; set; } = true; // good
-        public int SoundOption { get; set; } = 0; // good
-        public int AnimOption { get; set; } = 0; // good percent
-        public double percent { get; set; } = 80; // good 
+        public bool keep_Icons { get; set; } = true; // keep ability icons, if modified by mod
+        public bool KillStaticMat { get; set; } = false; // kill static material definitions
+        public bool sfx_events { get; set; } = false; // keep sfx_events.bnk (not recomended)
+        public bool folder { get; set; } = true; // output folder (else wad.client archive)
+        public bool binless { get; set; } = false; // only verify assets, dont write/delete bin logics
+        public bool SmallMod { get; set; } = true; // dont add missing assets, only verify paths
+        public bool SkipCheckup { get; set; } = false; // skip verification of paths (automatizion optimization)
+        public bool noskinni { get; set; } = true; // Apply custom skin to all other skin
+        public bool FixiShape { get; set; } = true;
+        public bool AllAviable { get; set; } = true; // process all aviable skins (based on bins contained)
+        public int SoundOption { get; set; } = 0; // auto/include/exclude sound archives
+        public int AnimOption { get; set; } = 0; // auto/include/exclude animation files
+        public double percent { get; set; } = 80; // minmum % of similarity to use other bin as substitute in case of fallback when looking for linked bins
 
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
@@ -235,6 +236,7 @@ namespace ModManager
             ulong h = XxHash64.HashToUInt64(data, seed: 0);
             return h;
         }
+        // League of legends Bin elements hash
         public enum Defi : uint
         {
             ContextualActionData = 3476110372,
@@ -254,7 +256,7 @@ namespace ModManager
             GearSkinUpgrade = 668820321,
             AnimationGraphData = 4126869447
         }
-
+        // WWise hash for given language
         public enum lang_id : uint
         {
             ar_AE = 3254137205,
@@ -591,6 +593,7 @@ namespace ModManager
             {
                 Characters.Enqueue((Settings.Character, Settings.skinNo, true));
             }
+
             FetchShaders();
             List<string> seen = new List<string>();
             while (Characters.Count > 0)
@@ -817,11 +820,11 @@ namespace ModManager
                         x.LowerLog($"[GOOD] {(lang_id)langID} in {kvp.Key.OriginalPath}", CLR_GOOD);
                     }
                 }
-                if (Audio_to_dl.Count > 0)
+                if (Audio_to_dl.Count > 0 && File.Exists(Settings.ManfiestDL))
                 {
                     foreach (var kv in Audio_to_dl)
                     {
-                        string VO_path = Path.Combine("manifests", $".lang_{Settings.bnk_version}_{kv.Key}");
+                        string VO_path = Path.Combine("manifests", $".lang_{Settings.bnk_version}");
                         string VO_wad = Path.Combine(VO_path, "DATA","FINAL","Champions",$"{Settings.Character}.{kv.Key}.wad.client");
                         if (!File.Exists(VO_wad))
                         {
@@ -1018,16 +1021,23 @@ namespace ModManager
                 ToCheckup.AddRange(processing.Where(IsANM));
                 processing.RemoveAll(IsANM);
             }
-
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            if (!Settings.SmallMod)
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            }
+            else
+            {
+                processing = _wadExtractor.FindAndSwapReferences(Settings.AllWadPaths, processing);
+            }
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
                 return processing;
             }
-            if (!Settings.SmallMod)
+            if (Settings.SoundOption == 0)
             {
-                if (Settings.SoundOption == 0)
+
+                if (!Settings.SmallMod)
                 {
                     foreach (var pair in bnkToWpkMap)
                     {
@@ -1040,18 +1050,9 @@ namespace ModManager
                         }
                     }
                 }
-                processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
-                if (processing.Count() == 0)
+                else
                 {
-                    check_n_fix_vo();
-                    return processing;
-                }
-            }
-            else
-            {
-                List<WadExtractor.Target> bnk = new List<WadExtractor.Target>();
-                if (Settings.SoundOption == 0)
-                {
+                    List<WadExtractor.Target> bnk = new List<WadExtractor.Target>();
                     foreach (var pair in bnkToWpkMap)
                     {
                         WadExtractor.Target bnkTarget = pair.Key;
@@ -1064,12 +1065,23 @@ namespace ModManager
                     }
                     _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bnk);
                 }
-                ToCheckup.AddRange(processing);
+            }
+
+            if (!Settings.SmallMod)
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
+            }
+            else
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            }
+
+            if (processing.Count() == 0)
+            {
                 check_n_fix_vo();
                 return processing;
             }
-
-                // Use _hashes instance
+            // Use _hashes instance
             processing = _hashes.FindMatches(processing);
 
             processing.RemoveAll(t =>
@@ -1086,13 +1098,27 @@ namespace ModManager
                 check_n_fix_vo();
                 return processing;
             }
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing, CLR_MOD);
+            if (!Settings.SmallMod)
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            }
+            else
+            {
+                processing = _wadExtractor.FindAndSwapReferences(Settings.AllWadPaths, processing);
+            }
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
                 return processing;
             }
-            processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing, CLR_MOD);
+            if (!Settings.SmallMod)
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
+            }
+            else
+            {
+                processing = _wadExtractor.ExtractAndSwapReferences(Settings.OldLookUp, processing);
+            }
             if (processing.Count() == 0)
             {
                 check_n_fix_vo();
@@ -1657,245 +1683,248 @@ namespace ModManager
                 }
             }
 
-            foreach (var entry in VFXEntries)
-            {
-                // Ensure we are working with a BinEmbed (the root definition)
-                if (entry.Value.Value is not BinEmbed vfxEmbed)
-                    continue;
-            
-                uint[] validHashes = { 0x6781e762, 0x868eb76a };
-            
-                // 1. Find the fields that contain the Emitter Lists (0x868eb76a, etc.)
-                // The user's snippet iterated Items directly, but the data dump shows these are Lists.
-                // We iterate the fields of the main Embed.
-                foreach (var listField in vfxEmbed.Items.Where(f => validHashes.Contains(f.Key.Hash)).ToList())
+            if (Settings.FixiShape) {
+                foreach (var entry in VFXEntries)
                 {
-                    x.UpperLog($"Found valid list hash: 0x{listField.Key.Hash:x8}");
-            
-                    // We expect the value to be a List of Pointers (The Emitters)
-                    if (listField.Value is not BinList binList) continue;
-            
-                    // 2. Iterate through every Emitter in that list
-                    foreach (var emitterValue in binList.Items)
+                    // Ensure we are working with a BinEmbed (the root definition)
+                    if (entry.Value.Value is not BinEmbed vfxEmbed)
+                        continue;
+
+                    uint[] validHashes = { 0x6781e762, 0x868eb76a };
+
+                    // 1. Find the fields that contain the Emitter Lists (0x868eb76a, etc.)
+                    // The user's snippet iterated Items directly, but the data dump shows these are Lists.
+                    // We iterate the fields of the main Embed.
+                    foreach (var listField in vfxEmbed.Items.Where(f => validHashes.Contains(f.Key.Hash)).ToList())
                     {
-                        if (emitterValue is not BinPointer emitterPointer) continue;
-            
-                        x.UpperLog($"Processing Emitter Pointer: {emitterPointer.Name}");
-            
-                        // 3. Find the Shape Attribute (0x9dc3d926) inside the Emitter
-                        var shapeField = emitterPointer.Items.FirstOrDefault(f => f.Key.Hash == 0x9dc3d926);
-            
-                        if (shapeField == null) continue;
-            
-                        // The shape is typically an Embed or Pointer containing data
-                        // We need to check if it has content.
-                        List<BinField>? shapeItems = null;
-                        if (shapeField.Value is BinEmbed shapeEmbed) shapeItems = shapeEmbed.Items;
-                        else if (shapeField.Value is BinPointer shapePtr) shapeItems = shapePtr.Items;
-            
-                        if (shapeItems == null || shapeItems.Count == 0) continue;
-            
-                        x.UpperLog($"Found Shape Attribute 0x9dc3d926 with {shapeItems.Count} items.");
-            
-                        // Initialize the "ShitDict" logic state
-                        bool emitRotationAnglesKeyValues = false;
-                        bool emitRotationAxesShit = false;
-                        bool flags = false;
-                        bool keepItAs0x4f4e2ed7 = false;
-            
-                        float radiusVal = 0;
-                        float heightVal = 0;
-            
-                        // We must iterate a Copy or use a for-loop because we might modify shapeItems inside
-                        for (int i = 0; i < shapeItems.Count; i++)
+                        //x.UpperLog($"Found valid list hash: 0x{listField.Key.Hash:x8}");
+
+                        // We expect the value to be a List of Pointers (The Emitters)
+                        if (listField.Value is not BinList binList) continue;
+
+                        // 2. Iterate through every Emitter in that list
+                        foreach (var emitterValue in binList.Items)
                         {
-                            var insideOfShape = shapeItems[i];
-            
-                            // --- Logic: 0xff7d0e41 (BirthTranslation handling) ---
-                            if (insideOfShape.Key.Hash == 0xff7d0e41)
+                            if (emitterValue is not BinPointer emitterPointer) continue;
+
+                            //x.UpperLog($"Processing Emitter Pointer: {emitterPointer.Name}");
+
+                            // 3. Find the Shape Attribute (0x9dc3d926) inside the Emitter
+                            var shapeField = emitterPointer.Items.FirstOrDefault(f => f.Key.Hash == 0x9dc3d926);
+
+                            if (shapeField == null) continue;
+
+                            // The shape is typically an Embed or Pointer containing data
+                            // We need to check if it has content.
+                            List<BinField>? shapeItems = null;
+                            if (shapeField.Value is BinEmbed shapeEmbed) shapeItems = shapeEmbed.Items;
+                            else if (shapeField.Value is BinPointer shapePtr) shapeItems = shapePtr.Items;
+
+                            if (shapeItems == null || shapeItems.Count == 0) continue;
+
+                            //x.UpperLog($"Found Shape Attribute 0x9dc3d926 with {shapeItems.Count} items.");
+
+                            // Initialize the "ShitDict" logic state
+                            bool emitRotationAnglesKeyValues = false;
+                            bool emitRotationAxesShit = false;
+                            bool flags = false;
+                            bool keepItAs0x4f4e2ed7 = false;
+
+                            float radiusVal = 0;
+                            float heightVal = 0;
+
+                            // We must iterate a Copy or use a for-loop because we might modify shapeItems inside
+                            for (int i = 0; i < shapeItems.Count; i++)
                             {
-                                // Check contents of this inner structure
-                                List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
-                                if (innerItems != null)
+                                var insideOfShape = shapeItems[i];
+
+                                // --- Logic: 0xff7d0e41 (BirthTranslation handling) ---
+                                if (insideOfShape.Key.Hash == 0xff7d0e41)
                                 {
-                                    var vec3Field = innerItems.FirstOrDefault(f => f.Key.Hash == 0xb4b427aa && f.Value.Type == BinType.Vec3);
-            
-                                    if (vec3Field != null && vec3Field.Value is BinVec3 vec3Val)
+                                    // Check contents of this inner structure
+                                    List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+                                    if (innerItems != null)
                                     {
-                                        x.UpperLog("Moving BirthTranslation to Emitter parent.");
-            
-                                        // Create new Embed for the Emitter
-                                        var birthTranslation = new BinEmbed(new FNV1a(0x68dc32b6)); // hash_type
-            
-                                        // Add the vec3 to the new embed
-                                        birthTranslation.Items.Add(new BinField(vec3Field.Key, new BinVec3(vec3Val.Value)));
-            
-                                        // Add this new field to the EMITTER (Parent of Shape)
-                                        // hash = 0x563d4a22
-                                        emitterPointer.Items.Add(new BinField(new FNV1a(0x563d4a22), birthTranslation));
-            
-                                        // Clear the data of the current shape item (inside_of_shape.data = [])
-                                        if (insideOfShape.Value is BinEmbed innerEmbed) innerEmbed.Items.Clear();
-                                        else if (insideOfShape.Value is BinPointer innerPtr) innerPtr.Items.Clear();
-            
-                                        // Python did a break here, implying specific handling for the first match
-                                        // logic usually continues to next shape item though.
+                                        var vec3Field = innerItems.FirstOrDefault(f => f.Key.Hash == 0xb4b427aa && f.Value.Type == BinType.Vec3);
+
+                                        if (vec3Field != null && vec3Field.Value is BinVec3 vec3Val)
+                                        {
+                                            //x.UpperLog("Moving BirthTranslation to Emitter parent.");
+
+                                            // Create new Embed for the Emitter
+                                            var birthTranslation = new BinEmbed(new FNV1a(0x68dc32b6)); // hash_type
+
+                                            // Add the vec3 to the new embed
+                                            birthTranslation.Items.Add(new BinField(vec3Field.Key, new BinVec3(vec3Val.Value)));
+
+                                            // Add this new field to the EMITTER (Parent of Shape)
+                                            // hash = 0x563d4a22
+                                            emitterPointer.Items.Add(new BinField(new FNV1a(0x563d4a22), birthTranslation));
+
+                                            // Clear the data of the current shape item (inside_of_shape.data = [])
+                                            if (insideOfShape.Value is BinEmbed innerEmbed) innerEmbed.Items.Clear();
+                                            else if (insideOfShape.Value is BinPointer innerPtr) innerPtr.Items.Clear();
+
+                                            // Python did a break here, implying specific handling for the first match
+                                            // logic usually continues to next shape item though.
+                                        }
                                     }
                                 }
-                            }
-            
-                            // --- Logic: 0xe5f268dd (Extracting Radius/Height) ---
-                            else if (insideOfShape.Key.Hash == 0xe5f268dd)
-                            {
-                                List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
-                                if (innerItems != null)
+
+                                // --- Logic: 0xe5f268dd (Extracting Radius/Height) ---
+                                else if (insideOfShape.Key.Hash == 0xe5f268dd)
                                 {
-                                    foreach (var item in innerItems)
+                                    List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+                                    if (innerItems != null)
                                     {
-                                        if (item.Key.Hash == 0xb4b427aa && item.Value is BinVec3 v3)
+                                        foreach (var item in innerItems)
                                         {
-                                            radiusVal = v3.Value.X;
-                                            heightVal = v3.Value.Y; // "lmao?"
-                                            x.UpperLog($"Extracted Radius: {radiusVal}, Height: {heightVal}");
-                                        }
-                                        else if (item.Key.Hash == 0xbc037de7)
-                                        {
-                                            // Drill down: inside_of_emitoffset -> table_data -> shit -> smoll_shit
-                                            AnalyzeNestedTable(item.Value, ref flags, ref keepItAs0x4f4e2ed7);
-                                        }
-                                    }
-                                }
-                            }
-            
-                            // --- Logic: 0x07f41838 ---
-                            else if (insideOfShape.Key.Hash == 0x07f41838)
-                            {
-                                List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
-                                if (innerItems != null)
-                                {
-                                    foreach (var valFloat in innerItems)
-                                    {
-                                        // "for stuff in value_float.data" implies structure depth
-                                        List<BinField>? stuffItems = GetItemsFromBinValue(valFloat.Value);
-                                        if (stuffItems == null) continue;
-            
-                                        foreach (var stuff in stuffItems)
-                                        {
-                                            if (stuff.Key.Hash == 0xbc037de7)
+                                            if (item.Key.Hash == 0xb4b427aa && item.Value is BinVec3 v3)
                                             {
-                                                AnalyzeNestedTableForRotation(stuff.Value, ref emitRotationAnglesKeyValues);
+                                                radiusVal = v3.Value.X;
+                                                heightVal = v3.Value.Y; // "lmao?"
+                                                x.UpperLog($"Extracted Radius: {radiusVal}, Height: {heightVal}");
+                                            }
+                                            else if (item.Key.Hash == 0xbc037de7)
+                                            {
+                                                // Drill down: inside_of_emitoffset -> table_data -> shit -> smoll_shit
+                                                AnalyzeNestedTable(item.Value, ref flags, ref keepItAs0x4f4e2ed7);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // --- Logic: 0x07f41838 ---
+                                else if (insideOfShape.Key.Hash == 0x07f41838)
+                                {
+                                    List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+                                    if (innerItems != null)
+                                    {
+                                        foreach (var valFloat in innerItems)
+                                        {
+                                            // "for stuff in value_float.data" implies structure depth
+                                            List<BinField>? stuffItems = GetItemsFromBinValue(valFloat.Value);
+                                            if (stuffItems == null) continue;
+
+                                            foreach (var stuff in stuffItems)
+                                            {
+                                                if (stuff.Key.Hash == 0xbc037de7)
+                                                {
+                                                    AnalyzeNestedTableForRotation(stuff.Value, ref emitRotationAnglesKeyValues);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // --- Logic: 0xd1789c65 ---
+                                else if (insideOfShape.Key.Hash == 0xd1789c65)
+                                {
+                                    List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
+                                    // Looking for list length 2
+                                    // Python: list[vec3] = { { 0, 1, 0 } { 0, 0, 1 } }
+                                    // In Ritobin, a List BinValue works differently than Embed items.
+                                    // If `insideOfShape.Value` is a BinList:
+                                    if (insideOfShape.Value is BinList vecList && vecList.Items.Count == 2)
+                                    {
+                                        if (vecList.Items[0] is BinVec3 v1 && vecList.Items[1] is BinVec3 v2)
+                                        {
+                                            if ((int)v1.Value.Y == 1 && (int)v2.Value.Z == 1)
+                                            {
+                                                emitRotationAxesShit = true;
+                                                x.UpperLog("EmitRotationAxesShit set to True");
                                             }
                                         }
                                     }
                                 }
                             }
-            
-                            // --- Logic: 0xd1789c65 ---
-                            else if (insideOfShape.Key.Hash == 0xd1789c65)
+
+                            // --- Final Reconstruction Logic ---
+
+                            // Python: shape.hash = 0x3bf0b4ed (This actually changes the KEY of the field in the parent list)
+                            // But usually in these scripts, it implies transforming the Object Type Hash (Name).
+                            // However, looking at the result logic:
+                            // It constructs a new Object.
+
+                            if (!keepItAs0x4f4e2ed7 && emitRotationAnglesKeyValues && emitRotationAxesShit)
                             {
-                                List<BinField>? innerItems = GetItemsFromBinValue(insideOfShape.Value);
-                                // Looking for list length 2
-                                // Python: list[vec3] = { { 0, 1, 0 } { 0, 0, 1 } }
-                                // In Ritobin, a List BinValue works differently than Embed items.
-                                // If `insideOfShape.Value` is a BinList:
-                                if (insideOfShape.Value is BinList vecList && vecList.Items.Count == 2)
+                                x.UpperLog("Transforming Shape to 0x3dbe415d");
+
+                                // Create new Pointer
+                                var newPointer = new BinPointer(new FNV1a(0x3dbe415d)); // Hash Type
+
+                                // Add Radius (0x0dba4cb3)
+                                newPointer.Items.Add(new BinField(new FNV1a(0x0dba4cb3), new BinF32(radiusVal)));
+
+                                // Add Height (0xd5bdbb42) if exists (check logic: python says if shit_dict.get("Height"))
+                                // Note: heightVal is float, check if non-zero or logic requires specific check? 
+                                // Assuming non-zero based on generic extraction logic
+                                if (heightVal != 0)
                                 {
-                                    if (vecList.Items[0] is BinVec3 v1 && vecList.Items[1] is BinVec3 v2)
-                                    {
-                                        if ((int)v1.Value.Y == 1 && (int)v2.Value.Z == 1)
-                                        {
-                                            emitRotationAxesShit = true;
-                                            x.UpperLog("EmitRotationAxesShit set to True");
-                                        }
-                                    }
+                                    newPointer.Items.Add(new BinField(new FNV1a(0xd5bdbb42), new BinF32(heightVal)));
                                 }
-                            }
-                        }
-            
-                        // --- Final Reconstruction Logic ---
-            
-                        // Python: shape.hash = 0x3bf0b4ed (This actually changes the KEY of the field in the parent list)
-                        // But usually in these scripts, it implies transforming the Object Type Hash (Name).
-                        // However, looking at the result logic:
-                        // It constructs a new Object.
-            
-                        if (!keepItAs0x4f4e2ed7 && emitRotationAnglesKeyValues && emitRotationAxesShit)
-                        {
-                            x.UpperLog("Transforming Shape to 0x3dbe415d");
-            
-                            // Create new Pointer
-                            var newPointer = new BinPointer(new FNV1a(0x3dbe415d)); // Hash Type
-            
-                            // Add Radius (0x0dba4cb3)
-                            newPointer.Items.Add(new BinField(new FNV1a(0x0dba4cb3), new BinF32(radiusVal)));
-            
-                            // Add Height (0xd5bdbb42) if exists (check logic: python says if shit_dict.get("Height"))
-                            // Note: heightVal is float, check if non-zero or logic requires specific check? 
-                            // Assuming non-zero based on generic extraction logic
-                            if (heightVal != 0)
-                            {
-                                newPointer.Items.Add(new BinField(new FNV1a(0xd5bdbb42), new BinF32(heightVal)));
-                            }
-            
-                            // Add Flags (0x9c677a2c)
-                            if (flags)
-                            {
-                                newPointer.Items.Add(new BinField(new FNV1a(0x9c677a2c), new BinU8(1)));
-                            }
-            
-                            // Update the Field Key and Value
-                            shapeField.Key = new FNV1a(0x3bf0b4ed);
-                            shapeField.Value = newPointer;
-                        }
-                        else
-                        {
-                            // Else logic
-                            // Check if shapeItems has 1 item, hash is 0xe5f268dd, and contains a Vector
-                            bool isSimpleVec3 = false;
-                            BinVec3? constantVec3 = null;
-            
-                            if (shapeItems.Count == 1 && shapeItems[0].Key.Hash == 0xe5f268dd)
-                            {
-                                // "isinstance(shape.data[0].data[0].data, Vector)"
-                                // We need to check if the INNER item is a Vec3
-                                List<BinField>? inner = GetItemsFromBinValue(shapeItems[0].Value);
-                                if (inner != null && inner.Count > 0 && inner[0].Value is BinVec3 v3)
+
+                                // Add Flags (0x9c677a2c)
+                                if (flags)
                                 {
-                                    isSimpleVec3 = true;
-                                    constantVec3 = v3;
+                                    newPointer.Items.Add(new BinField(new FNV1a(0x9c677a2c), new BinU8(1)));
                                 }
-                            }
-            
-                            if (isSimpleVec3 && constantVec3 != null)
-                            {
-                                x.UpperLog("Transforming Shape to 0xee39916f (Simple Vec3)");
-            
-                                // Transform to Embed with type ee39916f
-                                var newEmbed = new BinEmbed(new FNV1a(0xee39916f));
-            
-                                // Flatten: The field 0xe5f268dd now directly contains the vec3
-                                newEmbed.Items.Add(new BinField(new FNV1a(0xe5f268dd), new BinVec3(constantVec3.Value)));
-            
-                                shapeField.Value = newEmbed;
+
+                                // Update the Field Key and Value
+                                shapeField.Key = new FNV1a(0x3bf0b4ed);
+                                shapeField.Value = newPointer;
                             }
                             else
                             {
-                                x.UpperLog("Defaulting Shape to 0x4f4e2ed7");
-                                // Default 0x4f4e2ed7
-                                // In Ritobin, the "hash_type" is the Name of the Embed/Pointer
-                                if (shapeField.Value is BinEmbed existingEmbed)
+                                // Else logic
+                                // Check if shapeItems has 1 item, hash is 0xe5f268dd, and contains a Vector
+                                bool isSimpleVec3 = false;
+                                BinVec3? constantVec3 = null;
+
+                                if (shapeItems.Count == 1 && shapeItems[0].Key.Hash == 0xe5f268dd)
                                 {
-                                    existingEmbed.Name = new FNV1a(0x4f4e2ed7);
+                                    // "isinstance(shape.data[0].data[0].data, Vector)"
+                                    // We need to check if the INNER item is a Vec3
+                                    List<BinField>? inner = GetItemsFromBinValue(shapeItems[0].Value);
+                                    if (inner != null && inner.Count > 0 && inner[0].Value is BinVec3 v3)
+                                    {
+                                        isSimpleVec3 = true;
+                                        constantVec3 = v3;
+                                    }
                                 }
-                                else if (shapeField.Value is BinPointer existingPtr)
+
+                                if (isSimpleVec3 && constantVec3 != null)
                                 {
-                                    existingPtr.Name = new FNV1a(0x4f4e2ed7);
+                                    x.UpperLog("Transforming Shape to 0xee39916f (Simple Vec3)");
+
+                                    // Transform to Embed with type ee39916f
+                                    var newEmbed = new BinEmbed(new FNV1a(0xee39916f));
+
+                                    // Flatten: The field 0xe5f268dd now directly contains the vec3
+                                    newEmbed.Items.Add(new BinField(new FNV1a(0xe5f268dd), new BinVec3(constantVec3.Value)));
+
+                                    shapeField.Value = newEmbed;
+                                }
+                                else
+                                {
+                                    x.UpperLog("Defaulting Shape to 0x4f4e2ed7");
+                                    // Default 0x4f4e2ed7
+                                    // In Ritobin, the "hash_type" is the Name of the Embed/Pointer
+                                    if (shapeField.Value is BinEmbed existingEmbed)
+                                    {
+                                        existingEmbed.Name = new FNV1a(0x4f4e2ed7);
+                                    }
+                                    else if (shapeField.Value is BinPointer existingPtr)
+                                    {
+                                        existingPtr.Name = new FNV1a(0x4f4e2ed7);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+
 
 
             void ScanStrings(Dictionary<uint, KeyValuePair<BinValue, BinValue>> source)
@@ -2228,6 +2257,17 @@ namespace ModManager
                             if (File.Exists(fullPath))
                             {
                                 foundSkins.Add(i);
+                                continue;
+                            }
+
+                            relativePath = $"{Repatheruwu.HashPath(relativePath):8}.bin";
+
+                            // Combine the directory with the relative path
+                            fullPath = Path.Combine(wadPath, relativePath);
+
+                            if (File.Exists(fullPath))
+                            {
+                                foundSkins.Add(i);
                             }
                         }
                         continue; // Skip the WAD reading logic for this iteration
@@ -2292,14 +2332,46 @@ namespace ModManager
                     tempPaths.Add(wadPath);
                     byte[] fileBytes = File.ReadAllBytes(file);
 
+                    // --- Start of Modified Logic ---
+                    ulong pathHash;
+
+                    // Check if the file is directly in the root (no directory separators in the relative path)
+                    bool isRootFile = !relativePath.Contains(Path.DirectorySeparatorChar)
+                                      && !relativePath.Contains(Path.AltDirectorySeparatorChar);
+
+                    if (isRootFile)
+                    {
+                        // Try to parse the filename (without extension) as a hex string
+                        string filenameNoExt = Path.GetFileNameWithoutExtension(file);
+
+                        // Allow HexNumber format. "a5ed..." needs to be parsed as ulong.
+                        if (ulong.TryParse(filenameNoExt, System.Globalization.NumberStyles.HexNumber, null, out ulong manualHash))
+                        {
+                            pathHash = manualHash;
+                        }
+                        else
+                        {
+                            // Root file, but not a valid hash name -> Hash the path normally
+                            pathHash = Repatheruwu.HashPath(wadPath);
+                        }
+                    }
+                    else
+                    {
+                        // File is in a subdirectory -> Hash the path normally
+                        pathHash = Repatheruwu.HashPath(wadPath);
+                    }
+                    // --- End of Modified Logic ---
+
                     entries[i] = new WadEntryInfo
                     {
                         FilePath = file,
-                        PathHash = Repatheruwu.HashPath(wadPath),
+                        PathHash = pathHash,
                         DataChecksum = BitConverter.ToUInt64(XxHash64.Hash(fileBytes)),
                         Size = (uint)fileBytes.Length
                     };
                 });
+
+                // Assuming bonusPaths is defined in the class scope as per your original snippet
                 bonusPaths.AddRange(tempPaths);
 
                 Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
@@ -2347,7 +2419,6 @@ namespace ModManager
                     }
                 }
             }
-
             public (uint version, uint id) CheckLanguageID(List<string> wadPaths, string target)
             {
                 ulong targetHash = Repatheruwu.HashPath(target);
@@ -2469,6 +2540,7 @@ namespace ModManager
 
                 foreach (var wadPath in wadPaths)
                 {
+                    // x.UpperLog(wadPath, "#ff0000");
                     if (lookup.Count == 0) break;
                     if (!File.Exists(wadPath)) continue;
 
@@ -2479,7 +2551,7 @@ namespace ModManager
 
                         fs.Seek(268, SeekOrigin.Begin);
                         uint fileCount = br.ReadUInt32();
-
+                        // x.UpperLog(fileCount.ToString(), "#ff0000");
                         var bestCandidates = new Dictionary<Target, (ExtractionJob job, int priority)>();
 
                         for (int i = 0; i < fileCount; i++)

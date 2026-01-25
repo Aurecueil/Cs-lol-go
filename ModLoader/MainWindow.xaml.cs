@@ -296,8 +296,6 @@ namespace ModManager
         public async void noskin_button_make(object sender, RoutedEventArgs e)
         {
             noskin_button.IsEnabled = false;
-            // 1. PREPARATION (Main Thread)
-            // Calculate paths and prepare data here to ensure thread safety for UI objects.
             string gameDataPath = Path.Combine(Path.GetDirectoryName(settings.gamepath), "DATA", "FINAL");
             string modDir = Path.Combine("installed", "NoSkin");
             string wadOutputBase = Path.Combine(modDir, "WAD");
@@ -307,21 +305,15 @@ namespace ModManager
             if (Wad_champs_dict.Count < 10)
                 load_champ_wad_names();
 
-            // Convert to a List to safely pass to the background threads without modifying the source
             var championsToProcess = Wad_champs_dict
-    .Skip(1)          // Skips the first element
-    .SkipLast(2)      // Skips the last two elements
-    .ToList();
+                .Skip(1)          // Skips the first element
+                .SkipLast(2)      // Skips the last two elements
+                .ToList();
 
-            // 2. EXECUTION (Background Thread)
-            // Task.Run pushes the work off the UI thread
             await Task.Run(() =>
             {
-                // Parallel.ForEach handles splitting the list across multiple CPU cores
                 Parallel.ForEach(championsToProcess, kvp =>
                 {
-                    // Create a NEW instance for each thread (Thread-Local)
-                    // Do not share one 'Fixer' instance across threads!
                     Repatheruwu Fixer = new Repatheruwu();
 
                     Fixer.Settings.Character = kvp.Value;
@@ -334,7 +326,6 @@ namespace ModManager
                     Fixer.Settings.binless = false;
                     Fixer.Settings.folder = false;
 
-                    // This will use the default DummyLogger since no UI is passed
                     Fixer.FixiniYoursSkini();
                     Fixer = null;
                     GC.Collect();
@@ -561,9 +552,13 @@ namespace ModManager
 
                                 }
                             }
-                            catch (Exception)
+                            catch (UnauthorizedAccessException)
                             {
-
+                                Console.WriteLine("Access denied ");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine("Failed to read WAD entries during shortcut execution", ex);
                             }
                         }
                         mod.Wads = wads;
