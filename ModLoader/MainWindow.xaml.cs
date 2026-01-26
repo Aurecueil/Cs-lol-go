@@ -19,6 +19,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Collections.Concurrent;
 using static ModManager.FixerUI;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
@@ -30,6 +31,7 @@ using File = System.IO.File;
 using MessageBox = System.Windows.MessageBox;
 using Path = System.IO.Path;
 using SystemColors = System.Windows.SystemColors;
+
 
 namespace ModManager
 {
@@ -2784,16 +2786,16 @@ namespace ModManager
             }
         }
 
-        public Dictionary<string, Tuple<string, Dictionary<string, bool>>> WADS =
-    new(StringComparer.OrdinalIgnoreCase);
+        public ConcurrentDictionary<string, Tuple<string, Dictionary<string, bool>>> WADS =
+            new ConcurrentDictionary<string, Tuple<string, Dictionary<string, bool>>>(StringComparer.OrdinalIgnoreCase);
 
         public Dictionary<string, Tuple<string, Dictionary<string, bool>>> EMPTY_WADS =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public static Dictionary<string, Tuple<string, Dictionary<string, bool>>> CopyWadsDictionary(
-    Dictionary<string, Tuple<string, Dictionary<string, bool>>> source)
+        public static ConcurrentDictionary<string, Tuple<string, Dictionary<string, bool>>> CopyWadsDictionary(
+            Dictionary<string, Tuple<string, Dictionary<string, bool>>> source)
         {
-            var copy = new Dictionary<string, Tuple<string, Dictionary<string, bool>>>(StringComparer.OrdinalIgnoreCase);
+            var copy = new ConcurrentDictionary<string, Tuple<string, Dictionary<string, bool>>>(StringComparer.OrdinalIgnoreCase);
             foreach (var kvp in source)
             {
                 var innerCopy = new Dictionary<string, bool>(kvp.Value.Item2);
@@ -2831,8 +2833,8 @@ namespace ModManager
                 LoadWadFiles();
             }
             WADS = CopyWadsDictionary(EMPTY_WADS);
-            mods_loaded_in.Clear();
-            folders_loaded_in.Clear();
+            mods_loaded_in = new ConcurrentDictionary<string, bool>();
+            folders_loaded_in = new ConcurrentBag<int>();
             if (settings.tft_mode)
             {
                 await ProcessFolderChildrenAsync(-1, token);
@@ -3106,13 +3108,13 @@ namespace ModManager
 
         private ModToolsRunner _currentRunner;
 
-        HashSet<string> mods_loaded_in = new HashSet<string>();
-        List<int> folders_loaded_in = new List<int>();
+        ConcurrentDictionary<string, bool> mods_loaded_in = new ConcurrentDictionary<string, bool>();
+        ConcurrentBag<int> folders_loaded_in = new ConcurrentBag<int>();
 
         public async Task WriteWads(CancellationToken token)
         {
-            string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
-            string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
+            string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in.Keys)}\"";
+            string mod_list_disp = $"{string.Join("\n", mods_loaded_in.Keys)}";
             // CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
             Logger.Log("-- WRITING MODS --");
             Logger.Log(mod_list_disp);
@@ -3268,7 +3270,10 @@ namespace ModManager
                                 if (WADS.TryGetValue(trimmedWad, out var modsTuple))
                                 {
                                     var clearedFolders = modsTuple.Item2.Keys.ToList();
-                                    mods_loaded_in.RemoveWhere(m => clearedFolders.Contains(m));
+                                    foreach (var clearedFolder in clearedFolders)
+                                    {
+                                        mods_loaded_in.TryRemove(clearedFolder, out _);
+                                    }
 
                                     modsTuple.Item2.Clear();
 
@@ -3279,40 +3284,103 @@ namespace ModManager
                 }
             }
 
-            foreach (var (id, priority, isMod) in workingList)
+            // Group mods by priority for parallel processing
+            // Filter out skipped items: include if not in skipMap or if skip is false
+            var priorityGroups = workingList
+                .Where(item => 
+                {
+                    if (skipMap.TryGetValue(item.Id, out var shouldSkip))
+                        return !shouldSkip;
+                    return true; // Not in skipMap, so include it
+                })
+                .GroupBy(item => item.Priority)
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            foreach (var priorityGroup in priorityGroups)
             {
                 token.ThrowIfCancellationRequested();
 
-                if (skipMap.TryGetValue(id, out var skip) && skip)
-                    continue;
+                // Separate override mods (must be sequential) from regular mods (can be parallel)
+                var overrideMods = new List<(string Id, int Priority, bool IsMod)>();
+                var regularMods = new List<(string Id, int Priority, bool IsMod)>();
+                var folders = new List<(string Id, int Priority, bool IsMod)>();
 
-                if (isMod)
+                foreach (var item in priorityGroup)
                 {
-                    if (modByFolder.TryGetValue(id, out var mod))
+                    if (item.IsMod && modByFolder.TryGetValue(item.Id, out var mod) && mod.Details.override_)
                     {
-                        foreach (string wad in mod.Wads)
-                        {
-                            string trimmedWad = TrimWadName(wad);
-                            if (WADS.TryGetValue(trimmedWad, out var modsTuple))
-                            {
-                                if (mod.Details.override_)
-                                {
-                                    var clearedFolders = modsTuple.Item2.Keys.ToList();
-                                    mods_loaded_in.RemoveWhere(m => clearedFolders.Contains(m));
-                                    modsTuple.Item2.Clear();
-                                }
-
-                                modsTuple.Item2[mod.ModFolder] = mod.has_changed;
-                            }
-                            mods_loaded_in.Add(mod.ModFolder);
-                        }
+                        overrideMods.Add(item);
+                    }
+                    else if (item.IsMod)
+                    {
+                        regularMods.Add(item);
+                    }
+                    else
+                    {
+                        folders.Add(item);
                     }
                 }
-                else if (hierarchyById.TryGetValue(int.Parse(id), out var folderr))
+
+                // Process override mods sequentially (they clear other mods)
+                foreach (var (id, priority, isMod) in overrideMods)
                 {
-                    folders_loaded_in.Add(int.Parse(id));
-                    await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.override_);
+                    token.ThrowIfCancellationRequested();
+                    await ProcessModAsync(id, token);
                 }
+
+                // Process regular mods in parallel (they don't interfere with each other)
+                if (regularMods.Count > 0)
+                {
+                    var tasks = regularMods.Select(item => ProcessModAsync(item.Id, token));
+                    await Task.WhenAll(tasks);
+                }
+
+                // Process folders sequentially (they may have dependencies)
+                foreach (var (id, priority, isMod) in folders)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (hierarchyById.TryGetValue(int.Parse(id), out var folderr))
+                    {
+                        folders_loaded_in.Add(int.Parse(id));
+                        await ProcessFolderChildrenAsync(int.Parse(id), token, folderr.Random, folderr.override_);
+                    }
+                }
+            }
+        }
+
+        // Helper method to process a single mod (thread-safe)
+        private async Task ProcessModAsync(string modId, CancellationToken token)
+        {
+            await Task.Yield(); // Yield to allow parallel execution
+
+            if (!modByFolder.TryGetValue(modId, out var mod))
+                return;
+
+            foreach (string wad in mod.Wads)
+            {
+                token.ThrowIfCancellationRequested();
+                string trimmedWad = TrimWadName(wad);
+                
+                if (WADS.TryGetValue(trimmedWad, out var modsTuple))
+                {
+                    // Lock on the modsTuple.Item2 dictionary for thread-safe access
+                    lock (modsTuple.Item2)
+                    {
+                        if (mod.Details.override_)
+                        {
+                            var clearedFolders = modsTuple.Item2.Keys.ToList();
+                            foreach (var clearedFolder in clearedFolders)
+                            {
+                                mods_loaded_in.TryRemove(clearedFolder, out _);
+                            }
+                            modsTuple.Item2.Clear();
+                        }
+
+                        modsTuple.Item2[mod.ModFolder] = mod.has_changed;
+                    }
+                }
+                mods_loaded_in.TryAdd(mod.ModFolder, true);
             }
         }
 
