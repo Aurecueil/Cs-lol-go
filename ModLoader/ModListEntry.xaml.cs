@@ -380,6 +380,7 @@ namespace ModManager
                 Fixer = null;
             }
         }
+
         public void set_export(bool running)
         {
             if (running)

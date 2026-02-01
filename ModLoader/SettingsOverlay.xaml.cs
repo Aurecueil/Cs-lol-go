@@ -68,7 +68,7 @@ namespace ModLoader
             Start_Normal.SelectedIndex = mainWindow.settings.start_mode;
 
             no_tft.IsChecked = mainWindow.settings.not_tft;
-            supress_install.IsChecked = mainWindow.settings.supress_install_confilcts;
+            // supress_install.IsChecked = mainWindow.settings.supress_install_confilcts;
 
             defhearth.Text = mainWindow.settings.default_Hearth;
             defhome.Text = mainWindow.settings.default_home;
@@ -112,8 +112,8 @@ namespace ModLoader
             no_tft.Checked -= no_tft_Changed;
             no_tft.Unchecked -= no_tft_Changed;
 
-            supress_install.Checked -= supress_install_Changed;
-            supress_install.Unchecked -= supress_install_Changed;
+            // supress_install.Checked -= supress_install_Changed;
+            // supress_install.Unchecked -= supress_install_Changed;
 
             defAuthor.TextChanged -= Author_Changed;
             defhearth.TextChanged -= hearth_Changed;
@@ -157,8 +157,8 @@ namespace ModLoader
             no_tft.Checked += no_tft_Changed;
             no_tft.Unchecked += no_tft_Changed;
 
-            supress_install.Checked += supress_install_Changed;
-            supress_install.Unchecked += supress_install_Changed;
+            // supress_install.Checked += supress_install_Changed;
+            // supress_install.Unchecked += supress_install_Changed;
 
             defAuthor.TextChanged += Author_Changed;
             defhearth.TextChanged += hearth_Changed;
@@ -171,13 +171,13 @@ namespace ModLoader
         }
 
         #region Event Handlers
-        private void supress_install_Changed(object sender, RoutedEventArgs e)
-        {
-            if (mainWindow?.settings == null) return;
-
-            mainWindow.settings.supress_install_confilcts = supress_install.IsChecked ?? false;
-            mainWindow.save_settings();
-        }
+        // private void supress_install_Changed(object sender, RoutedEventArgs e)
+        // {
+        //     if (mainWindow?.settings == null) return;
+        // 
+        //     mainWindow.settings.supress_install_confilcts = supress_install.IsChecked ?? false;
+        //     mainWindow.save_settings();
+        // }
         private void no_tft_Changed(object sender, RoutedEventArgs e)
         {
             if (mainWindow?.settings == null) return;
@@ -538,13 +538,13 @@ $Shortcut.Save()
             mainWindow.save_settings();
         }
 
-        private void CatchUpdates_Changed(object sender, RoutedEventArgs e)
-        {
-            if (mainWindow?.settings == null) return;
-
-            mainWindow.settings.catch_updated = CatchUpdatesToggle.IsChecked ?? false;
-            mainWindow.save_settings();
-        }
+        // private void CatchUpdates_Changed(object sender, RoutedEventArgs e)
+        // {
+        //     if (mainWindow?.settings == null) return;
+        // 
+        //     mainWindow.settings.catch_updated = CatchUpdatesToggle.IsChecked ?? false;
+        //     mainWindow.save_settings();
+        // }
 
         private void ImportOverride_Changed(object sender, SelectionChangedEventArgs e)
         {

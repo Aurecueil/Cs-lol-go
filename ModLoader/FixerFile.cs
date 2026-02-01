@@ -2107,7 +2107,7 @@ namespace ModManager
 
         public void FindStringsRecursive(BinValue value, List<WadExtractor.Target> results)
         {
-            if (value == null) return;
+            if (value is null) return;
 
             // Recursive Action helper
             void Recurse(BinValue v) => FindStringsRecursive(v, results);
@@ -2156,6 +2156,13 @@ namespace ModManager
                                     string baseName = Path.ChangeExtension(s, null); // Get path without extension
                                     string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
                                     string alternativePath = baseName + targetExt;
+
+                                    return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                                }
+
+                                if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    string alternativePath = Path.ChangeExtension(s, "scb");
 
                                     return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
                                 }
@@ -2921,7 +2928,7 @@ namespace ModManager
                 // -------------------------------
                 // 3.4 Requirement: TOC Checksum
                 // -------------------------------
-                ulong headerChecksum = CalculateTocChecksum(processedEntries);
+                byte[] headerChecksum = CalculateTocChecksum(processedEntries);
 
                 // -------------------------------
                 // 3. Write WAD (Version 3.4)
@@ -2933,8 +2940,8 @@ namespace ModManager
                 bw.Write(new[] { 'R', 'W' });
                 bw.Write((byte)3); // Major
                 bw.Write((byte)4); // Minor (Updated to 4)
-                bw.Write(new byte[256]); // ECDSA Signature (Empty)
                 bw.Write(headerChecksum); // 3.4 Required Checksum
+                bw.Write(new byte[248]); // ECDSA Signature (Empty)
                 bw.Write((uint)processedEntries.Length);
 
                 // Calculate Data Start Offset
@@ -2988,9 +2995,9 @@ namespace ModManager
             // -------------------------------
             // Helper for WAD 3.4 Checksum
             // -------------------------------
-            private ulong CalculateTocChecksum(ProcessedEntry[] sortedEntries)
+            private byte[] CalculateTocChecksum(ProcessedEntry[] sortedEntries)
             {
-                var hasher = new XxHash3();
+                var hasher = new XxHash128();
                 // 3.4 Header Magic+Ver
                 hasher.Append(new byte[] { (byte)'R', (byte)'W', 3, 4 });
 
@@ -3000,8 +3007,9 @@ namespace ModManager
                     hasher.Append(BitConverter.GetBytes(e.Info.DataChecksum));
                 }
 
-                // GetCurrentHash() returns byte[], convert to ulong
-                return BitConverter.ToUInt64(hasher.GetCurrentHash());
+                byte[] hash = hasher.GetCurrentHash();
+                Array.Reverse(hash);
+                return hash;
             }
 
         }

@@ -2,6 +2,7 @@
 using Microsoft.Win32;
 using ModLoader;
 using ModPkgLibSpace;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -19,6 +20,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using static ModManager.FixerUI;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
@@ -228,7 +230,7 @@ namespace ModManager
         private bool display_only_active = false;
 
         Dictionary<int, HierarchyElement> hierarchyById = new();
-        Dictionary<string, Mod> modByFolder = new();
+        ConcurrentDictionary<string, Mod> modByFolder = new ConcurrentDictionary<string, Mod>();
         private static readonly string installedPath = "installed";
         List<ModListEntry> modListEntriesInDisplay = new List<ModListEntry>();
         List<ModListEntry> FolderListEntriesInDisplay = new List<ModListEntry>();
@@ -1069,7 +1071,21 @@ namespace ModManager
         }
 
 
+        static async Task DownloadCslolDll()
+        {
+            try
+            {
+                string url = "https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/cslol-dll.dll";
+                string savePath = Path.Combine("cslol-tools", "cslol-dll.dll");
 
+                Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+
+                using HttpClient client = new HttpClient();
+                byte[] data = await client.GetByteArrayAsync(url);
+                await File.WriteAllBytesAsync(savePath, data);
+            }
+            catch { }
+        }
 
 
         private void OnTrayIconDoubleClick()
@@ -1462,30 +1478,20 @@ namespace ModManager
         }
         private async void awaitKillSwitch()
         {
-
             using (HttpClient client = new HttpClient())
             {
                 try
                 {
-                    Console.WriteLine("Checking killswitch...");
-
-                    // Download the text content of the file
-                    string content = await client.GetStringAsync($"https://raw.githubusercontent.com/Aurecueil/Temp/main/images/killswitch?t={DateTime.UtcNow.Ticks}");
-                    // Clean up whitespace (newlines/spaces)
+                    string content = await client.GetStringAsync($"https://raw.githubusercontent.com/Aurecueil/Temp/main/images/good?t={DateTime.UtcNow.Ticks}");
                     string cleanContent = content.Trim();
 
-                    Console.WriteLine($"Current status: {cleanContent}");
-
-                    if (!cleanContent.Equals("GOOD", StringComparison.OrdinalIgnoreCase))
+                    if (!cleanContent.Equals("OKAY", StringComparison.OrdinalIgnoreCase))
                     {
-                        CustomMessageBox.Show($"Cslolgo is out of date, and so will now close. Please download an update", null, "New Version Aviable!");
-                        Environment.Exit(0);
+                        CustomMessageBox.Show($"{cleanContent}", null, "Info");
                     }
                 }
-                catch (Exception)
+                catch
                 {
-                    CustomMessageBox.Show($"Cannot verify version, app will now close. Get internet connection and try again", null, "Connection failed :sob:");
-                    Environment.Exit(0);
                 }
             }
         }
@@ -1538,7 +1544,6 @@ namespace ModManager
             this.SizeChanged += MainWindow_SizeChanged;
             this.PreviewKeyDown += MainWindow_PreviewKeyDown;
 
-            awaitKillSwitch();
             CleanUpOldBackups();
             ModListEntry.MainWindowInstance = this;
 
@@ -1565,6 +1570,13 @@ namespace ModManager
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             await Dispatcher.Yield(); // forces first render
+            try
+            {
+                await CheckForAppUpdates();
+            }
+            catch { }
+            awaitKillSwitch();
+            DownloadCslolDll();
 
             try
             {
@@ -1856,9 +1868,12 @@ namespace ModManager
                     // If relative path goes outside (e.g., contains '..'), it's not inside installed
                     if (!relativeToBase.StartsWith("..") && Directory.Exists(fullPath))
                     {
-                        Directory.Delete(fullPath, true); // true = recursive delete
-                        string backup = Path.GetFullPath(Path.Combine("backup", mod_folder));
-                        if (Directory.Exists(backup)) { Directory.Delete(backup, true); }
+                        Task.Run(() =>
+                        {
+                            Directory.Delete(fullPath, true); // true = recursive delete
+                            string backup = Path.GetFullPath(Path.Combine("backup", mod_folder));
+                            if (Directory.Exists(backup)) { Directory.Delete(backup, true); }
+                        });
                     }
 
 
@@ -1867,7 +1882,7 @@ namespace ModManager
                     {
                         old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
                     }
-                    modByFolder.Remove(mod_folder);
+                    modByFolder.TryRemove(mod_folder, out _);
 
                     cachedUIElements.Remove((true, mod_folder));
 
@@ -2731,7 +2746,7 @@ namespace ModManager
             {
                 if (_modLoadCts != null)
                 {
-                    return; // Already running
+                    return;
                 }
 
                 _modLoadCts = new CancellationTokenSource();
@@ -2744,12 +2759,10 @@ namespace ModManager
             {
                 await InitializeModsAsync(token);
 
-                // Check if we're still the active cancellation token
                 lock (_loaderLock)
                 {
                     if (_modLoadCts != localCts)
                     {
-                        // We've been cancelled/replaced
                         return;
                     }
                 }
@@ -3107,10 +3120,12 @@ namespace ModManager
         private ModToolsRunner _currentRunner;
 
         HashSet<string> mods_loaded_in = new HashSet<string>();
+        HashSet<string> mods_loaded_in_over = new HashSet<string>();
         List<int> folders_loaded_in = new List<int>();
 
         public async Task WriteWads(CancellationToken token)
         {
+            mods_loaded_in.UnionWith(mods_loaded_in_over);
             string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
             string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
             // CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
@@ -3121,83 +3136,88 @@ namespace ModManager
             _currentRunner = runner;
             string game_path = Path.GetDirectoryName(settings.gamepath);
 
+            bool test = false;
+            if (test)
+            {
+                OverlayTool ovrl = new OverlayTool();
+                ovrl.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
+            }
+            else
+            {
 
-            //OverlayTool.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
-            
-            
-            var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
-            
-            
-            if (settings.not_tft)
-            {
-                args += " --noTFT";
-            }
-            
-            if (settings.supress_install_confilcts)
-            {
-                args += " --ignoreConflict";
-            }
-            
-            
-            string err_catch = "";
-            var outputLines = new List<string>();
-            var errorLines = new List<string>();
-            try
-            {
-                int result = await runner.RunAsync(args,
-                onOutput: line =>
+
+
+                var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
+
+
+                if (settings.not_tft)
                 {
-                    outputLines.Add(line);
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Feed.Text = line;
-                        string lastPart = line.Split('/').Last();
-                        string trimmedWad = lastPart.Replace(".wad.client", "");
-                        if (EMPTY_WADS.TryGetValue(trimmedWad, out var wadInfo))
-                        {
-                            int position = EMPTY_WADS.Keys
-                                .Select((key, index) => new { key, index })
-                                .FirstOrDefault(x => x.key.Equals(trimmedWad, StringComparison.OrdinalIgnoreCase))?.index ?? -1;
-            
-                            if (position >= 0)
-                            {
-                                int total = EMPTY_WADS.Count;
-                                currentProgress = (double)(position + 1) / total;
-                                SetProgress();
-            
-            
-                            }
-                        }
-                    });
-                },
-                onError: line =>
-                {
-                    errorLines.Add(line);  // just collect errors, no immediate display
+                    args += " --noTFT";
                 }
-            );
-                PaintActiveMods();
-            
-                // After RunAsync completes, display all error lines if any
-                if (errorLines.Count > 0)
+
+                args += " --ignoreConflict";
+
+
+                string err_catch = "";
+                var outputLines = new List<string>();
+                var errorLines = new List<string>();
+                try
                 {
-                    string allErrors = string.Join(Environment.NewLine, errorLines);
-                    Application.Current.Dispatcher.Invoke(() =>
+                    int result = await runner.RunAsync(args,
+                    onOutput: line =>
+                    {
+                        outputLines.Add(line);
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            Feed.Text = line;
+                            string lastPart = line.Split('/').Last();
+                            string trimmedWad = lastPart.Replace(".wad.client", "");
+                            if (EMPTY_WADS.TryGetValue(trimmedWad, out var wadInfo))
+                            {
+                                int position = EMPTY_WADS.Keys
+                                    .Select((key, index) => new { key, index })
+                                    .FirstOrDefault(x => x.key.Equals(trimmedWad, StringComparison.OrdinalIgnoreCase))?.index ?? -1;
+
+                                if (position >= 0)
+                                {
+                                    int total = EMPTY_WADS.Count;
+                                    currentProgress = (double)(position + 1) / total;
+                                    SetProgress();
+
+
+                                }
+                            }
+                        });
+                    },
+                    onError: line =>
+                    {
+                        errorLines.Add(line);  // just collect errors, no immediate display
+                    }
+                );
+                    PaintActiveMods();
+
+                    // After RunAsync completes, display all error lines if any
+                    if (errorLines.Count > 0)
                     {
                         string allErrors = string.Join(Environment.NewLine, errorLines);
-                        _modLoadCts?.Cancel();
-                        ToggleFeed(false);
-                        err_catch = allErrors;
-                        _currentRunner = null;
-                        throw new InvalidOperationException(allErrors);
-                    });
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            string allErrors = string.Join(Environment.NewLine, errorLines);
+                            _modLoadCts?.Cancel();
+                            ToggleFeed(false);
+                            err_catch = allErrors;
+                            _currentRunner = null;
+                            throw new InvalidOperationException(allErrors);
+                        });
+                    }
                 }
-            }
-            catch (Exception)
-            {
-                Load_check_box.IsChecked = false;
-                if (!string.IsNullOrEmpty(err_catch))
+                catch (Exception)
                 {
-                    CustomMessageBox.Show(err_catch, new[] { "OK" }, "Error");
+                    Load_check_box.IsChecked = false;
+                    if (!string.IsNullOrEmpty(err_catch))
+                    {
+                        CustomMessageBox.Show(err_catch, new[] { "OK" }, "Error");
+                    }
                 }
             }
             currentProgress = 1;
@@ -3250,35 +3270,6 @@ namespace ModManager
 
             workingList.Sort((a, b) => a.Priority.CompareTo(b.Priority));
 
-            if (overrride)
-            {
-                foreach (var (id, priority, isMod) in workingList)
-                {
-                    if (skipMap.TryGetValue(id, out var skip) && skip)
-                        continue;
-
-                    if (isMod)
-                    {
-                        if (modByFolder.TryGetValue(id, out var mod))
-                        {
-                            foreach (string wad in mod.Wads)
-                            {
-                                string trimmedWad = TrimWadName(wad);
-
-                                if (WADS.TryGetValue(trimmedWad, out var modsTuple))
-                                {
-                                    var clearedFolders = modsTuple.Item2.Keys.ToList();
-                                    mods_loaded_in.RemoveWhere(m => clearedFolders.Contains(m));
-
-                                    modsTuple.Item2.Clear();
-
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             foreach (var (id, priority, isMod) in workingList)
             {
                 token.ThrowIfCancellationRequested();
@@ -3304,7 +3295,14 @@ namespace ModManager
 
                                 modsTuple.Item2[mod.ModFolder] = mod.has_changed;
                             }
-                            mods_loaded_in.Add(mod.ModFolder);
+                            if (overrride)
+                            {
+                                mods_loaded_in.Add(mod.ModFolder);
+                            }
+                            else
+                            {
+                                mods_loaded_in_over.Add(mod.ModFolder);
+                            }
                         }
                     }
                 }
@@ -3698,61 +3696,114 @@ namespace ModManager
                 PreCacheAllUIElements();
             }
         }
+        static async Task CheckForAppUpdates()
+        {
+            const string OWNER = "Aurecueil";
+            const string REPO = "Cs-lol-go";
 
+            string baseDir = AppContext.BaseDirectory;
+            string versionFile = Path.Combine(baseDir, "version.txt");
+
+            string localVersion = File.Exists(versionFile)
+                ? File.ReadAllText(versionFile).Trim()
+                : "0.0.0";
+
+            using HttpClient http = new();
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("cslol-go-check-update");
+
+            string json = await http.GetStringAsync(
+                $"https://api.github.com/repos/{OWNER}/{REPO}/releases/latest");
+
+            using JsonDocument doc = JsonDocument.Parse(json);
+
+            string remoteVersion = doc.RootElement
+                .GetProperty("tag_name")
+                .GetString()!
+                .TrimStart('v');
+
+            if (!Version.TryParse(remoteVersion, out var r) ||
+                !Version.TryParse(localVersion, out var l) ||
+                r <= l)
+                return; // no update
+            if (!File.Exists("cslol-go.exe")) return;
+            try
+            {
+                CustomMessageBox.Show("Update Found! cslol-go will now close, and auto update", null, "Update");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cslol-go.exe",
+                    Arguments = "-w",
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+            finally
+            {
+                Environment.Exit(0);
+            }
+
+        }
         private async Task PreCacheAllUIElements()
         {
-            double current = 1;
-            double max = hierarchyById.Count;
-            // Cache all folder entries
-            foreach (var kvp in hierarchyById)
+            // Process Folders
+            await ProcessCacheChunk(hierarchyById, (kvp) =>
             {
+                var cacheKey = (false, kvp.Key.ToString());
 
-                SetLoading(kvp.Value.Name, 2, current/max);
-                current += 1;
-                int folderId = kvp.Key;
-                HierarchyElement folderElement = kvp.Value;
-
-                var cacheKey = (false, folderId.ToString()); // isMod = false for folders
-
-                // Check if element is already cached
+                // Standard Dictionary Thread-Safety check
                 if (!cachedUIElements.ContainsKey(cacheKey))
                 {
-                    // Create new folder entry
-                    var folderEntry = new ModListEntry(folderId.ToString());
-                    folderEntry.InitializeWithFolder(folderElement);
+                    var folderEntry = new ModListEntry(kvp.Key.ToString());
+                    folderEntry.InitializeWithFolder(kvp.Value);
                     folderEntry.FolderDoubleClicked += (id) => RefreshModListPanel(id, false);
 
-                    // Add to cache
                     cachedUIElements[cacheKey] = folderEntry;
                 }
+            }, "Folders", 2);
 
-                await Dispatcher.Yield(DispatcherPriority.Background);
-            }
-            current = 1;
-            max = modByFolder.Count;
-
-            foreach (var kvp in modByFolder)
+            // Process Mods
+            await ProcessCacheChunk(modByFolder, (kvp) =>
             {
-                string modId = kvp.Key;
-                SetLoading(kvp.Value.Info.Name, 3, current / max);
-                current += 1;
-                Mod modElement = kvp.Value;
+                var cacheKey = (true, kvp.Key);
 
-                var cacheKey = (true, modId); // isMod = true for mods
-
-                // Check if element is already cached
                 if (!cachedUIElements.ContainsKey(cacheKey))
                 {
-                    // Create new mod entry
-                    var modEntry = new ModListEntry(modId);
-                    modEntry.InitializeWithMod(modElement);
-                    // Add any mod-specific event handlers here if needed
+                    var modEntry = new ModListEntry(kvp.Key);
+                    modEntry.InitializeWithMod(kvp.Value);
 
-                    // Add to cache
                     cachedUIElements[cacheKey] = modEntry;
                 }
+            }, "Mods", 3);
+        }
 
-                await Dispatcher.Yield(DispatcherPriority.Background);
+        private async Task ProcessCacheChunk<TKey, TValue>(
+            IEnumerable<KeyValuePair<TKey, TValue>> source,
+            Action<KeyValuePair<TKey, TValue>> action,
+            string typeLabel,
+            int step)
+        {
+            double current = 0;
+            // Safely get count from IEnumerable
+            double max = source is ICollection<KeyValuePair<TKey, TValue>> col ? col.Count : 0;
+
+            int batchSize = 10;
+            int count = 0;
+
+            foreach (var kvp in source)
+            {
+                action(kvp);
+
+                current++;
+                count++;
+
+                if (count >= batchSize)
+                {
+                    SetLoading($"{typeLabel}: {kvp.Key}", step, max > 0 ? current / max : 0);
+                    // This Yield is critical because cachedUIElements is NOT concurrent.
+                    // It ensures we stay on the UI thread where it's safe to modify the dict.
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    count = 0;
+                }
             }
         }
         private void CollectAllModsRecursively(HierarchyElement currentFolder, List<(string childId, Mod element)> mods, string searchFilter = null)
@@ -4287,35 +4338,42 @@ namespace ModManager
 
         public void LoadMods()
         {
-
             if (!Directory.Exists(installedPath))
             {
                 Directory.CreateDirectory(installedPath);
                 return;
             }
 
-
             string[] modFolders = Directory.GetDirectories(installedPath);
-            //int j = 0;
-            foreach (string modFolderPath in modFolders)
-            {
-                //j++;
-                string modFolderName = Path.GetFileName(modFolderPath);
 
-                try
+            Parallel.ForEach(
+                modFolders,
+                new ParallelOptions
                 {
-                    Mod mod = CreateModFromFolder(modFolderPath);
-                    
-                }
-                catch (Exception ex)
+                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                },
+                modFolderPath =>
                 {
-                    MessageBox.Show($"Error loading mod from folder '{modFolderName}': {ex.Message}");
-                }
+                    string modFolderName = Path.GetFileName(modFolderPath);
 
-                
-            }
-            //MessageBox.Show($"{j}");
+                    try
+                    {
+                        Mod mod = CreateModFromFolder(modFolderPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        // UI access must be marshaled to UI thread
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            CustomMessageBox.Show(
+                                $"Error reading mod installed/{modFolderName} : {ex.Message}", null, "Error"
+                            );
+                        });
+                    }
+                }
+            );
         }
+
         public void SaveModInfo(Mod mod, string basePath = null)
         {
             basePath ??= Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installed");
@@ -4611,7 +4669,7 @@ namespace ModManager
                 if (hierarchyById.TryGetValue(parent, out var old_parent)) {
                     old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
                 }
-                modByFolder.Remove(modFolderName);
+                modByFolder.TryRemove(modFolderName, out _);
             }
             int new_parent = get_parent_from_innerPath(new_mod_netyr.Details.InnerPath);
             modByFolder[modFolderName] = new_mod_netyr;
@@ -4902,53 +4960,7 @@ namespace ModManager
 
                         // Note: Assuming 'settings' and 'installedPath' are thread-safe or static. 
                         // If they are UI controls, capture them before Task.Run.
-                        if (settings.catch_updated)
-                        {
-                            // HasLowerVersionInstalled likely does disk IO, safe here.
-                            string? lowerVersionPath = HasLowerVersionInstalled(path, installedPath);
-                            if (lowerVersionPath != null)
-                            {
-                                extractTargetDir = Path.Combine(installedPath, fileName);
-                                using (var archive = ZipFile.OpenRead(path))
-                                {
-                                    foreach (var entry in archive.Entries)
-                                    {
-                                        string fullPath = Path.Combine(extractTargetDir, entry.FullName);
-                                        if (string.IsNullOrEmpty(entry.Name))
-                                        {
-                                            Directory.CreateDirectory(fullPath);
-                                            continue;
-                                        }
-                                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-                                        entry.ExtractToFile(fullPath, overwrite: true);
-                                    }
-                                }
-
-                                // File IO Operations
-                                File.Move(Path.Combine(installedPath, lowerVersionPath, "META", "details.json"), Path.Combine(extractTargetDir, "META", "details.json"), overwrite: true);
-                                DeleteMod(lowerVersionPath);
-
-                                // Dictionary operations need care if shared across threads, assuming single consumer or safe context
-                                ProfileEntries.Remove(lowerVersionPath);
-                                ProfileEntries[fileName] = 10;
-                                SaveProfileEntriesToFile();
-
-                                var newmod = CreateModFromFolder(Path.Combine(installedPath, fileName), true);
-                                if (newmod == null)
-                                {
-                                    Application.Current.Dispatcher.Invoke(() =>
-                                        CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
-                                    return;
-                                }
-                                SaveModDetails(newmod);
-
-                                Application.Current.Dispatcher.Invoke(() =>
-                                    RefreshModListPanel(Current_location_folder));
-
-                                return;
-                            }
-                        }
-                        else if (modByFolder.TryGetValue(fileName, out var mod))
+                        if (modByFolder.TryGetValue(fileName, out var mod))
                         {
                             int overrideSetting = settings.import_override;
 
@@ -5087,45 +5099,6 @@ namespace ModManager
         RegexOptions.Compiled | RegexOptions.IgnoreCase
     );
 
-        public static string? HasLowerVersionInstalled(string fantomeFilePath, string installedPath)
-        {
-            string fileName = Path.GetFileName(fantomeFilePath);
-            var match = modRegex.Match(fileName);
-            if (!match.Success)
-                return null;
-
-            string modName = match.Groups["name"].Value;
-            Version currentVersion = new Version(match.Groups["version"].Value);
-
-            string? lowerVersionFolder = null;
-
-            var directories = Directory.GetDirectories(installedPath);
-            foreach (var dir in directories)
-            {
-                string folderName = Path.GetFileName(dir);
-                var m = modRegex.Match(folderName);
-                if (!m.Success)
-                    continue;
-
-                if (m.Groups["name"].Value == modName)
-                {
-                    Version version = new Version(m.Groups["version"].Value);
-                    if (version >= currentVersion)
-                    {
-                        // A same or higher version exists — cancel
-                        return null;
-                    }
-                    else
-                    {
-                        // Keep track of the lower version folder
-                        lowerVersionFolder = folderName;
-                    }
-                }
-            }
-
-            return lowerVersionFolder;
-        }
-
         private void install_modpkg(string path, bool override_ = false)
         {
             var info = ModPkgLib.GetMetadata(path);
@@ -5224,7 +5197,7 @@ namespace ModManager
             RefreshModListPanel(Current_location_folder);
         }
 
-        private void HandleWadImport(string path)
+        private async void HandleWadImport(string path)
         {
             if (Directory.Exists(path))
             {
@@ -5250,7 +5223,7 @@ namespace ModManager
             }
 
             string name = Path.GetFileName(path);
-            if (!EMPTY_WADS.ContainsKey(TrimWadName(name))) { return; };
+            if (!path.EndsWith(".wad") && !path.EndsWith(".client") && !EMPTY_WADS.ContainsKey(TrimWadName(name))) { return; };
             string tempFolder = Path.Combine(Path.GetTempPath(), $"modtemp_{Guid.NewGuid()}");
             string wadDir = Path.Combine(tempFolder, "WAD");
             string metaDir = Path.Combine(tempFolder, "META");
@@ -5295,8 +5268,7 @@ namespace ModManager
 
                 ZipFile.CreateFromDirectory(tempFolder, tempZip);
 
-                // Import it
-                HandleDroppedItem(tempZip);
+                await HandleDroppedItem(tempZip);
 
                 // Clean up zip
                 File.Delete(tempZip);

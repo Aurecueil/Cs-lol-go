@@ -317,18 +317,18 @@
                                         </Grid.ColumnDefinitions>
 
                                         <CheckBox Grid.Column="0"
-										  x:Name="supress_install"
+										  x:Name="HashesUpdatesToggle"
 										  Style="{StaticResource CustomCheckBoxStyle}"
 										  IsChecked="True"
-										  Checked="supress_install_Changed"
-										  Unchecked="supress_install_Changed"
+										  Checked="HashUpdates_Changed"
+										  Unchecked="HashUpdates_Changed"
 										  Margin="0,0,8,0"/>
 
-                                        <TextBlock Grid.Column="1"
-										   Text="Supress Install Conflicts"
-										   Foreground="White"
-										   FontSize="14"
-										   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3"
+ Text="Auto Update Hashes"
+ Foreground="White"
+ FontSize="14"
+ VerticalAlignment="Center"/>
                                     </Grid>
                                     <Grid Margin="0,0,0,0" Grid.Column="2" ToolTip="Will skip TFT wads when loading mods">
                                         <Grid.ColumnDefinitions>
@@ -354,42 +354,6 @@
                                 </Grid>
 
 
-                                <!-- Catch updates -->
-                                <Grid Margin="0,0,0,0" ToolTip="When importing mods, will try to catch updates for already existing mods&#x0a;(if so, will override currently existing mod, even if import override is disabled)">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <CheckBox Grid.Column="0"
-                                              x:Name="CatchUpdatesToggle"
-                                              Style="{StaticResource CustomCheckBoxStyle}"
-                                              IsChecked="False"
-                                              Checked="CatchUpdates_Changed"
-                                              Unchecked="CatchUpdates_Changed"
-                                              Margin="0,0,8,0"/>
-
-                                    <TextBlock Grid.Column="1"
-                                               Text="Catch updates"
-                                               Foreground="White"
-                                               FontSize="14"
-                                               VerticalAlignment="Center"/>
-                                    <CheckBox Grid.Column="2"
-          x:Name="HashesUpdatesToggle"
-          Style="{StaticResource CustomCheckBoxStyle}"
-          IsChecked="False"
-          Checked="HashUpdates_Changed"
-          Unchecked="HashUpdates_Changed"
-          Margin="0,0,8,0"/>
-
-                                    <TextBlock Grid.Column="3"
-           Text="Auto Update Hashes"
-           Foreground="White"
-           FontSize="14"
-           VerticalAlignment="Center"/>
-                                </Grid>
 
                                 <!-- Import override -->
                                 <Grid Margin="14,0,0,0" ToolTip="When importing mod, mod already exists:&#x0a;a) throw error&#x0a;b)override it with new files, but keep old files that arent in new one&#x0a;c)delte old one and replace with new one&#x0a;d)Install new one alongside old one">

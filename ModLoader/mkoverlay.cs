@@ -1,396 +1,261 @@
-﻿using System.IO;
+﻿using ModManager;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Hashing;
+using System.Linq;
+using System.Threading.Tasks;
+using ZstdSharp;
 
 namespace ModLoader
 {
-    public static class OverlayTool
+    public class OverlayTool
     {
-        public static void MkOverlay(
-            string srcDir,
-            string dstDir,
-            string gameDir,
-            HashSet<string> modNames,
-            Action<string> onStatusUpdate = null,
-            Action<double> onProgressUpdate = null)
+        public void AnalyzeWad(string wadPath, string logOutputPath)
         {
-            void Report(string status, double progress)
+            using var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read);
+            using var br = new BinaryReader(fs);
+            using var writer = new StreamWriter(logOutputPath);
+
+            writer.WriteLine($"Analysis for: {Path.GetFileName(wadPath)}");
+            writer.WriteLine("Hash | TypeByte | Subchunk | MagicBytes | CompSize | UncompSize | Ratio | RealType");
+            writer.WriteLine("--------------------------------------------------------------------------------");
+
+            fs.Seek(268, SeekOrigin.Begin);
+            uint fileCount = br.ReadUInt32();
+
+            for (int i = 0; i < fileCount; i++)
             {
-                onStatusUpdate?.Invoke(status);
-                onProgressUpdate?.Invoke(progress);
-            }
+                ulong hash = br.ReadUInt64();
+                uint offset = br.ReadUInt32();
+                uint cSize = br.ReadUInt32();
+                uint uSize = br.ReadUInt32();
+                byte flags = br.ReadByte();
+                byte[] subchunk = br.ReadBytes(3);
+                ulong checksum = br.ReadUInt64();
 
-            Report("Initializing...", 0.0);
+                // Peek at the first 4 bytes of data
+                long currentPos = fs.Position;
+                fs.Seek(offset, SeekOrigin.Begin);
+                byte[] magic = br.ReadBytes(Math.Min(4, (int)cSize));
+                fs.Seek(currentPos, SeekOrigin.Begin);
 
-            // Dictionary to map WAD Names -> Archive Objects
-            var activeWads = new Dictionary<string, WadArchive>(StringComparer.OrdinalIgnoreCase);
+                string magicHex = BitConverter.ToString(magic).Replace("-", " ");
 
-            // Global Map: FileHash -> List of WADs that contain this file.
-            // Used to propagate mod updates to ALL wads containing the same file.
-            var globalHashMap = new Dictionary<ulong, List<WadArchive>>();
-
-            // Keep track of valid output paths for cleanup
-            var validRelativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var gameFiles = Directory.GetFiles(gameDir, "*.wad.client", SearchOption.AllDirectories);
-            int totalGameFiles = gameFiles.Length;
-
-            // 1. FAST INDEXING (Game WADs)
-            // We only read headers to map out where files live.
-            for (int i = 0; i < totalGameFiles; i++)
-            {
-                var file = gameFiles[i];
-                var wadName = Path.GetFileName(file);
-                string relativePath = GetRelativePath(gameDir, file);
-
-                if (!activeWads.TryGetValue(wadName, out var archive))
+                // Identify real compression by magic
+                string realType = "Unknown";
+                if (magic.Length >= 4)
                 {
-                    archive = new WadArchive(wadName, relativePath, file);
-                    activeWads[wadName] = archive;
-                    validRelativePaths.Add(relativePath);
+                    if (magic[0] == 0x28 && magic[1] == 0xB5 && magic[2] == 0x2F && magic[3] == 0xFD)
+                        realType = "Standard Zstd";
+                    else if (magic[0] == 0x1F && magic[1] == 0x8B)
+                        realType = "GZip";
+                    else if (cSize == uSize)
+                        realType = "Raw/Uncompressed";
+                    else
+                        realType = "Encrypted/Dictionary Zstd";
                 }
 
-                // Reads the TOC into memory, populates globalHashMap
-                archive.LoadGameWadFast(file, globalHashMap);
+                double ratio = (double)cSize / uSize;
+
+                writer.WriteLine($"{hash:X16} | {flags:X2} | {BitConverter.ToString(subchunk)} | {magicHex} | {cSize} | {uSize} | {ratio:P2} | {realType}");
             }
 
-            // 2. PROCESS MODS
-            double modStep = 0.30 / (modNames.Count > 0 ? modNames.Count : 1);
-            int j = 0;
-            foreach (string modName in modNames)
-            {
-                var modPath = Path.Combine(srcDir, modName);
-
-                Report($"Processing Mod: {modName}", 0.30 + (j * modStep));
-
-                if (Directory.Exists(modPath))
-                {
-                    ProcessMod(modPath, activeWads, globalHashMap);
-                }
-                j++;
-            }
-
-            // 3. WRITE OUTPUT
-            // Filter to only WADs that have been modified ("Dirty")
-            var dirtyWads = activeWads.Values.Where(w => w.IsDirty).ToList();
-            double writeStep = 0.40 / (dirtyWads.Count > 0 ? dirtyWads.Count : 1);
-            int count = 0;
-
-            foreach (var wad in dirtyWads)
-            {
-                Report($"Writing: {wad.Name}", 0.60 + (count * writeStep));
-
-                var dstPath = Path.Combine(dstDir, wad.RelativePath);
-                Directory.CreateDirectory(Path.GetDirectoryName(dstPath));
-
-                // Smart Write: Copies Original & Patches if possible, else Rebuilds
-                wad.SmartWrite(dstPath);
-                count++;
-            }
-
-            // 4. CLEANUP
-            Report("Cleaning up...", 0.95);
-            Cleanup(dstDir, validRelativePaths);
-
-            Report("Done!", 1.0);
+            writer.WriteLine("--- End of Analysis ---");
+            Console.WriteLine($"Analysis complete: {logOutputPath}");
+        }
+        private class WadEntryReference
+        {
+            public ulong Hash;
+            public uint Size;
+            public uint UncompressedSize;
+            public byte[] Metadata = new byte[4]; // [0]=Flags, [1-3]=SubchunkIndex
+            public ulong DataChecksum;
+            public string SourcePath;
+            public uint OriginalOffset; 
+            public byte[] PrecompressedData;
+            public bool IsInWad;
         }
 
-        private static void ProcessMod(
-            string modPath,
-            Dictionary<string, WadArchive> activeWads,
-            Dictionary<ulong, List<WadArchive>> globalHashMap)
+        private static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {".webm"
+        };
+
+        public void MkOverlay(string srcDir, string dstDir, string gameDir, HashSet<string> modNames)
         {
-            var wadFiles = Directory.GetFiles(modPath, "*.wad.client", SearchOption.AllDirectories);
+            var hashDict = new Dictionary<ulong, WadEntryReference>();
 
-            foreach (var wadFile in wadFiles)
+            // 1. Discovery - Original Game File
+            // string baseWad = Path.Combine(gameDir, "DATA/FINAL/Champions/Viego.wad.client");
+            // if (File.Exists(baseWad)) ReadWadMetadata(baseWad, hashDict);
+
+            // 2. Discovery - Mod Overrides
+            foreach (var mod in modNames)
             {
-                var wadName = Path.GetFileName(wadFile);
-
-                // Get target WAD (or create new if mod adds a completely new WAD)
-                if (!activeWads.TryGetValue(wadName, out var targetWad))
+                string wadFolder = Path.Combine(srcDir, mod, "WAD");
+                if (!Directory.Exists(wadFolder)) continue;
+                
+                // Process folders (loose files) and WADs within the mod folder
+                foreach (string entry in Directory.GetFileSystemEntries(wadFolder))
                 {
-                    string relativePath = GetRelativePath(modPath, wadFile);
-                    // OriginalPath is null because this is a new custom WAD
-                    targetWad = new WadArchive(wadName, relativePath, null);
-                    activeWads[wadName] = targetWad;
-                }
-
-                // Merge mod files into the target WAD (and propagate via globalHashMap)
-                targetWad.MergeModWad(wadFile, globalHashMap);
-            }
-        }
-
-        private static void Cleanup(string dstDir, HashSet<string> validRelativePaths)
-        {
-            if (!Directory.Exists(dstDir)) return;
-            var existingFiles = Directory.GetFiles(dstDir, "*.wad.client", SearchOption.AllDirectories);
-            foreach (var file in existingFiles)
-            {
-                string relPath = GetRelativePath(dstDir, file);
-                if (!validRelativePaths.Contains(relPath))
-                {
-                    File.Delete(file);
+                    if (Directory.Exists(entry)) ReadAndCompressFolder(entry, hashDict);
+                    else if (File.Exists(entry) && entry.EndsWith(".wad.client")) ReadWadMetadata(entry, hashDict);
                 }
             }
-            DeleteEmptyDirs(dstDir);
+            
+            if (hashDict.Count == 0) return; // Prevent writing empty files
+
+            // 3. Sort & Write
+            var sortedEntries = hashDict.Values.OrderBy(e => e.Hash).ToList();
+            byte[] headerChecksum = CalculateTocChecksum(sortedEntries);
+
+            string outputPath = Path.Combine(dstDir, "DATA/FINAL/Champions/Viego.wad.client");
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+            WriteWadHybrid(sortedEntries, headerChecksum, outputPath);
         }
 
-        private static string GetRelativePath(string rootPath, string fullPath)
+        private void ReadAndCompressFolder(string rootFolder, Dictionary<ulong, WadEntryReference> dict)
         {
-            rootPath = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-            if (fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
-                return fullPath.Substring(rootPath.Length);
-            return Path.GetFileName(fullPath);
+            var files = Directory.GetFiles(rootFolder, "*", SearchOption.AllDirectories);
+            var results = new WadEntryReference[files.Length];
+
+            Parallel.For(0, files.Length, i =>
+            {
+                string file = files[i];
+                string relPath = Path.GetRelativePath(rootFolder, file).Replace('\\', '/').ToLowerInvariant();
+                byte[] raw = File.ReadAllBytes(file);
+
+                ulong pathHash;
+                if (!relPath.Contains('/') && ulong.TryParse(Path.GetFileNameWithoutExtension(file), System.Globalization.NumberStyles.HexNumber, null, out ulong mh))
+                    pathHash = mh;
+                else
+                    pathHash = Repatheruwu.HashPath(relPath);
+
+                bool shouldStayRaw = RawExtensions.Contains(Path.GetExtension(file)) || raw.Length < 128;
+
+                byte[] compressed;
+                byte type;
+                if (shouldStayRaw) { compressed = raw; type = 0; }
+                else
+                {
+                    using var compressor = new Compressor(3);
+                    compressed = compressor.Wrap(raw).ToArray();
+                    type = 3;
+                }
+
+                results[i] = new WadEntryReference
+                {
+                    Hash = pathHash,
+                    PrecompressedData = compressed,
+                    Size = (uint)compressed.Length,
+                    UncompressedSize = (uint)raw.Length,
+                    Metadata = new byte[] { type, 0, 0, 0 },
+                    DataChecksum = XxHash3.HashToUInt64(compressed),
+                    IsInWad = false
+                };
+            });
+
+            foreach (var r in results) if (r != null) dict[r.Hash] = r;
         }
 
-        private static void DeleteEmptyDirs(string startDir)
+        private void ReadWadMetadata(string path, Dictionary<ulong, WadEntryReference> dict)
         {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var br = new BinaryReader(fs);
+
+            fs.Seek(268, SeekOrigin.Begin);
+            uint count = br.ReadUInt32();
+
+            for (int i = 0; i < count; i++)
+            {
+                var entry = new WadEntryReference
+                {
+                    SourcePath = path,
+                    IsInWad = true,
+                    Hash = br.ReadUInt64(),
+                    OriginalOffset = br.ReadUInt32(),
+                    Size = br.ReadUInt32(),
+                    UncompressedSize = br.ReadUInt32(),
+                    Metadata = br.ReadBytes(4),
+                    DataChecksum = br.ReadUInt64()
+                };
+                dict[entry.Hash] = entry;
+            }
+        }
+
+        private void WriteWadHybrid(List<WadEntryReference> entries, byte[] headerChecksum, string outputPath)
+        {
+            using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
+            using var bw = new BinaryWriter(fs);
+
+            // Header (v3.4)
+            bw.Write(new[] { 'R', 'W' });
+            bw.Write((byte)3); bw.Write((byte)4);
+            bw.Write(headerChecksum);
+            bw.Write(new byte[248]);
+            bw.Write((uint)entries.Count);
+
+            uint currentOffset = 272 + (uint)(entries.Count * 32);
+            var writtenOffsets = new Dictionary<ulong, uint>();
+
+            // TOC Loop
+            foreach (var e in entries)
+            {
+                if (!writtenOffsets.TryGetValue(e.DataChecksum, out uint off))
+                {
+                    off = currentOffset;
+                    writtenOffsets[e.DataChecksum] = currentOffset;
+                    currentOffset += e.Size;
+                }
+                bw.Write(e.Hash);
+                bw.Write(off);
+                bw.Write(e.Size);
+                bw.Write(e.UncompressedSize);
+                bw.Write(e.Metadata);
+                bw.Write(e.DataChecksum);
+            }
+
+            // Data Loop
+            var writtenChecksums = new HashSet<ulong>();
+            var openedWads = new Dictionary<string, FileStream>();
+            byte[] buffer = new byte[81920];
+
             try
             {
-                foreach (var d in Directory.EnumerateDirectories(startDir)) DeleteEmptyDirs(d);
-                if (!Directory.EnumerateFileSystemEntries(startDir).Any()) Directory.Delete(startDir);
-            }
-            catch { }
-        }
-    }
-
-    public class WadArchive
-    {
-        public string Name { get; }
-        public string RelativePath { get; }
-        public string OriginalGamePath { get; }
-
-        public Dictionary<ulong, WadEntry> Files { get; } = new Dictionary<ulong, WadEntry>();
-
-        public bool IsDirty { get; private set; } = false;
-        private bool _hasNewFiles = false; // If true, we MUST rebuild TOC (cannot patch)
-
-        public WadArchive(string name, string relativePath, string originalPath)
-        {
-            Name = name;
-            RelativePath = relativePath;
-            OriginalGamePath = originalPath;
-        }
-
-        public void LoadGameWadFast(string path, Dictionary<ulong, List<WadArchive>> globalHashMap)
-        {
-            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var br = new BinaryReader(fs))
-            {
-                // Header (268) + FileCount (4) = 272 bytes minimum
-                if (fs.Length < 272) return;
-
-                fs.Seek(268, SeekOrigin.Begin);
-                uint fileCount = br.ReadUInt32();
-
-                // Read entire TOC block
-                int tocSize = (int)(fileCount * 32);
-                byte[] tocBuffer = br.ReadBytes(tocSize);
-
-                for (int i = 0; i < fileCount; i++)
+                foreach (var e in entries)
                 {
-                    int offset = i * 32;
-                    ulong pathHash = BitConverter.ToUInt64(tocBuffer, offset);
-
-                    var entry = new WadEntry
+                    if (!writtenChecksums.Add(e.DataChecksum)) continue;
+                    if (!e.IsInWad) bw.Write(e.PrecompressedData);
+                    else
                     {
-                        Hash = pathHash,
-                        TocIndex = i,
-                        SourceOffset = BitConverter.ToUInt32(tocBuffer, offset + 8),
-                        SourceSize = BitConverter.ToUInt32(tocBuffer, offset + 12),
-                        UncompressedSize = BitConverter.ToUInt32(tocBuffer, offset + 16),
-                        Type = (WadCompressionType)tocBuffer[offset + 20],
-                        SourcePath = path // Pointing to ORIGINAL GAME WAD
-                    };
-
-                    Files[pathHash] = entry;
-
-                    // Add to Global Map for propagation
-                    if (!globalHashMap.TryGetValue(pathHash, out var list))
-                    {
-                        list = new List<WadArchive>();
-                        globalHashMap[pathHash] = list;
-                    }
-                    list.Add(this);
-                }
-            }
-        }
-
-        public void MergeModWad(string path, Dictionary<ulong, List<WadArchive>> globalHashMap)
-        {
-            using (var fs = File.OpenRead(path))
-            using (var br = new BinaryReader(fs))
-            {
-                if (fs.Length < 272) return;
-
-                fs.Seek(268, SeekOrigin.Begin);
-                uint fileCount = br.ReadUInt32();
-
-                int tocSize = (int)(fileCount * 32);
-                byte[] tocBuffer = br.ReadBytes(tocSize);
-
-                for (int i = 0; i < fileCount; i++)
-                {
-                    int offset = i * 32;
-                    ulong pathHash = BitConverter.ToUInt64(tocBuffer, offset);
-
-                    var entry = new WadEntry
-                    {
-                        Hash = pathHash,
-                        SourceOffset = BitConverter.ToUInt32(tocBuffer, offset + 8),
-                        SourceSize = BitConverter.ToUInt32(tocBuffer, offset + 12),
-                        UncompressedSize = BitConverter.ToUInt32(tocBuffer, offset + 16),
-                        Type = (WadCompressionType)tocBuffer[offset + 20],
-                        SourcePath = path // Pointing to MOD WAD
-                    };
-
-                    // Apply to Self
-                    AddOrUpdate(entry);
-
-                    // Propagate to linked archives
-                    if (globalHashMap.TryGetValue(pathHash, out var linked))
-                    {
-                        foreach (var other in linked)
+                        if (!openedWads.TryGetValue(e.SourcePath, out var sfs))
+                            openedWads[e.SourcePath] = sfs = new FileStream(e.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        sfs.Seek(e.OriginalOffset, SeekOrigin.Begin);
+                        long rem = e.Size;
+                        while (rem > 0)
                         {
-                            if (other != this) other.AddOrUpdate(entry);
+                            int r = sfs.Read(buffer, 0, (int)Math.Min(buffer.Length, rem));
+                            bw.Write(buffer, 0, r);
+                            rem -= r;
                         }
                     }
                 }
             }
+            finally { foreach (var s in openedWads.Values) s.Dispose(); }
         }
 
-        public void AddOrUpdate(WadEntry entry)
+        private byte[] CalculateTocChecksum(List<WadEntryReference> entries)
         {
-            if (Files.TryGetValue(entry.Hash, out var existing))
+            var hasher = new XxHash128();
+            hasher.Append(new byte[] { (byte)'R', (byte)'W', 3, 4 });
+            foreach (var e in entries)
             {
-                // REPLACING existing file.
-                // Keep the original TOC Index so we can patch it in place if needed.
-                entry.TocIndex = existing.TocIndex;
+                hasher.Append(BitConverter.GetBytes(e.Hash));
+                hasher.Append(BitConverter.GetBytes(e.DataChecksum));
             }
-            else
-            {
-                // NEW file.
-                _hasNewFiles = true;
-                entry.TocIndex = Files.Count; // Assign new virtual index
-            }
-
-            Files[entry.Hash] = entry;
-            IsDirty = true;
-        }
-
-        public void SmartWrite(string dstPath)
-        {
-            // STRATEGY A: PATCHING
-            // Conditions: 
-            // 1. We have an Original File (not a new custom WAD)
-            // 2. No NEW files were added (only replacements) -> TOC size matches
-            if (OriginalGamePath != null && !_hasNewFiles)
-            {
-                // Copy the original file (Fastest operation)
-                File.Copy(OriginalGamePath, dstPath, true);
-
-                using (var fs = new FileStream(dstPath, FileMode.Open, FileAccess.ReadWrite))
-                using (var bw = new BinaryWriter(fs))
-                {
-                    // Find modified entries
-                    var modifiedEntries = Files.Values.Where(e => e.SourcePath != OriginalGamePath).ToList();
-
-                    foreach (var entry in modifiedEntries)
-                    {
-                        // 1. Append Mod Data to End of File
-                        fs.Seek(0, SeekOrigin.End);
-                        uint newOffset = (uint)fs.Position;
-                        AppendData(bw, entry);
-
-                        // 2. Patch TOC Entry
-                        // Offset Calc: Header(268) + FileCount(4) + (Index * 32)
-                        long tocOffset = 272 + (entry.TocIndex * 32);
-
-                        fs.Seek(tocOffset + 8, SeekOrigin.Begin); // Skip Hash (8 bytes)
-
-                        bw.Write(newOffset);         // Offset (4)
-                        bw.Write(entry.SourceSize);  // CompressedSize (4)
-                        bw.Write(entry.UncompressedSize); // UncompressedSize (4)
-                        bw.Write((byte)entry.Type);  // Type (1)
-                        // Duplicate(1), Pad(2), Sha(8) are left untouched
-                    }
-                }
-            }
-            // STRATEGY B: FULL REBUILD
-            // Required if we added new files or if it's a brand new WAD
-            else
-            {
-                WriteFullRebuild(dstPath);
-            }
-        }
-
-        private void WriteFullRebuild(string dstPath)
-        {
-            var sortedEntries = Files.Values.OrderBy(x => x.Hash).ToList();
-
-            using (var fs = File.Create(dstPath))
-            using (var bw = new BinaryWriter(fs))
-            {
-                // Header (RW31)
-                bw.Write(new char[] { 'R', 'W' });
-                bw.Write((byte)3); bw.Write((byte)1);
-                bw.Write(new byte[256]); // Signature (Empty)
-                bw.Write((ulong)0);      // Checksum (Empty)
-
-                // File Count
-                bw.Write((uint)sortedEntries.Count);
-
-                // Data Start: 268 + 4 + (Count * 32)
-                uint currentOffset = 272 + (uint)(sortedEntries.Count * 32);
-
-                // Write TOC
-                foreach (var entry in sortedEntries)
-                {
-                    bw.Write(entry.Hash);
-                    bw.Write(currentOffset);
-                    bw.Write(entry.SourceSize);
-                    bw.Write(entry.UncompressedSize);
-                    bw.Write((byte)entry.Type);
-                    bw.Write((byte)0);
-                    bw.Write((ushort)0);
-                    bw.Write((ulong)0);
-
-                    currentOffset += entry.SourceSize;
-                }
-
-                // Write Data
-                foreach (var entry in sortedEntries)
-                {
-                    AppendData(bw, entry);
-                }
-            }
-        }
-
-        private void AppendData(BinaryWriter bw, WadEntry entry)
-        {
-            using (var src = File.OpenRead(entry.SourcePath))
-            {
-                src.Seek(entry.SourceOffset, SeekOrigin.Begin);
-                byte[] buffer = new byte[81920];
-                long left = entry.SourceSize;
-                while (left > 0)
-                {
-                    int read = src.Read(buffer, 0, (int)Math.Min(buffer.Length, left));
-                    bw.Write(buffer, 0, read);
-                    left -= read;
-                }
-            }
+            byte[] hash = hasher.GetCurrentHash();
+            Array.Reverse(hash);
+            return hash;
         }
     }
-
-    public class WadEntry
-    {
-        public ulong Hash;
-        public int TocIndex;
-        public string SourcePath;
-        public uint SourceOffset;
-        public uint SourceSize;
-        public uint UncompressedSize;
-        public WadCompressionType Type;
-    }
-
-    public enum WadCompressionType : byte { Uncompressed = 0, Gzip = 1, Zstd = 3 }
 }
