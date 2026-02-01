@@ -230,7 +230,7 @@ namespace ModManager
         private bool display_only_active = false;
 
         Dictionary<int, HierarchyElement> hierarchyById = new();
-        Dictionary<string, Mod> modByFolder = new Dictionary<string, Mod>();
+        ConcurrentDictionary<string, Mod> modByFolder = new ConcurrentDictionary<string, Mod>();
         private static readonly string installedPath = "installed";
         List<ModListEntry> modListEntriesInDisplay = new List<ModListEntry>();
         List<ModListEntry> FolderListEntriesInDisplay = new List<ModListEntry>();
@@ -1811,7 +1811,7 @@ namespace ModManager
                     {
                         old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
                     }
-                    modByFolder.Remove(mod_folder);
+                    modByFolder.TryRemove(mod_folder, out _);
 
                     cachedUIElements.Remove((true, mod_folder));
 
@@ -2774,6 +2774,7 @@ namespace ModManager
             }
             WADS = CopyWadsDictionary(EMPTY_WADS);
             mods_loaded_in.Clear();
+            mods_loaded_in_over.Clear();
             folders_loaded_in.Clear();
             if (settings.tft_mode)
             {
@@ -3674,58 +3675,65 @@ namespace ModManager
         }
         private async Task PreCacheAllUIElements()
         {
-            double current = 1;
-            double max = hierarchyById.Count;
-            // Cache all folder entries
-            foreach (var kvp in hierarchyById)
+            // Process Folders
+            await ProcessCacheChunk(hierarchyById, (kvp) =>
             {
+                var cacheKey = (false, kvp.Key.ToString());
 
-                SetLoading(kvp.Value.Name, 2, current / max);
-                current += 1;
-                int folderId = kvp.Key;
-                HierarchyElement folderElement = kvp.Value;
-
-                var cacheKey = (false, folderId.ToString()); // isMod = false for folders
-
-                // Check if element is already cached
+                // Standard Dictionary Thread-Safety check
                 if (!cachedUIElements.ContainsKey(cacheKey))
                 {
-                    // Create new folder entry
-                    var folderEntry = new ModListEntry(folderId.ToString());
-                    folderEntry.InitializeWithFolder(folderElement);
+                    var folderEntry = new ModListEntry(kvp.Key.ToString());
+                    folderEntry.InitializeWithFolder(kvp.Value);
                     folderEntry.FolderDoubleClicked += (id) => RefreshModListPanel(id, false);
 
-                    // Add to cache
                     cachedUIElements[cacheKey] = folderEntry;
                 }
+            }, "Folders", 2);
 
-                await Dispatcher.Yield(DispatcherPriority.Background);
-            }
-            current = 1;
-            max = modByFolder.Count;
-
-            foreach (var kvp in modByFolder)
+            // Process Mods
+            await ProcessCacheChunk(modByFolder, (kvp) =>
             {
-                string modId = kvp.Key;
-                SetLoading(kvp.Value.Info.Name, 3, current / max);
-                current += 1;
-                Mod modElement = kvp.Value;
+                var cacheKey = (true, kvp.Key);
 
-                var cacheKey = (true, modId); // isMod = true for mods
-
-                // Check if element is already cached
                 if (!cachedUIElements.ContainsKey(cacheKey))
                 {
-                    // Create new mod entry
-                    var modEntry = new ModListEntry(modId);
-                    modEntry.InitializeWithMod(modElement);
-                    // Add any mod-specific event handlers here if needed
+                    var modEntry = new ModListEntry(kvp.Key);
+                    modEntry.InitializeWithMod(kvp.Value);
 
-                    // Add to cache
                     cachedUIElements[cacheKey] = modEntry;
                 }
+            }, "Mods", 3);
+        }
 
-                await Dispatcher.Yield(DispatcherPriority.Background);
+        private async Task ProcessCacheChunk<TKey, TValue>(
+            IEnumerable<KeyValuePair<TKey, TValue>> source,
+            Action<KeyValuePair<TKey, TValue>> action,
+            string typeLabel,
+            int step)
+        {
+            double current = 0;
+            // Safely get count from IEnumerable
+            double max = source is ICollection<KeyValuePair<TKey, TValue>> col ? col.Count : 0;
+
+            int batchSize = 10;
+            int count = 0;
+
+            foreach (var kvp in source)
+            {
+                action(kvp);
+
+                current++;
+                count++;
+
+                if (count >= batchSize)
+                {
+                    SetLoading($"{typeLabel}: {kvp.Key}", step, max > 0 ? current / max : 0);
+                    // This Yield is critical because cachedUIElements is NOT concurrent.
+                    // It ensures we stay on the UI thread where it's safe to modify the dict.
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    count = 0;
+                }
             }
         }
         private void CollectAllModsRecursively(HierarchyElement currentFolder, List<(string childId, Mod element)> mods, string searchFilter = null)
@@ -4591,7 +4599,7 @@ namespace ModManager
                 if (hierarchyById.TryGetValue(parent, out var old_parent)) {
                     old_parent.Children.RemoveAll(child => child.Item1 == old_entry.ModFolder && child.Item2 == true);
                 }
-                modByFolder.Remove(modFolderName);
+                modByFolder.TryRemove(modFolderName, out _);
             }
             int new_parent = get_parent_from_innerPath(new_mod_netyr.Details.InnerPath);
             modByFolder[modFolderName] = new_mod_netyr;
