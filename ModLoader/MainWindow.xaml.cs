@@ -259,41 +259,23 @@ namespace ModManager
                 Console.WriteLine($"Parent ID {parentId} not found.");
             }
         }
-
-        public void EnsureRuneforgeProtocolRegistered()
-
+        // runeforge-mod://install/ba538a07-d743-4a40-830a-5578059f9377/46f99a6e-3219-415f-8d8a-0798356bd222
+        public async void EnsureRuneforgeProtocolRegistered()
         {
-
             const string protocol = "runeforge-mod";
-
             string exePath = Process.GetCurrentProcess().MainModule.FileName;
 
-
-            // Check if already registered
-
-            using (var key = Registry.ClassesRoot.OpenSubKey(protocol))
-
+            using (var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{protocol}"))
             {
+                key.SetValue("", "URL:Runeforge Protocol");
+                key.SetValue("URL Protocol", "");
 
-                if (key != null)
-
+                using (var shellKey = key.CreateSubKey(@"shell\open\command"))
                 {
-
-                    Rf_Button.ToolTip = "Open Runeforge ^^";
-
-                    Rf_Button.Click -= Runeforge_protocol_add;
-
-                    Rf_Button.Click += (sender, e) => { open_rf(); };
-
-                    return; // Already set up
-
+                    // The "%1" is where the URL is passed to your app
+                    shellKey.SetValue("", $"\"{exePath}\" \"%1\"");
                 }
-
             }
-
-
-
-
         }
         public async void noskin_button_make(object sender, RoutedEventArgs e)
         {
@@ -362,12 +344,12 @@ namespace ModManager
 
             {
 
-                MessageBox.Show("Failed to open Runeforge website: " + ex.Message);
+                CustomMessageBox.Show("Failed to open Runeforge website: " + ex.Message);
 
             }
 
         }
-        public static async void open_rf()
+        public async void open_rf(object sender, RoutedEventArgs e)
 
         {
 
@@ -393,66 +375,12 @@ namespace ModManager
 
             {
 
-                MessageBox.Show("Failed to open Runeforge website: " + ex.Message);
+                CustomMessageBox.Show("Failed to open Runeforge website: " + ex.Message);
 
             }
 
         }
 
-
-        private void Runeforge_protocol_add(object sender, RoutedEventArgs e)
-
-        {
-
-            var exePath = Process.GetCurrentProcess().MainModule.FileName;
-
-            string regCommands = $@"reg add HKCR\runeforge-mod /ve /d ""URL:Runeforge Mod Protocol"" /f & " +
-
-                        $@"reg add HKCR\runeforge-mod /v ""URL Protocol"" /d """" /f & " +
-
-                        $@"reg add HKCR\runeforge-mod\shell\open\command /ve /d ""\""{exePath}\"" \""%1\"""" /f";
-
-
-            var psi = new ProcessStartInfo
-
-            {
-
-                FileName = "cmd.exe",
-
-                Arguments = $"/c {regCommands}",
-
-                UseShellExecute = true,
-
-                Verb = "runas",   // triggers UAC
-
-            };
-
-
-            try
-
-            {
-
-                Process.Start(psi);
-
-                Rf_Button.ToolTip = "Open Runeforge ^^";
-
-                Rf_Button.Click -= Runeforge_protocol_add;
-
-                Rf_Button.Click += (sender, e) => { open_rf(); };
-
-                open_rf();
-
-            }
-
-            catch (System.ComponentModel.Win32Exception)
-
-            {
-
-                MessageBox.Show("Admin rights required to register protocol.");
-
-            }
-
-        }
 
 
         private void Create_Folder(object sender, RoutedEventArgs e)
@@ -1569,6 +1497,7 @@ namespace ModManager
         }
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            EnsureRuneforgeProtocolRegistered();
             await Dispatcher.Yield(); // forces first render
             try
             {
