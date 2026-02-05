@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="cslolgo - 0.2.3"
+        Title="cslolgo - 0.2.4"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="700"

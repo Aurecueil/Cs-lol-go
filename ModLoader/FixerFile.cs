@@ -99,6 +99,7 @@ namespace ModManager
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
         public List<string> CharraBlackList = ["viegowraith"];
+        public List<string> CharraBlackList_Lux = ["luxair", "luxdark", "luxfire", "luxice", "luxmagma", "luxmystic", "luxnature", "luxstorm", "luxwater"];
         public uint bnk_version { get; set; } = 145; 
         public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
         public List<ShaderEntry> shaders { get; set; } = null;
@@ -143,7 +144,6 @@ namespace ModManager
             ["kogmaw"] = new List<string> { "kogmawdead", },
             ["lissandra"] = new List<string> { "lissandrapassive", },
             ["lulu"] = new List<string> { "lulufaerie", "lulupolymorphcritter", },
-            ["lux"] = new List<string> { "luxair", "luxdark", "luxfire", "luxice", "luxmagma", "luxmystic", "luxnature", "luxstorm", "luxwater", },
             ["malzahar"] = new List<string> { "malzaharvoidling", },
             ["maokai"] = new List<string> { "maokaisproutling", },
             ["milio"] = new List<string> { "miliominion", },
@@ -642,6 +642,13 @@ namespace ModManager
                     {
                         Characters.Enqueue((name, skinNo, false));
                         // linkedList.Items.AdFd(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
+                    }
+                }
+                if (Settings.Character.ToLower() == "lux" && Settings.skinNo==7)
+                {
+                    foreach (string luxi in Settings.CharraBlackList_Lux)
+                    {
+                        Characters.Enqueue((luxi, 7, true));
                     }
                 }
 
@@ -1261,14 +1268,26 @@ namespace ModManager
 
             collectedIcons.RemoveAll(target =>
                  !target.OriginalPath.Contains("icons2d", StringComparison.OrdinalIgnoreCase));
-
+            if (Settings.Character.ToLower() == "samira")
+            {
+                List<string> ranks = ["assets/characters/samira/skins/base/particles/samira_p_meter_a.tex", "assets/characters/samira/skins/base/particles/samira_p_meter_b.tex",
+"assets/characters/samira/skins/base/particles/samira_p_meter_c.tex","assets/characters/samira/skins/base/particles/samira_p_meter_d.tex",
+"assets/characters/samira/skins/base/particles/samira_p_meter_s_plus_plus.tex","assets/characters/samira/skins/base/particles/samira_p_meter_s_plus.tex",
+"assets/characters/samira/skins/base/particles/samira_p_meter_s.tex", "assets/characters/samira/skins/base/particles/samira_base_p_max_style_rose.tex",
+"assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_1.tex", "assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_2.tex",
+"assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_3.tex", "assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_4.tex",
+"assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_5.tex", "assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_6.tex",];
+                foreach (string rank in ranks)
+                {
+                    collectedIcons.Add(new WadExtractor.Target { OriginalPath = rank, Hashes = [rank.Replace(".tex", ".dds"), rank], OutputPath = Settings.outputDir, OutputString =rank, BinStringRef=null});
+                }
+            }
             foreach (var tar in collectedIcons)
             {
                 tar.OutputString = tar.OriginalPath;
                 tar.BinStringRef = null;
             }
-            _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, collectedIcons);
-
+            _wadExtractor.ExtractAndSwapReferences(Settings.base_wad_path, collectedIcons, "#24bcbf");
         }
 
         (BinMap, BinMap, BinMap, List<WadExtractor.Target>, BinList) LoadAllBins(string rootBinPath)
@@ -1949,6 +1968,7 @@ namespace ModManager
 
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
+                if (Settings.CharraBlackList_Lux.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase) && Settings.skinNo!=7) continue;  
                 if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false));  
             }
 
@@ -2135,7 +2155,12 @@ namespace ModManager
                             if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
                                 hashes.Add(Path.ChangeExtension(s, ".tex"));
                             if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string_out.Replace(".sco", ".scb");
                                 hashes.Add(Path.ChangeExtension(s, ".scb"));
+                            }
+                            if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
+                                hashes.Add(Path.ChangeExtension(s, ".sco"));
 
                             if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
                                 hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
@@ -2545,7 +2570,7 @@ namespace ModManager
                 public string Extension;
             }
 
-            public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets, string logColor = CLR_GOOD)
+            public List<Target> ExtractAndSwapReferences(List<string> wadPaths, List<Target> targets, string logColor = CLR_GOOD, string alt_Mod = CLR_MOD)
             {
                 if (targets == null || targets.Count == 0) return targets;
                 if (wadPaths.Count == 0) return targets;
@@ -2599,7 +2624,7 @@ namespace ModManager
                                 {
                                     Hash = pathHash,
                                     Target = entry.target,
-                                    Extension = entry.ext,
+                                    Extension = entry.ext == ".sco" ? ".scb" : entry.ext,
                                     Offset = BitConverter.ToUInt32(entryBuffer, 8),
                                     CompressedSize = BitConverter.ToUInt32(entryBuffer, 12),
                                     Type = entryBuffer[20]
@@ -2667,30 +2692,45 @@ namespace ModManager
                                         Directory.CreateDirectory(dir);
                                         createdDirectories.Add(dir);
                                     }
-
-                                    File.WriteAllBytes(outPath, finalData);
+                                    if (job.Extension == ".sco" || job.Extension == ".scb")
+                                    {
+                                        if (finalData.Length > 0 && finalData[0] == 0x72) // 'r' for r3d2Mesh
+                                        {
+                                            File.WriteAllBytes(outPath, finalData);
+                                        }
+                                        else // Defaults to SCO parser if it starts with '[' or text
+                                        {
+                                            var sco = new SceneObject();
+                                            sco.ReadSCO(finalData);
+                                            sco.WriteSCB(outPath);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        File.WriteAllBytes(outPath, finalData);
+                                    }
                                 }
+                                string right = final_out.Length > 55
+                                    ? $"{final_out[..26]}...{final_out[^26..]}"
+                                    : final_out;
 
-                                if (job.Target.BinStringRef != null)
+                                string ext = Path.GetExtension(job.Target.OriginalPath);
+                                if (ext.ToLower()!=".bin")
                                 {
                                     string left = job.Target.OriginalPath.Length > 55
-    ? $"{job.Target.OriginalPath[..26]}...{job.Target.OriginalPath[^26..]}"
-    : job.Target.OriginalPath;
+        ? $"{job.Target.OriginalPath[..26]}...{job.Target.OriginalPath[^26..]}"
+        : job.Target.OriginalPath;
 
-                                    string right = final_out.Length > 55
-                                        ? $"{final_out[..26]}...{final_out[^26..]}"
-                                        : final_out;
-
-                                    // Determine if extension changed for color coding
-                                    bool extChanged = !string.Equals(Path.GetExtension(job.Target.OriginalPath), Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
+                                    bool extChanged = !string.Equals(ext, Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
                                     string logTag = extChanged ? "[FIXD]" : "[GOOD]";
-                                    string log_c = extChanged ? CLR_MOD : logColor;
+                                    string log_c = extChanged ? alt_Mod : logColor;
                                     x.UpperLog($"{logTag} {left,-55} --> {right,-55}", log_c);
-
-                                    string outRef = final_out;
+                                }
+                                if (job.Target.BinStringRef != null)
+                                {
                                     foreach (BinString s in job.Target.BinStringRef)
                                     {
-                                        s.Value = outRef;
+                                        s.Value = final_out;
                                     }
                                 }
                                 targets.Remove(job.Target);
@@ -3303,5 +3343,190 @@ namespace ModManager
 
         }
 
+    }
+    public enum SOFlag : uint
+    {
+        HasVcp = 1,
+        HasLocalOriginLocatorAndPivot = 2
+    }
+
+    public struct Vector3
+    {
+        public float X, Y, Z;
+        public Vector3(float x, float y, float z) { X = x; Y = y; Z = z; }
+    }
+
+    public struct Vector2
+    {
+        public float X, Y;
+        public Vector2(float x, float y) { X = x; Y = y; }
+    }
+
+    public class SceneObject
+    {
+        public string Name;
+        public Vector3 Central;
+        public Vector3 Pivot;
+        public string Material;
+        public List<Vector3> Positions = new List<Vector3>();
+        public List<int> Indices = new List<int>();
+        public List<Vector2> UVs = new List<Vector2>();
+        public SOFlag Flags = SOFlag.HasLocalOriginLocatorAndPivot;
+
+        // --- SCO READER (Text) ---
+        public void ReadSCO(byte[] data)
+        {
+            // Clear previous data if reusing the object
+            Positions.Clear();
+            Indices.Clear();
+            UVs.Clear();
+
+            using (MemoryStream ms = new MemoryStream(data))
+            using (StreamReader reader = new StreamReader(ms, Encoding.UTF8))
+            {
+                string firstLine = reader.ReadLine()?.Trim();
+                if (firstLine != "[ObjectBegin]")
+                    throw new Exception("Invalid SCO Signature: " + firstLine);
+
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    line = line.Trim();
+                    if (string.IsNullOrEmpty(line) || line == "[ObjectEnd]") continue;
+
+                    string[] inp = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (inp.Length == 0) continue;
+
+                    switch (inp[0])
+                    {
+                        case "Name=":
+                            Name = inp.Length > 1 ? inp[1] : "";
+                            break;
+
+                        case "CentralPoint=":
+                            Central = new Vector3(
+                                float.Parse(inp[1]), float.Parse(inp[2]), float.Parse(inp[3]));
+                            break;
+
+                        case "PivotPoint=":
+                            Pivot = new Vector3(
+                                float.Parse(inp[1]), float.Parse(inp[2]), float.Parse(inp[3]));
+                            break;
+
+                        case "Verts=":
+                            int vertexCount = int.Parse(inp[1]);
+                            for (int i = 0; i < vertexCount; i++)
+                            {
+                                string[] v = reader.ReadLine().Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                Positions.Add(new Vector3(float.Parse(v[0]), float.Parse(v[1]), float.Parse(v[2])));
+                            }
+                            break;
+
+                        case "Faces=":
+                            int faceCount = int.Parse(inp[1]);
+                            for (int i = 0; i < faceCount; i++)
+                            {
+                                // Replace tabs with spaces to handle both formatting styles
+                                string faceLine = reader.ReadLine().Replace('\t', ' ');
+                                string[] f = faceLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                                // Indices are in f[1], f[2], f[3]
+                                Indices.Add(int.Parse(f[1]));
+                                Indices.Add(int.Parse(f[2]));
+                                Indices.Add(int.Parse(f[3]));
+
+                                Material = f[4];
+
+                                // SCO UVs: U1 V1 U2 V2 U3 V3
+                                UVs.Add(new Vector2(float.Parse(f[5]), float.Parse(f[6])));
+                                UVs.Add(new Vector2(float.Parse(f[7]), float.Parse(f[8])));
+                                UVs.Add(new Vector2(float.Parse(f[9]), float.Parse(f[10])));
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+        // --- SCB WRITER (Binary) ---
+        public void WriteSCB(string path)
+        {
+            using (BinaryWriter bw = new BinaryWriter(File.Open(path, FileMode.Create)))
+            {
+                // 1. Signature & Version
+                bw.Write(Encoding.ASCII.GetBytes("r3d2Mesh")); // 8 bytes
+                bw.Write((ushort)3); // Major
+                bw.Write((ushort)2); // Minor
+
+                // 2. Name (Padded 128)
+                byte[] nameBytes = new byte[128];
+                Encoding.ASCII.GetBytes(Name ?? "").CopyTo(nameBytes, 0);
+                bw.Write(nameBytes);
+
+                // 3. Counts & Flags
+                bw.Write((uint)Positions.Count);
+                bw.Write((uint)(Indices.Count / 3));
+                bw.Write((uint)Flags);
+
+                // 4. Bounding Box (Calculated)
+                var (min, max) = GetBoundingBox();
+                WriteVec3(bw, min);
+                WriteVec3(bw, max);
+
+                // 5. Vertex Type (0 for no colors)
+                bw.Write((uint)0);
+
+                // 6. Positions
+                foreach (var pos in Positions) WriteVec3(bw, pos);
+
+                // 7. Central Point
+                WriteVec3(bw, Central);
+
+                // 8. Faces (Indices, Material, UVs)
+                int faceCount = Indices.Count / 3;
+                for (int i = 0; i < faceCount; i++)
+                {
+                    int idx = i * 3;
+                    bw.Write((uint)Indices[idx]);
+                    bw.Write((uint)Indices[idx + 1]);
+                    bw.Write((uint)Indices[idx + 2]);
+
+                    byte[] matBytes = new byte[64];
+                    Encoding.ASCII.GetBytes(Material ?? "lambert1").CopyTo(matBytes, 0);
+                    bw.Write(matBytes);
+
+                    // UV Layout: U1, U2, U3, V1, V2, V3
+                    bw.Write(UVs[idx].X);
+                    bw.Write(UVs[idx + 1].X);
+                    bw.Write(UVs[idx + 2].X);
+                    bw.Write(UVs[idx].Y);
+                    bw.Write(UVs[idx + 1].Y);
+                    bw.Write(UVs[idx + 2].Y);
+                }
+            }
+        }
+
+        private void ParseVector3(string line, out Vector3 vec)
+        {
+            string[] p = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            vec = new Vector3(float.Parse(p[1]), float.Parse(p[2]), float.Parse(p[3]));
+        }
+
+        private void WriteVec3(BinaryWriter bw, Vector3 v)
+        {
+            bw.Write(v.X); bw.Write(v.Y); bw.Write(v.Z);
+        }
+
+        private (Vector3 min, Vector3 max) GetBoundingBox()
+        {
+            Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            foreach (var p in Positions)
+            {
+                if (p.X < min.X) min.X = p.X; if (p.X > max.X) max.X = p.X;
+                if (p.Y < min.Y) min.Y = p.Y; if (p.Y > max.Y) max.Y = p.Y;
+                if (p.Z < min.Z) min.Z = p.Z; if (p.Z > max.Z) max.Z = p.Z;
+            }
+            return (min, max);
+        }
     }
 }

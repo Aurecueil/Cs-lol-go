@@ -34,8 +34,6 @@ internal static class Program
                 Console.WriteLine("Press any key to exit...");
                 Console.ReadKey();
             }
-
-            return 1;
         }
         try
         {
@@ -146,16 +144,6 @@ internal static class Program
         string name,
         string browser_download_url
     );
-
-
-    static async Task DownloadFileAsync(HttpClient http, string url, string path, bool debug)
-    {
-        using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        await using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
-        await response.Content.CopyToAsync(fs);
-    }
 
     static void ApplyUpdate(string sourceDir, string targetDir, bool debug)
     {
