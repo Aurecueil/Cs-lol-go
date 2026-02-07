@@ -204,12 +204,11 @@ namespace ModManager
                                   (chkBinsless.IsChecked == true) ||
                                   (chkAllSkins.IsChecked == true) ||
                                   isSpecialIndex;
-
             // MessageBox.Show($"{shouldCollapse} - RealIdx: {realIndex} - Total: {totalItems}");
 
+            chkSmallMod.Visibility = chkBinsless.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
             chkNoSkinLight.Visibility = shouldCollapse ? Visibility.Collapsed : Visibility.Visible;
 
-            if (shouldCollapse) chkNoSkinLight.IsChecked = false;
         }
 
         private void CheckSkinNo()
@@ -845,7 +844,13 @@ namespace ModManager
                 // Since this runs on the background thread now, FixiniYoursSkini MUST use 
                 // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
                 var fixerTimer = System.Diagnostics.Stopwatch.StartNew();
-                Fixer.FixiniYoursSkini(this);
+                try
+                {
+                    Fixer.FixiniYoursSkini(this);
+                }
+                catch (Exception ex) {
+                    CustomMessageBox.Show($"Fixer got drunk and failed, sry.\nDetails:\n{ex.Message}",null,"Fixer Crash");
+                }
                 fixerTimer.Stop();
                 LowerLog($"[INFO] Finished fixing mod in {fixerTimer.Elapsed.TotalSeconds:F2}s", "#2dc55e");
 

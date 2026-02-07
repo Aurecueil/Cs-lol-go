@@ -3630,11 +3630,17 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = File.Exists(versionFile)
-                ? File.ReadAllText(versionFile).Trim()
-                : "0.0.0";
+            string localVersion = "0.2.4";
+            if (File.Exists(versionFile))
+            {
+                localVersion = File.ReadAllText(versionFile).Trim();
+            }
+            else
+            {
+                File.WriteAllText(versionFile, localVersion);
+            }
 
-            using HttpClient http = new();
+                using HttpClient http = new();
             http.DefaultRequestHeaders.UserAgent.ParseAdd("cslol-go-check-update");
 
             string json = await http.GetStringAsync(

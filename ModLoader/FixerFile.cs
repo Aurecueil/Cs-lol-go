@@ -628,6 +628,7 @@ namespace ModManager
                 x.LowerLog($"[PROC] Processing Assets", CLR_ACT);
 
                 allStrings = process(allStrings);
+                x.LowerLog($"[DONE] Done Processing Assets", CLR_ACT);
                 // foreach (var item in allStrings) {
                 //      x.LowerLog($"[MISS] {item.OriginalPath}", CLR_ERR);
                 // }
@@ -1387,7 +1388,7 @@ namespace ModManager
 
                         if (hash == 0) continue;
                         Dictionary<uint, KeyValuePair<BinValue, BinValue>> targetDict;
-
+                        // bool override_older = true;
                         switch ((Defi)entryData.Name.Hash)
                         {
                             case Defi.SkinCharacterDataProperties:
@@ -1414,6 +1415,7 @@ namespace ModManager
                                 break;
 
                             case Defi.AnimationGraphData:
+                                // override_older = false;
                                 targetDict = AnimEntries;
                                 break;
 
@@ -1433,7 +1435,21 @@ namespace ModManager
                                 targetDict = OtherEntries;
                                 break;
                         }
-                        targetDict[hash] = kvp;
+                        if (!targetDict.ContainsKey(hash))
+                        {
+                            targetDict[hash] = kvp;
+                        }
+                        // if (override_older)
+                        // {
+                        //     targetDict[hash] = kvp;
+                        // }
+                        // else
+                        // {
+                        //     if (!targetDict.ContainsKey(hash))
+                        //     {
+                        //         targetDict[hash] = kvp;
+                        //     }
+                        // }
                     }
 
 
@@ -2069,12 +2085,12 @@ namespace ModManager
                                         if (d0 == 0 && d1 >= 1)
                                         {
                                             flags = true;
-                                            x.UpperLog("Flags detected via nested table");
+                                            // x.UpperLog("Flags detected via nested table");
                                         }
                                         else if (d0 == -1 && d1 == 1)
                                         {
                                             keepIt = true;
-                                            x.UpperLog("KeepItAs0x4f4e2ed7 detected via nested table");
+                                            // x.UpperLog("KeepItAs0x4f4e2ed7 detected via nested table");
                                         }
                                     }
                                 }
@@ -2114,7 +2130,7 @@ namespace ModManager
                                         if (d0 == 0 && d1 > 1)
                                         {
                                             emitRotation = true;
-                                            x.UpperLog("EmitRotationAnglesKeyValues detected");
+                                            // x.UpperLog("EmitRotationAnglesKeyValues detected");
                                         }
                                     }
                                 }
