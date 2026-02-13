@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using Microsoft.VisualBasic;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -300,8 +301,11 @@ namespace ModManager
                     {
                         entry.block.Text = "Exporting Mod";
                         meow.Add(entry);
-                        entry.set_export(true);
                     }
+                }
+                foreach(var entry in meow)
+                {
+                    entry.set_export(true);
                 }
                 block.Text = "Exporting Mod";
                 set_export(true);

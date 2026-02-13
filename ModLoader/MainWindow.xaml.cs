@@ -4331,7 +4331,7 @@ namespace ModManager
 
                 try
                 {
-                    Mod mod = CreateModFromFolder(modFolderPath);
+                    CreateModFromFolder(modFolderPath);
 
                 }
                 catch (Exception ex)
@@ -4623,7 +4623,10 @@ namespace ModManager
                 string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
-            if (modInfo.Description.Contains("darkseal") || modInfo.Author.Contains("darkseal")) return null;
+            if (modInfo.Description.ToLower().Contains("alban1911") || modInfo.Description.ToLower().Contains("/rose") || modInfo.Description.ToLower().Contains("darkseal") || modInfo.Author.ToLower().Contains("darkseal") || modInfo.Author.ToLower().Contains("alban1911") || modInfo.Author == "Rose")
+            {
+                return null;
+            }
 
             // Create and return Mod object
             Mod new_mod_netyr = new Mod
@@ -4798,6 +4801,11 @@ namespace ModManager
                     }
                     string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
                     Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                    if (new_mod == null) {
+                        Application.Current.Dispatcher.Invoke(() =>
+                   CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
+                        return;
+                    }
                     RefreshModListPanel(Current_location_folder);
                     string metaDir = Path.Combine(extractTargetDir, "meta");
                     Directory.CreateDirectory(metaDir);
@@ -5020,7 +5028,7 @@ namespace ModManager
                             }
 
                             string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                            var newmod = CreateModFromFolder(extractTargetDir, true);
+                            Mod newmod = CreateModFromFolder(extractTargetDir, true);
 
                             if (newmod == null)
                             {
@@ -5164,7 +5172,14 @@ namespace ModManager
             File.WriteAllText(Path.Combine(metaPath, "details.json"), json2);
 
             string folderName = Path.GetFileName(installPath.TrimEnd(Path.DirectorySeparatorChar));
-            SaveModDetails(CreateModFromFolder(installPath, true));
+            Mod moddi = CreateModFromFolder(installPath, true);
+            if(moddi == null)
+                            {
+                Application.Current.Dispatcher.Invoke(() =>
+                   CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
+                return;
+            }
+            SaveModDetails(moddi);
             RefreshModListPanel(Current_location_folder);
         }
 
