@@ -161,6 +161,7 @@ namespace ModManager
         public bool show_thumbs { get; set; } = true;
         public float thumb_opacity { get; set; } = 0.4f;
         public bool auto_update_hashes { get; set; } = true;
+        public bool No_Skinni { get; set; } = true;
         public int Ailgment { get; set; } = 1;
         public int game_version_major { get; set; } = 0;
         public int game_version_minor { get; set; } = 0;
@@ -4918,8 +4919,11 @@ namespace ModManager
 
                                 if (!hasWad || !hasMetaInfo)
                                 {
-                                    Application.Current.Dispatcher.Invoke(() =>
-                                        MessageBox.Show("Invalid mod archive: Must contain 'WAD' or 'RAW' folder and 'META/info.json'", "Invalid Mod", MessageBoxButton.OK, MessageBoxImage.Error));
+
+                                    Application.Current.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        MessageBox.Show("Invalid mod archive: Must contain 'WAD' or 'RAW' folder and 'META/info.json'", "Invalid Mod", MessageBoxButton.OK, MessageBoxImage.Error);
+                            });
                                     return;
                                 }
 
@@ -4928,8 +4932,11 @@ namespace ModManager
                         }
                         catch (Exception ex)
                         {
-                            Application.Current.Dispatcher.Invoke(() =>
-                                MessageBox.Show($"Error reading archive:\n{ex.Message}", "Zip Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                            Application.Current.Dispatcher.InvokeAsync(() =>
+                            {
+                                MessageBox.Show($"Error reading archive:\n{ex.Message}", "Zip Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+
                             return;
                         }
 
@@ -4952,8 +4959,10 @@ namespace ModManager
                             switch (overrideSetting)
                             {
                                 case 0:
-                                    Application.Current.Dispatcher.Invoke(() =>
-                                        MessageBox.Show($"Mod already EXISTS under this path:\n{mod.ModFolder}", "Import Skipped", MessageBoxButton.OK, MessageBoxImage.Warning));
+                                    Application.Current.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        MessageBox.Show($"Mod already EXISTS under this path:\n{mod.ModFolder}", "Import Skipped", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        });
                                     return;
 
                                 case 1:
@@ -4985,8 +4994,10 @@ namespace ModManager
                                     break;
 
                                 default:
-                                    Application.Current.Dispatcher.Invoke(() =>
-                                        MessageBox.Show("Unknown import override setting.", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                                    Application.Current.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        MessageBox.Show("Unknown import override setting.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        });
                                     return;
                             }
                         }
@@ -5032,15 +5043,19 @@ namespace ModManager
 
                             if (newmod == null)
                             {
-                                Application.Current.Dispatcher.Invoke(() =>
-                                   CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
+                                Application.Current.Dispatcher.InvokeAsync(() =>
+                                {
+                                    CustomMessageBox.Show("skinhacks are not supported, get lost", null, "No Skins?");
+                                });
                                 return;
                             }
-
-                            Application.Current.Dispatcher.Invoke(() =>
-                                SaveModDetails(newmod));
-                            Application.Current.Dispatcher.Invoke(() =>
-                                RefreshModListPanel(Current_location_folder));
+                            else
+                            {
+                                Application.Current.Dispatcher.Invoke(() =>
+                                    SaveModDetails(newmod));
+                                Application.Current.Dispatcher.Invoke(() =>
+                                    RefreshModListPanel(Current_location_folder));
+                            }
                         }
                         catch (Exception)
                         {
@@ -5064,8 +5079,10 @@ namespace ModManager
                 }
                 catch (Exception ex)
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
-                        MessageBox.Show($"Error handling dropped item:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error));
+                    Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                    MessageBox.Show($"Error handling dropped item:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            });
                 }
 
                 // Final UI refresh for this item (wrapped in Dispatcher)

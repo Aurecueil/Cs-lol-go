@@ -39,6 +39,10 @@ namespace ModManager
             this.Fixer = Fixi;
             this.DataContext = this;
 
+            chkNoSkinLight.IsChecked = Main.settings.No_Skinni;
+            chkNoSkinLight.Checked += udptNoSkinniSetting;
+            chkNoSkinLight.Unchecked += udptNoSkinniSetting;
+
             LoadTopazImage();
             PopulateCharacters();
 
@@ -53,6 +57,13 @@ namespace ModManager
             HookUpEvents();
 
             UpdateNoSkinLightVisibility();
+        }
+
+        private async void udptNoSkinniSetting(object sender, RoutedEventArgs e)
+        {
+
+            Main.settings.No_Skinni = chkNoSkinLight.IsChecked ?? false;
+            Main.save_settings();
         }
 
         private void HookUpEvents()

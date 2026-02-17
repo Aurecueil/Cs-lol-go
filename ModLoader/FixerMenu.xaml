@@ -320,7 +320,7 @@ Text="-"/>
                                               Style="{StaticResource CustomCheckBoxStyle}"/>
                                     <CheckBox x:Name="chkSmallMod" Grid.Column="1" Content="'Small Mod'" IsChecked="True"  Style="{StaticResource CustomCheckBoxStyle}" ToolTip="Will only verify paths for not included assets, instead of puting them in mod"/>
 
-                                    <CheckBox x:Name="chkNoSkinLight" Grid.Column="2" Content="Apply to all skins" IsChecked="True"
+                                    <CheckBox x:Name="chkNoSkinLight" Grid.Column="2" Content="Apply to all skins"
                                               Style="{StaticResource CustomCheckBoxStyle}" Visibility="Visible"/>
 
                                 </Grid>
