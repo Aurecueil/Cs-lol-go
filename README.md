@@ -27,7 +27,7 @@ My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueTool
         
 1. Download: [cslol-go.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.4/cslol-go.zip)
 2. Extract: `cslol-go.zip`
-3. Run `cslol-go.exe`
+3. Run `ModLoader.exe`
 
       </p>
     </td>
