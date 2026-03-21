@@ -38,7 +38,7 @@ My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueTool
     </td>
   </tr>
 </table>
-
+-# If above Version shows `EOS` error, click [here](https://github.com/Aurecueil/Temp/raw/refs/heads/main/cslol-go.0.2.4.1.march.20th.zip) to micro-patch
 # Updates
 cslol-go automatically checks for the latest version when you open the app. If there is a newer version, the app will display a message box.
 
