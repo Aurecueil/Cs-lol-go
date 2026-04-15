@@ -633,7 +633,7 @@ namespace ModManager
         {
             if (IsMod)
             {
-                Main.CreateModFromFolder(ModElement.ModFolder);
+                Main.CreateModFromFolder($"installed/{ModElement.ModFolder}");
                 Main.RefreshModListPanel(Main.Current_location_folder);
             }
             Main.OverlayHost.Children.Clear();
