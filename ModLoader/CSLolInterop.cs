@@ -1,21 +1,31 @@
 ﻿using System.Runtime.InteropServices;
 
-public static class CSLolInterop
+namespace ModManager
 {
-    private const string DllName = "cslol-tools/cslol-dll.dll";
+    internal static class CSLolInterop
+    {
+        private const string DllName = "cslol-tools/cslol-dll.dll";
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr cslol_init();
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr cslol_init();
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
-    public static extern IntPtr cslol_set_config(string prefix);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+        public static extern IntPtr cslol_set_config([MarshalAs(UnmanagedType.LPWStr)] string configPath);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern uint cslol_find();
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr cslol_set_flags(ulong flags);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr cslol_hook(uint tid, int timeoutMs, int retries);
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr cslol_set_log_level(long level);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr cslol_log_pull();
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint cslol_find();
+
+        // The v1.8 runner uses this simplified hook call
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr cslol_hook(uint tid, uint timeoutMs, uint stepMs);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr cslol_log_pull();
+    }
 }

@@ -282,6 +282,7 @@ namespace ModManager
         }
         public (int, bool) ProcessAviableSkin2(List<int> entries)
         {
+            Logger.Log(string.Join(", ", entries));
             if (entries == null || entries.Count == 0)
             {
                 return (0, true);
@@ -317,7 +318,7 @@ namespace ModManager
             {
                 isSequential = sequenceLengths.Any(len => len < 4);
             }
-            if (isSequential)
+            if (isSequential || entries.Count > 8)
             {
                 return (0, false);
             }

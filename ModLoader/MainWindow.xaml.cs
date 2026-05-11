@@ -1076,7 +1076,7 @@ namespace ModManager
                 bool modLoadingRunning = _isLoaderRunning || _modLoadCts != null;
 
                 // Check if CSLol process is running
-                bool cslolRunning = CSLolManager.IsRunning();
+                bool cslolRunning = CSLolManager.IsRunning;
 
                 return modLoadingRunning || cslolRunning;
             }
@@ -2573,6 +2573,7 @@ namespace ModManager
             ToggleOverlay(true);
             Feed.Text = "[INF] Checking Game Version";
             await CheckGameVersion();
+            Feed.Text = "[INF] Initializing";
             currentProgress = 0;
             SetProgress();
             ProfileComboBox.IsEnabled = false;
@@ -2703,6 +2704,7 @@ namespace ModManager
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading mods: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                await Stop_loader_internal();
             }
             finally
             {
@@ -2809,6 +2811,7 @@ namespace ModManager
                         if (settings.reinitialize) { 
                             try
                             {
+                                Thread.Sleep(500);
                                 Feed.Text = "Reinitializing mods...";
                                 ToggleOverlay(true);
                                 ClearPaintActiveMods();
@@ -3631,7 +3634,7 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "0.2.4";
+            string localVersion = "0.2.4.2";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -3654,10 +3657,19 @@ namespace ModManager
                 .GetString()!
                 .TrimStart('v');
 
+
+
             if (!Version.TryParse(remoteVersion, out var r) ||
                 !Version.TryParse(localVersion, out var l) ||
                 r <= l)
                 return; // no update
+
+            bool isNewSignificantVersion =
+    r.Major > l.Major ||
+    (r.Major == l.Major && r.Minor > l.Minor) ||
+    (r.Major == l.Major && r.Minor == l.Minor && r.Build > l.Build);
+            if (!isNewSignificantVersion)
+                return;
 
             var res = CustomMessageBox.Show("Update Found! Do you want to auto-pdate the app?", ["Update", "Ignore"], "New Update");
 
