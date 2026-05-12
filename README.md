@@ -1,20 +1,23 @@
+
+## About cs-lol-go
+
+**cs-lol-go** is a **League of Legends mod manager** designed for best possible user expirience. Built as an alternative to the original **cslol-manager** and the current **ltk-manager**, it provides a interface similar to og cslol-manager, but with significant Quality of Life (QoL) improvements.
+
 <p align="center">
   <a href="#">
     <img src="https://github.com/Aurecueil/Temp/blob/main/images/cslolgo_0.2.2.png?raw=true" width="800" >
   </a>
 </p>
 
-# cslol-go
-My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueToolkit/cslol-manager), but with more features and options.
-
-
 ## Features
 - Customizable UI
 - Mod Folders
+- Batch operations
 - Random mod selection
 - [Runeforge](https://www.runeforge.dev/) one-click downloads
 - [Modpkg](https://github.com/LeagueToolkit/league-mod) import/export
-- Mod fixer
+- Flexible importing
+- Best mod fixer
 - Mod thumbnails
 - Instant profiles
 
