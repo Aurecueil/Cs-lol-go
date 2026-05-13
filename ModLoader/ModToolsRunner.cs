@@ -73,6 +73,7 @@ namespace ModManager
                             IntPtr msgPtr;
                             while ((msgPtr = CSLolInterop.cslol_log_pull()) != IntPtr.Zero)
                             {
+                                // onLog("[cslol] " + Marshal.PtrToStringAnsi(msgPtr));
                             }
                             Thread.Sleep(1000);
                         }

@@ -1169,9 +1169,32 @@ namespace ModManager
                 WadExtractor.Target found = bins_hashed.FirstOrDefault(t => t.OriginalPath == hashed);
                 if (found == null)
                 {
+                    List<string> hshs = new List<string>();
+                    hshs.Add(path);
+                    int count = path.Count(f => f == '/');
+                    if (count == 1 && path.Contains("_"))
+                    {
+                        string fname = path.Split('/')[1];
+                        string[] parts = fname.Split(new[] { '_' }, 2);
+                        string full = $"DATA/Characters/{fname.Split('_')[0]}/{parts[0]}_Multi_{parts[1]}";
+                        hshs.Add(full);
+                        x.LowerLog(path, CLR_GOOD);
+                        x.LowerLog(full, CLR_GOOD);
+                        x.LowerLog("---------------------", CLR_ERR);
+                    }
+                    if (count == 3 && path.ToLower().Contains("_multi_"))
+                    {
+                        string fname = path.Split('/')[^1];
+                        string[] parts = fname.Split(new[] { '_' }, 3);
+                        string full = $"DATA/{parts[0]}_{parts[2]}";
+                        hshs.Add(full);
+                        x.LowerLog(path, CLR_GOOD);
+                        x.LowerLog(full, CLR_GOOD);
+                        x.LowerLog("---------------------", CLR_ERR);
+                    }
                     bins_hashed.Add(new WadExtractor.Target
                     {
-                        Hashes = new List<string> { path },
+                        Hashes = hshs,
                         OutputPath = Settings.inputDir,
                         OutputString = hashed,
                         BinStringRef = null,

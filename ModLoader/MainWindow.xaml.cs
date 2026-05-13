@@ -7,6 +7,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -157,6 +158,7 @@ namespace ModManager
         public string default_author { get; set; } = "Unknown";
         public string default_Hearth { get; set; } = "";
         public string default_home { get; set; } = "";
+        public string ver { get; set; } = "";
 
         public bool show_thumbs { get; set; } = true;
         public float thumb_opacity { get; set; } = 0.4f;
@@ -1626,6 +1628,13 @@ namespace ModManager
             }
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
+
+            if (settings.ver != "0.2.5")
+            {
+                settings.ver = "0.2.5";
+                save_settings();
+                CustomMessageBox.Show("MODS ARE NOT NOT FULL FIXED YET, \nALL MOD APPS LIKE: ltk, celestial, cslol-go) \nCAN STILL CAUSE ISSUE LIKE NO MODS OR BSOD\nPLEASE BE CAREFULL AND PATIENT\n\nPatchnotes\n- Fixer updated for patch 16.10\n- Fixed one fixer crash instance\n- Improved Importing\n- Apply to all skins option is not persistant", ["Okay"],"What New?");
+            }
         }
         private void SetLoading(string text, int progress, double stage)
         {
@@ -2665,8 +2674,85 @@ namespace ModManager
             UpdateContextMenuLoaderState();
         }
 
-        public async void Load_Mods()
+        private bool DoesLeagueHaveHigherPermissions()
         {
+            // 1. Check if CURRENT app is Admin
+            bool isAppAdmin = false;
+            using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
+            {
+                WindowsPrincipal principal = new WindowsPrincipal(identity);
+                isAppAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+
+            // 2. Find League and check its status
+            var targetNames = new[] { "LeagueClient", "League of Legends" };
+            bool isLeagueAdmin = false;
+            bool foundLeague = false;
+
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    bool matches = false;
+                    foreach (var name in targetNames)
+                    {
+                        if (string.Equals(proc.ProcessName, name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matches = true;
+                            break;
+                        }
+                    }
+
+                    if (!matches) continue;
+                    foundLeague = true;
+
+                    // Try to open the process token to check elevation
+                    if (OpenProcessToken(proc.Handle, 0x0008, out IntPtr tokenHandle))
+                    {
+                        try
+                        {
+                            using (var identity = new WindowsIdentity(tokenHandle))
+                            {
+                                var principal = new WindowsPrincipal(identity);
+                                isLeagueAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+                            }
+                        }
+                        finally { CloseHandle(tokenHandle); }
+                    }
+                }
+                catch (Win32Exception ex) when (ex.NativeErrorCode == 5) // Access Denied
+                {
+                    // If we get Access Denied trying to check the handle, 
+                    // it means League is Admin and we are likely NOT.
+                    isLeagueAdmin = true;
+                }
+                catch { continue; }
+
+                if (foundLeague) break;
+            }
+
+            // 3. Apply your specific logic:
+            // Only return TRUE if (App is NOT Admin) AND (League IS Admin)
+            return !isAppAdmin && isLeagueAdmin;
+        }
+
+        // --- Required P/Invokes ---
+        [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccess, out IntPtr TokenHandle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    public async void Load_Mods()
+        {
+            if (DoesLeagueHaveHigherPermissions())
+            {
+                if (CustomMessageBox.Show($"OH NO!!! League is running as administrator!!!\nYour mods will probably not work. . .\n\nTo fix this use Yasuo (Wheelchair) Button above and restart your PC\n(or ensure league isnt running as administrator in any other way)", ["Okay", "Ignore"], "Privilages Missmatch") == "Okay")
+                {
+                    await Stop_loader_internal();
+                }
+            }
+
             CancellationTokenSource localCts = null;
 
             lock (_loaderLock)
@@ -3634,7 +3720,7 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "0.2.4.2";
+            string localVersion = "0.2.5";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -3684,7 +3770,6 @@ namespace ModManager
             }
             if (!File.Exists("cslol-go.exe"))
             {
-                MessageBox.Show("e");
                 string directUrl = "https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.2.1/cslol-go.audtoupdater.zip";
 
                 string tempDir = Path.Combine(baseDir, "_update"); 
@@ -4901,7 +4986,7 @@ namespace ModManager
         public async Task HandleDroppedItem(string path)
         {
             // Offload the heavy work to a background thread
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -4931,6 +5016,110 @@ namespace ModManager
 
                                 if (!hasWad || !hasMetaInfo)
                                 {
+                                    bool hasNestedArchive = archive.Entries.Any(e =>
+            e.FullName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+            e.FullName.EndsWith(".fantome", StringComparison.OrdinalIgnoreCase));
+
+                                    if (hasNestedArchive)
+                                    {
+                                        string tempDirectory = Path.Combine(Path.GetTempPath(), "cslol-go_extract_" + Guid.NewGuid().ToString());
+                                        Directory.CreateDirectory(tempDirectory);
+
+                                        try
+                                        {
+                                            var nestedEntries = archive.Entries.Where(e =>
+                                                e.FullName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+                                                e.FullName.EndsWith(".fantome", StringComparison.OrdinalIgnoreCase));
+
+                                            foreach (var entry in nestedEntries)
+                                            {
+                                                string fileName2 = Path.GetFileName(entry.FullName);
+                                                string destinationPath = Path.Combine(tempDirectory, fileName2);
+
+                                                entry.ExtractToFile(destinationPath, overwrite: true);
+
+                                                await HandleDroppedItem(destinationPath);
+                                            }
+
+                                        }
+                                        finally
+                                        {
+                                            if (Directory.Exists(tempDirectory))
+                                            {
+                                                Directory.Delete(tempDirectory, true);
+                                            }
+                                        }
+
+                                        return;
+                                    }
+
+                                    // 1. Find all META/info.json entries (supports multiple mods in one zip)
+                                    var allMetaEntries = archive.Entries.Where(e =>
+                                        e.FullName.EndsWith("META/info.json", StringComparison.OrdinalIgnoreCase) ||
+                                        e.FullName.EndsWith("META\\info.json", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                                    foreach (var metaEntry in allMetaEntries)
+                                    {
+                                        // Normalize path to use forward slashes
+                                        string metaFullName = metaEntry.FullName.Replace('\\', '/');
+
+                                        // Determine the root for THIS specific mod (the folder containing META)
+                                        string parentPath = metaFullName.Substring(0, Math.Max(0, metaFullName.IndexOf("META/", StringComparison.OrdinalIgnoreCase)));
+
+                                        string expectedWad = parentPath + "WAD/";
+                                        string expectedRaw = parentPath + "RAW/";
+
+                                        // Check if a WAD or RAW folder exists relative to this specific META folder
+                                        bool foundWad = archive.Entries.Any(e => e.FullName.Replace('\\', '/').StartsWith(expectedWad, StringComparison.OrdinalIgnoreCase));
+                                        bool foundRaw = archive.Entries.Any(e => e.FullName.Replace('\\', '/').StartsWith(expectedRaw, StringComparison.OrdinalIgnoreCase));
+
+                                        if (foundWad || foundRaw)
+                                        {
+                                            // Create a unique temp folder for this specific mod entry
+                                            string uniqueModId = Guid.NewGuid().ToString().Substring(0, 8);
+                                            string tempModPath = Path.Combine(Path.GetTempPath(), $"Mod_{uniqueModId}");
+                                            Directory.CreateDirectory(tempModPath);
+
+                                            try
+                                            {
+                                                // Extract only the files belonging to this specific mod (WAD, RAW, and META)
+                                                var filesToExtract = archive.Entries.Where(e =>
+                                                    e.FullName.Replace('\\', '/').StartsWith(parentPath, StringComparison.OrdinalIgnoreCase));
+
+                                                foreach (var file in filesToExtract)
+                                                {
+                                                    // Calculate relative path to maintain folder structure inside the temp folder
+                                                    string relativePath = file.FullName.Replace('\\', '/').Substring(parentPath.Length);
+                                                    string destinationPath = Path.Combine(tempModPath, relativePath);
+
+                                                    // Ensure subdirectories exist
+                                                    string destDir = Path.GetDirectoryName(destinationPath);
+                                                    if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
+
+                                                    if (!string.IsNullOrEmpty(file.Name)) // Don't try to extract directory-only entries
+                                                    {
+                                                        file.ExtractToFile(destinationPath, true);
+                                                    }
+                                                }
+
+                                                // Process this specific mod folder
+                                                await HandleDroppedItem(tempModPath);
+                                            }
+                                            finally
+                                            {
+                                                // Clean up this specific mod's temp files
+                                                if (Directory.Exists(tempModPath))
+                                                {
+                                                    Directory.Delete(tempModPath, true);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if(allMetaEntries.Count != 0 || hasNestedArchive)
+                                    {
+                                        return;
+                                    }
 
                                     Application.Current.Dispatcher.InvokeAsync(() =>
                                     {

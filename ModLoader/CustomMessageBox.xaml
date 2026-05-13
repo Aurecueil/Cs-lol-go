@@ -8,8 +8,7 @@
         WindowStartupLocation="CenterOwner">
     <Border
             Background="{DynamicResource BackgroundBrush}"
-            Padding="0"
-            Width="400">
+            Padding="0" MaxWidth="500">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="2*"/>

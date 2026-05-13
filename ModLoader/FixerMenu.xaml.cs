@@ -666,7 +666,8 @@ namespace ModManager
                         if (Directory.Exists(bakWad))
                             Directory.Delete(bakWad, true);
 
-                        Directory.Move(modWad, bakWad);
+                        CopyDirectory(modWad, bakWad);
+                        Directory.Delete(modWad, true);
                     }
                     Directory.CreateDirectory(modWad);
                     LowerLog("[INFO] Created Backup (just in case)", "#2dc55e");
@@ -679,8 +680,8 @@ namespace ModManager
             }
             catch (Exception ex)
             {
-                return;
                 CustomMessageBox.Show($"{ex}", null, "ERROR");
+                return;
             }
             CallerModListEntry.set_fixer(true);
             close.Visibility = Visibility.Visible;
