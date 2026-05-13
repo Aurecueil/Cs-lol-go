@@ -1,7 +1,7 @@
 
-## About cs-lol-go
+## About cslol-go
 
-**cs-lol-go** is a **League of Legends mod manager** designed for best possible user expirience. Built as an alternative to the original [**cslol-manager**](https://github.com/LeagueToolkit/cslol-manager) and the current [**ltk-manager**](https://github.com/LeagueToolkit/ltk-manager), it provides a interface similar to og cslol-manager, but with significant Quality of Life (QoL) improvements.
+**cslol-go** is a **League of Legends mod manager** designed for best possible user expirience. Built as an alternative to the original [**cslol-manager**](https://github.com/LeagueToolkit/cslol-manager) and the current [**ltk-manager**](https://github.com/LeagueToolkit/ltk-manager), it provides a interface similar to og cslol-manager, but with significant Quality of Life (QoL) improvements.
 
 <p align="center">
   <a href="#">
@@ -28,7 +28,7 @@
     <td>
       <p> 
         
-1. Download: [cslol-go.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.4.2/cslol-go.zip)
+1. Download: [cslol-go.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.5/cslol-go.zip)
 2. Extract: `cslol-go.zip`
 3. Run `ModLoader.exe`
 
