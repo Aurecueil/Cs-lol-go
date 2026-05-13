@@ -1,20 +1,23 @@
+
+## About cs-lol-go
+
+**cs-lol-go** is a **League of Legends mod manager** designed for best possible user expirience. Built as an alternative to the original [**cslol-manager**](https://github.com/LeagueToolkit/cslol-manager) and the current [**ltk-manager**](https://github.com/LeagueToolkit/ltk-manager), it provides a interface similar to og cslol-manager, but with significant Quality of Life (QoL) improvements.
+
 <p align="center">
   <a href="#">
     <img src="https://github.com/Aurecueil/Temp/blob/main/images/cslolgo_0.2.2.png?raw=true" width="800" >
   </a>
 </p>
 
-# cslol-go
-My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueToolkit/cslol-manager), but with more features and options.
-
-
 ## Features
 - Customizable UI
 - Mod Folders
+- Batch operations
 - Random mod selection
 - [Runeforge](https://www.runeforge.dev/) one-click downloads
 - [Modpkg](https://github.com/LeagueToolkit/league-mod) import/export
-- Mod fixer
+- Flexible importing
+- Best mod fixer
 - Mod thumbnails
 - Instant profiles
 
@@ -25,7 +28,7 @@ My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueTool
     <td>
       <p> 
         
-1. Download: [cslol-go.zip](https://github.com/Aurecueil/Temp/raw/refs/heads/main/cslol-go.0.2.4.1.april.15th.zip)
+1. Download: [cslol-go.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/0.2.4.2/cslol-go.zip)
 2. Extract: `cslol-go.zip`
 3. Run `ModLoader.exe`
 
@@ -38,8 +41,6 @@ My LoL custom skin manager. Like [`cslol-manager`](https://github.com/LeagueTool
     </td>
   </tr>
 </table>
-
--# If above Version shows `EOS` error, click [here](https://github.com/Aurecueil/Temp/raw/refs/heads/main/cslol-go.0.2.4.1.april.15th.zip) to download micro-patch
 
 # Updates
 cslol-go automatically checks for the latest version when you open the app. If there is a newer version, the app will display a message box.
