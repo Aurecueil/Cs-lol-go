@@ -93,10 +93,12 @@ internal static class Program
             ?? throw new Exception("No .zip asset found in latest release");
 
         string tempDir = Path.Combine(baseDir, "_update");
-        string zipPath = Path.Combine(tempDir, asset.name);
 
         if (Directory.Exists(tempDir))
             Directory.Delete(tempDir, true);
+
+        string zipPath = Path.Combine(tempDir, asset.name);
+
 
         Directory.CreateDirectory(tempDir);
 

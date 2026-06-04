@@ -1178,9 +1178,6 @@ namespace ModManager
                         string[] parts = fname.Split(new[] { '_' }, 2);
                         string full = $"DATA/Characters/{fname.Split('_')[0]}/{parts[0]}_Multi_{parts[1]}";
                         hshs.Add(full);
-                        x.LowerLog(path, CLR_GOOD);
-                        x.LowerLog(full, CLR_GOOD);
-                        x.LowerLog("---------------------", CLR_ERR);
                     }
                     if (count == 3 && path.ToLower().Contains("_multi_"))
                     {
@@ -1188,9 +1185,6 @@ namespace ModManager
                         string[] parts = fname.Split(new[] { '_' }, 3);
                         string full = $"DATA/{parts[0]}_{parts[2]}";
                         hshs.Add(full);
-                        x.LowerLog(path, CLR_GOOD);
-                        x.LowerLog(full, CLR_GOOD);
-                        x.LowerLog("---------------------", CLR_ERR);
                     }
                     bins_hashed.Add(new WadExtractor.Target
                     {
