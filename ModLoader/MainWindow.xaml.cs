@@ -1790,7 +1790,6 @@ namespace ModManager
         }
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isInitializing) return;
             if (ProfileComboBox.SelectedItem is not null)
             {
                 settings.CurrentProfile = ProfileComboBox.SelectedItem.ToString();
@@ -2063,11 +2062,8 @@ namespace ModManager
                         }
                     }
 
-                    if (!_isInitializing)
-                    {
                         RefreshModListPanel(Current_location_folder);
                         RefreshAllCachedElementsDisplay(false, true);
-                    }
                 }
                 else
                 {

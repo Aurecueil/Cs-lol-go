@@ -1,5 +1,177 @@
 [
   {
+    "version": "16.13.7906961",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/9A4D17E5BC0B96B4.manifest"
+  },
+  {
+    "version": "16.13.7893741",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/35A97970D82BC911.manifest"
+  },
+  {
+    "version": "16.12.7884269",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/CD96B0B9FC671D58.manifest"
+  },
+  {
+    "version": "16.12.7869679",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/D1E5F3E1C25EB66D.manifest"
+  },
+  {
+    "version": "16.12.7851316",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/29AAF0B36D9C69F3.manifest"
+  },
+  {
+    "version": "16.11.7829736",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/C89F41ECEEAC0E71.manifest"
+  },
+  {
+    "version": "16.11.7821492",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/93DC3AF590807CCE.manifest"
+  },
+  {
+    "version": "16.11.7811789",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/6ADFBC6EB7CF4B21.manifest"
+  },
+  {
+    "version": "16.11.7794239",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/7C267B69A5CA096D.manifest"
+  },
+  {
+    "version": "16.10.7765552",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/DAFB5FDD5647079F.manifest"
+  },
+  {
+    "version": "16.10.7751511",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/59703720E3CCCF17.manifest"
+  },
+  {
+    "version": "16.10.7747445",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/073C80AD5CF64081.manifest"
+  },
+  {
+    "version": "16.9.7728292",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/580BD6FA861E4D2C.manifest"
+  },
+  {
+    "version": "16.9.7721032",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/1D0BDEC9762D3CC3.manifest"
+  },
+  {
+    "version": "16.9.7718383",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/F7929B70A1B5E7B9.manifest"
+  },
+  {
+    "version": "16.9.7695709",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/E1CAD5918060FC64.manifest"
+  },
+  {
+    "version": "16.8.7668562",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/D3559584E22EEA21.manifest"
+  },
+  {
+    "version": "16.8.7643737",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/12ED9F21C0DA9C90.manifest"
+  },
+  {
+    "version": "16.7.7620675",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/44E6C90D86F0DDD2.manifest"
+  },
+  {
+    "version": "16.7.7609485",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/8258C23BA7ACE711.manifest"
+  },
+  {
+    "version": "16.7.7605228",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/85CF8AF275ECF57B.manifest"
+  },
+  {
+    "version": "16.7.7584427",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/4059719AE872AEC4.manifest"
+  },
+  {
+    "version": "16.6.7569613",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/D0B9041C4880B29A.manifest"
+  },
+  {
+    "version": "16.6.7560931",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/5F7C9C2142753174.manifest"
+  },
+  {
+    "version": "16.6.7552788",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/12E40FA4120BD9FE.manifest"
+  },
+  {
+    "version": "16.6.7552102",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/9A511A123B596660.manifest"
+  },
+  {
+    "version": "16.6.7538272",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/9AFE6E3C4598CAAD.manifest"
+  },
+  {
+    "version": "16.5.7527101",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/EA8D7D67B326E12E.manifest"
+  },
+  {
+    "version": "16.5.7519084",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/E4B62B3F193B34D5.manifest"
+  },
+  {
+    "version": "16.5.7511533",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/79CFFE595C2B0C01.manifest"
+  },
+  {
+    "version": "16.5.7496037",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/AA3EA3C261C23199.manifest"
+  },
+  {
+    "version": "16.4.7480682",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/BA80B75282F55531.manifest"
+  },
+  {
+    "version": "16.4.7465697",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/3427E5DC848E0C1A.manifest"
+  },
+  {
+    "version": "16.3.7457600",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/65F094ADF9A65AD2.manifest"
+  },
+  {
+    "version": "16.3.7447656",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/B99CC53F3A78EA3A.manifest"
+  },
+  {
+    "version": "16.3.7441639",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/9FE07DA11C89FD5E.manifest"
+  },
+  {
+    "version": "16.3.7426169",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/4FA2C8AF0E088889.manifest"
+  },
+  {
+    "version": "16.2.7413171",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/9D2B6B3A14330140.manifest"
+  },
+  {
+    "version": "16.2.7401491",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/64D0BA0F7A4D111C.manifest"
+  },
+  {
+    "version": "16.2.7389684",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/5F3AECB2F24CBC01.manifest"
+  },
+  {
+    "version": "16.1.7374870",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest"
+  },
+  {
+    "version": "16.1.7371049",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/A085FB4FD9272EAF.manifest"
+  },
+  {
+    "version": "16.1.7345787",
+    "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/FB85E098B3FEAA5D.manifest"
+  },
+  {
     "version": "15.24.7347485",
     "link": "https://lol.secure.dyn.riotcdn.net/channels/public/releases/A88CDF1294D092BE.manifest"
   },
