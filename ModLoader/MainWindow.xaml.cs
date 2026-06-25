@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using ModLoader;
 using ModPkgLibSpace;
 using System.ComponentModel;
@@ -1459,6 +1459,7 @@ namespace ModManager
         }
 
         public List<Manifest> manifests = null;
+        private bool _isInitializing = true;
         public MainWindow()
         {
             InitializeComponent();
@@ -1615,6 +1616,8 @@ namespace ModManager
                 await PreCacheAllUIElements();
                 ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
 
+                _isInitializing = false;
+                RefreshModListPanel(Current_location_folder);
 
                 ShowBreadcrumb(Current_location_folder);
                 EnsureRuneforgeProtocolRegistered();
@@ -1781,6 +1784,7 @@ namespace ModManager
         }
         private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isInitializing) return;
             if (ProfileComboBox.SelectedItem is not null)
             {
                 settings.CurrentProfile = ProfileComboBox.SelectedItem.ToString();
@@ -2053,8 +2057,11 @@ namespace ModManager
                         }
                     }
 
-                    RefreshModListPanel(Current_location_folder);
-                    RefreshAllCachedElementsDisplay(false, true);
+                    if (!_isInitializing)
+                    {
+                        RefreshModListPanel(Current_location_folder);
+                        RefreshAllCachedElementsDisplay(false, true);
+                    }
                 }
                 else
                 {
@@ -3471,9 +3478,11 @@ namespace ModManager
 
 
         private Dictionary<(bool isMod, string id), ModListEntry> cachedUIElements = new Dictionary<(bool, string), ModListEntry>();
+        private int _refreshId = 0;
 
-        public void RefreshModListPanel(int c_location, bool rebuild = false)
+        public async void RefreshModListPanel(int c_location, bool rebuild = false)
         {
+            int currentRefreshId = ++_refreshId;
             FolderListEntriesInDisplay.Clear();
             modListEntriesInDisplay.Clear();
             string searchString = Global_searchText;
@@ -3636,9 +3645,11 @@ namespace ModManager
             }
             Current_location_folder = c_location;
 
-
+            int folderCount = 0;
             foreach (var (childId, childElement) in folders)
             {
+                if (currentRefreshId != _refreshId) return;
+
                 if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
 
                 var cacheKey = (false, childId); // isMod = false for folders
@@ -3669,11 +3680,20 @@ namespace ModManager
                     folderEntry.SetSelection(true);
                     folderEntry.RefreshDisplay(false, true);
                 }
+
+                if (++folderCount % 25 == 0)
+                {
+                    await Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+                    if (currentRefreshId != _refreshId) return;
+                }
             }
 
+            int count = 0;
             // Add mods second
             foreach (var (childId, childElement) in mods)
             {
+                if (currentRefreshId != _refreshId) return;
+
                 if (!ProfileEntries.ContainsKey(childId) && display_only_active) { continue; }
 
                 var cacheKey = (true, childElement.ModFolder); // isMod = true for mods
@@ -3705,11 +3725,21 @@ namespace ModManager
                     modEntry.SetSelection(true);
                     modEntry.RefreshDisplay(false, true);
                 }
+
+                if (++count % 25 == 0)
+                {
+                    await Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+                    if (currentRefreshId != _refreshId) return;
+                }
             }
-            DelayedAdjustModListLayout();
-            if (rebuild)
+            
+            if (currentRefreshId == _refreshId)
             {
-                PreCacheAllUIElements();
+                DelayedAdjustModListLayout();
+                if (rebuild)
+                {
+                    PreCacheAllUIElements();
+                }
             }
         }
         static async Task CheckForAppUpdates()
