@@ -373,7 +373,6 @@ namespace ModManager
                 cmbCharacter.SelectedIndex = foundKey;
                 Fixer.Settings.base_wad_path = fileSysEntries;
                 var (i, b) = Fixer.getSkinInts(foundValue);
-
                 if (i == -1)
                 {
                     chkAllSkins.IsChecked = true;
@@ -861,7 +860,7 @@ namespace ModManager
                     Fixer.FixiniYoursSkini(this);
                 }
                 catch (Exception ex) {
-                    CustomMessageBox.Show($"Fixer got drunk and failed, sry.\nDetails:\n{ex.Message}",null,"Fixer Crash");
+                    MessageBox.Show($"Fixer got drunk and failed, sry.\nDetails:\n{ex.Message}");
                 }
                 fixerTimer.Stop();
                 LowerLog($"[INFO] Finished fixing mod in {fixerTimer.Elapsed.TotalSeconds:F2}s", "#2dc55e");

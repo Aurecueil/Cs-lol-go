@@ -7,8 +7,10 @@ using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
 using System.Net.Http;
+using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Windows.Documents;
 using ZstdSharp;
 using static System.Net.Mime.MediaTypeNames;
 using Path = System.IO.Path;
@@ -273,95 +275,129 @@ namespace ModManager
             zh_TW = 2983963595
         }
 
-        private Queue<(string, int, bool)> Characters = new Queue<(string, int, bool)>();
+        private Queue<(string, int, bool, string)> Characters = new Queue<(string, int, bool, string)>();
         public (int, bool) getSkinInts(string charra)
         {
             List<int> Skins = _wadExtractor.GetAvailableSkinNumbers(Settings.base_wad_path, charra);
             var (i, b) = ProcessAviableSkin2(Skins);
             return (i, b);
         }
+        // public (int, bool) ProcessAviableSkin2(List<int> entries)
+        // {
+        //     Logger.Log(string.Join(", ", entries));
+        //     if (entries == null || entries.Count == 0)
+        //     {
+        //         return (0, true);
+        //     }
+        // 
+        //     if (entries.Count == 1)
+        //     {
+        //         return (entries[0], false);
+        //     }
+        // 
+        //     bool isSequential = false;
+        // 
+        //     var sequenceLengths = new List<int>();
+        //     int currentLength = 1;
+        //     for (int i = 0; i < entries.Count - 1; i++)
+        //     {
+        //         if (entries[i + 1] == entries[i] + 1)
+        //         {
+        //             currentLength++;
+        //         }
+        //         else
+        //         {
+        //             sequenceLengths.Add(currentLength);
+        //             currentLength = 1;
+        //         }
+        //     }
+        //     sequenceLengths.Add(currentLength);
+        //     if (sequenceLengths.Count == 1 && sequenceLengths?[0] < 12)
+        //     {
+        //         isSequential = true;
+        //     }
+        //     else
+        //     {
+        //         isSequential = sequenceLengths.Any(len => len > 4);
+        //     }
+        //     if (isSequential || entries.Count > 8)
+        //     {
+        //         return (0, false);
+        //     }
+        //     else
+        //     {
+        //         return (-1, false);
+        //     }
+        // }
+        // 
+
         public (int, bool) ProcessAviableSkin2(List<int> entries)
         {
-            Logger.Log(string.Join(", ", entries));
+            // 1. Empty list check
             if (entries == null || entries.Count == 0)
             {
+                Logger.Log("Entries empty or null.");
                 return (0, true);
             }
 
+            Logger.Log(string.Join(", ", entries));
+
+            // 2. Regular Skin (Exactly one ID)
             if (entries.Count == 1)
             {
                 return (entries[0], false);
             }
 
-            bool isSequential = false;
+            // Sort the entries to make sequence and bloat detection reliable
+            var sortedEntries = entries.OrderBy(x => x).ToList();
+            int minId = sortedEntries[0];
 
-            var sequenceLengths = new List<int>();
-            int currentLength = 1;
-            for (int i = 0; i < entries.Count - 1; i++)
+            // Check if the entire list forms a contiguous sequence
+            bool isPerfectSequence = true;
+            for (int i = 0; i < sortedEntries.Count - 1; i++)
             {
-                if (entries[i + 1] == entries[i] + 1)
+                if (sortedEntries[i + 1] != sortedEntries[i] + 1)
                 {
-                    currentLength++;
-                }
-                else
-                {
-                    sequenceLengths.Add(currentLength);
-                    currentLength = 1;
-                }
-            }
-            sequenceLengths.Add(currentLength);
-            if (sequenceLengths.Count == 1 && sequenceLengths?[0] > 12)
-            {
-                isSequential = true;
-            }
-            else
-            {
-                isSequential = sequenceLengths.Any(len => len < 4);
-            }
-            if (isSequential || entries.Count > 8)
-            {
-                return (0, false);
-            }
-            else
-            {
-                return (-1, false);
-            }
-        }
-
-        public void ProcessAviableSkin(List<int> entries, string charra)
-        {
-            if (entries == null || entries.Count == 0)
-            {
-                Characters.Enqueue((charra, 0, true));
-                return;
-            }
-
-            if (entries.Count == 1)
-            {
-                Characters.Enqueue((charra, entries[0], true));
-                return;
-            }
-
-            bool isSequential = true;
-            for (int i = 0; i < entries.Count - 1; i++)
-            {
-                if (entries[i + 1] != entries[i] + 1)
-                {
-                    isSequential = false;
+                    isPerfectSequence = false;
                     break;
                 }
             }
 
-            if (isSequential)
+            if (isPerfectSequence)
             {
-                Characters.Enqueue((charra, entries[0], true));
-            }
-            else
-            {
-                foreach (var entry in entries)
+                // 3. Repathed Skin: A perfect sequence starting strictly at 0
+                if (minId == 0)
                 {
-                    Characters.Enqueue((charra, entry, true));
+                    return (0, false);
                 }
+
+                // 4. Chroma: A perfect sequence that does NOT start at 0
+                return (-1, false);
+            }
+
+            // 5. Regular skin with random spam/bloat
+            // If it's not a perfect sequence but we have multiple IDs, return the lowest ID
+            return (minId, false);
+        }
+
+        public void ProcessAviableSkin(List<int> entries, string charra)
+        {
+            x.LowerLog($"rapathing following skin IDs for {charra}: {string.Join(", ", entries)}", CLR_ACT);
+
+            // 1. Handle null or empty
+            if (entries == null || entries.Count == 0)
+            {
+                Characters.Enqueue((charra, 0, true, ""));
+                return;
+            }
+
+            string shortChar = charra.Length > 4
+    ? charra.Substring(0, 4)
+    : charra;
+            string prefix = $"{shortChar}_skin{entries[0]}_";
+            foreach (var entry in entries)
+            {
+                Characters.Enqueue((charra, entry, true, prefix));
             }
         }
         private Dictionary<uint, ShaderEntry> _byHash = new Dictionary<uint, ShaderEntry>();
@@ -590,14 +626,14 @@ namespace ModManager
             }
             else
             {
-                Characters.Enqueue((Settings.Character, Settings.skinNo, true));
+                Characters.Enqueue((Settings.Character, Settings.skinNo, true, ""));
             }
 
             FetchShaders();
             List<string> seen = new List<string>();
             while (Characters.Count > 0)
             {
-                var (Current_Char, skinNo, HpBar) = Characters.Dequeue();
+                var (Current_Char, skinNo, HpBar, Prefix) = Characters.Dequeue();
                 x.LowerLog($"[FIXI] Fixing {Current_Char} skin {skinNo}", CLR_ACT);
 
                 if (seen.Contains($"{Current_Char}{skinNo}", StringComparer.OrdinalIgnoreCase)) continue;
@@ -606,6 +642,8 @@ namespace ModManager
                 Settings.Character = Current_Char;
                 Settings.skinNo = skinNo;
                 Settings.verifyHpBar = HpBar;
+                if (Prefix != "")
+                    Settings.repath_path_path = Prefix;
                 string shortChar = Current_Char.Length > 4
     ? Current_Char.Substring(0, 4)
     : Current_Char;
@@ -642,7 +680,7 @@ namespace ModManager
                 {
                     foreach (var name in CharacterCases[key])
                     {
-                        Characters.Enqueue((name, skinNo, false));
+                        Characters.Enqueue((name, skinNo, false, ""));
                         // linkedList.Items.AdFd(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
                     }
                 }
@@ -650,7 +688,7 @@ namespace ModManager
                 {
                     foreach (string luxi in Settings.CharraBlackList_Lux)
                     {
-                        Characters.Enqueue((luxi, 7, true));
+                        Characters.Enqueue((luxi, 7, true, ""));
                     }
                 }
 
@@ -1003,6 +1041,13 @@ namespace ModManager
                         {
                             processing.Add(bnkTarget);
                         }
+                        else
+                        {
+                            if (!remainingPaths.Contains(wpkPath.Replace(".wpk", ".bnk"), StringComparer.OrdinalIgnoreCase))
+                            {
+                                processing.Add(bnkTarget);
+                            }
+                        }
                     }
                 }
                 processing = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, processing);
@@ -1056,6 +1101,13 @@ namespace ModManager
                         {
                             processing.Add(bnkTarget);
                         }
+                        else
+                        {
+                            if (!remainingPaths.Contains(wpkPath.Replace(".wpk", ".bnk"), StringComparer.OrdinalIgnoreCase))
+                            {
+                                processing.Add(bnkTarget);
+                            }
+                        }
                     }
                 }
                 else
@@ -1070,8 +1122,17 @@ namespace ModManager
                         {
                             bnk.Add(bnkTarget);
                         }
+                        else
+                        {
+                            if (!remainingPaths.Contains(wpkPath.Replace(".wpk", ".bnk"), StringComparer.OrdinalIgnoreCase))
+                            {
+                                bnk.Add(bnkTarget);
+                            }
+                        }
                     }
-                    _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bnk);
+                    var leftover = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bnk);
+                    leftover = _hashes.FindMatches(leftover);
+                    _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, leftover);
                 }
             }
 
@@ -2003,7 +2064,7 @@ namespace ModManager
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
                 if (Settings.CharraBlackList_Lux.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase) && Settings.skinNo!=7) continue;  
-                if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false));  
+                if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false, ""));  
             }
 
             var finalMap = new BinMap(BinType.Hash, BinType.Embed);
@@ -3104,12 +3165,23 @@ namespace ModManager
                 "perks", "rewards", "shared", "sounds", "spells", "ux"
             };
             private HashSet<string> seen = new HashSet<string>();
+            private HashSet<string> seen_pre = new HashSet<string>();
             public string FixPath(string finalPath)
             {
+                string og_path = finalPath;
                 finalPath = FixPath_local(finalPath);
 
                 if (seen.Add(finalPath))
+                {
+                    seen_pre.Add(og_path);
                     return finalPath;
+                }
+
+                if (!seen_pre.Add(og_path))
+                {
+                    return finalPath;
+                }
+
 
                 string dir = Path.GetDirectoryName(finalPath)!;
                 string name = Path.GetFileNameWithoutExtension(finalPath);
@@ -3123,7 +3195,7 @@ namespace ModManager
                     candidate = Path.Combine(dir, $"{name}_{i}{ext}");
                     i++;
                 }
-                while (!seen.Add(candidate)); 
+                while (!seen.Add(candidate));
 
                 return candidate;
             }

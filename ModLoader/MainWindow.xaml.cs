@@ -128,6 +128,8 @@ namespace ModManager
     }
     public class Settings
     {
+        public int Loader_version { get; set; } = 1;
+        public bool elevate_by_default { get; set; } = false;
         public bool tft_mode { get; set; } = false;
         public bool hide_on_minimize { get; set; } = false;
         public bool show_path_window { get; set; } = true;
@@ -1002,14 +1004,19 @@ namespace ModManager
         {
             try
             {
-                string url = "https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/cslol-dll.dll";
-                string savePath = Path.Combine("cslol-tools", "cslol-dll.dll");
+                string[] files = ["cslol-hook-dll.dll", "cslol-host.exe", "cslol-dll.dll"];
+                foreach (string file in files)
+                {
+                    string url = $"https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/{file}";
+                    string savePath = Path.Combine("cslol-tools", file);
 
-                Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+                    Directory.CreateDirectory(Path.GetDirectoryName(savePath));
 
-                using HttpClient client = new HttpClient();
-                byte[] data = await client.GetByteArrayAsync(url);
-                await File.WriteAllBytesAsync(savePath, data);
+                    using HttpClient client = new HttpClient();
+                    byte[] data = await client.GetByteArrayAsync(url);
+                    await File.WriteAllBytesAsync(savePath, data);
+
+                }
             }
             catch { }
         }
@@ -1078,7 +1085,7 @@ namespace ModManager
                 bool modLoadingRunning = _isLoaderRunning || _modLoadCts != null;
 
                 // Check if CSLol process is running
-                bool cslolRunning = CSLolManager.IsRunning;
+                bool cslolRunning = IsRunningCheck.IsRunning();
 
                 return modLoadingRunning || cslolRunning;
             }
@@ -1632,11 +1639,10 @@ namespace ModManager
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "0.2.5")
+            if (settings.ver != "2.6.0")
             {
-                settings.ver = "0.2.5";
+                settings.ver = "2.6.0";
                 save_settings();
-                CustomMessageBox.Show("MODS ARE NOT NOT FULL FIXED YET, \nALL MOD APPS LIKE: ltk, celestial, cslol-go) \nCAN STILL CAUSE ISSUE LIKE NO MODS OR BSOD\nPLEASE BE CAREFULL AND PATIENT\n\nPatchnotes\n- Fixer updated for patch 16.10\n- Fixed one fixer crash instance\n- Improved Importing\n- Apply to all skins option is not persistant", ["Okay"],"What New?");
             }
         }
         private void SetLoading(string text, int progress, double stage)
@@ -2635,6 +2641,7 @@ namespace ModManager
             try
             {
                 await Task.Run(() => CSLolManager.Stop()); // Move heavy sync work off UI thread
+                await Task.Run(() => CSLolHostManager.Stop()); // Move heavy sync work off UI thread
             }
             catch (Exception ex)
             {
@@ -2786,8 +2793,15 @@ namespace ModManager
                         return;
                     }
                 }
-
-                StartCSLol(token);
+                if (settings.Loader_version == 0)
+                {
+                    StartCSLol(token);
+                }
+                else
+                {
+                    StartCSLol2(token);
+                }
+                
             }
             catch (OperationCanceledException)
             {
@@ -2880,11 +2894,91 @@ namespace ModManager
             ToggleOverlay(false);
         }
 
+        private void StartCSLol2(CancellationToken token)
+        {
+            // Compute the base profile target directory path
+            string profileBase = Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
+                + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
+                    ? "‗PBE‗profile"
+                    : "");
 
+            string overlayPath = Path.Combine(profileBase, "overlay");
+
+            bool requiresElevation = false;
+            if (Elevator.ShouldElevateInjector() == 1)
+            {
+                requiresElevation = true;
+            }
+            if (Elevator.ShouldElevateInjector() == 2)
+            {
+                Stop_loader_internal();
+                return;
+            }
+
+            CSLolHostManager.Initialize(
+                overlayPath,
+                requiresElevation,
+                token,
+
+                text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
+
+                () => Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ToggleFeed(false);
+                    _isLoaderRunning = false;
+                    _modLoadCts = null;
+                }),
+
+                () => Application.Current.Dispatcher.Invoke(async () =>
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        if (settings.reinitialize)
+                        {
+                            try
+                            {
+                                Thread.Sleep(500);
+                                Feed.Text = "Re-Loading Mods...";
+                                ToggleOverlay(true);
+                                ClearPaintActiveMods();
+                                await InitializeModsAsync(token);
+                                Feed.Text = "Mods re-loaded. Waiting for game to start...";
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                    }
+                }),
+
+                (wadFile, errorStatus) => Application.Current.Dispatcher.Invoke(() =>
+                {
+                    _modLoadCts?.Cancel();
+
+                    string warningPrompt = $"{(errorStatus == "c0000229" ? "Sknhack" : "Problem")} detetected in {wadFile}. (Code: {errorStatus} )\n\n" +
+                                           $"Please Disable or Delete {(errorStatus == "c000029" ? "Sknhacks" : "Corrupted mod")}.";
+  
+                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c000029" ? "Sknhack" : "Corrupted mod")} Detected");
+                }),
+
+                errorMsg => Application.Current.Dispatcher.Invoke(() =>
+                {
+                    ToggleFeed(false);
+                    _isLoaderRunning = false;
+                    MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Stop_loader_internal();
+                })
+            );
+        }
         private void StartCSLol(CancellationToken token)
         {
             CSLolManager.Initialize(
-    Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
+    Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile, "overlay")
         + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
             ? "‗PBE‗profile"
             : ""),
@@ -2905,11 +2999,11 @@ namespace ModManager
                             try
                             {
                                 Thread.Sleep(500);
-                                Feed.Text = "Reinitializing mods...";
+                                Feed.Text = "Re-Loading mods...";
                                 ToggleOverlay(true);
                                 ClearPaintActiveMods();
                                 await InitializeModsAsync(token);
-                                Feed.Text = "Mods reinitialized. Waiting for game to start...";
+                                Feed.Text = "Mods re-loaded. Waiting for game to start...";
                             }
                             catch (OperationCanceledException)
                             {
@@ -2927,6 +3021,7 @@ namespace ModManager
                     ToggleFeed(false);
                     _isLoaderRunning = false;
                     MessageBox.Show(errorMsg, "CSLol Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Stop_loader_internal();
                 })
             );
         }
@@ -3170,7 +3265,7 @@ namespace ModManager
 
 
 
-                var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}\" --game:\"{game_path}\" --mods:{mod_list}";
+                var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}/overlay\" --game:\"{game_path}\" --mods:{mod_list}";
 
 
                 if (settings.not_tft)
@@ -3750,7 +3845,7 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "0.2.5";
+            string localVersion = "2.6.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();

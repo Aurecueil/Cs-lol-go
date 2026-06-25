@@ -330,6 +330,7 @@
  FontSize="14"
  VerticalAlignment="Center"/>
                                     </Grid>
+                                    
                                     <Grid Margin="0,0,0,0" Grid.Column="2" ToolTip="Will skip TFT wads when loading mods">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -351,6 +352,41 @@
 										   VerticalAlignment="Center"/>
                                     </Grid>
 
+                                </Grid>
+                                <Grid>
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+                                    <Grid Grid.ColumnSpan="3">
+
+                                        <Grid Margin="13,0,0,10" ToolTip="Be aware that legacy patcher can cause bug, that makes vanguard blue screen your pc. Might also be inconsistent">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="20"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            
+
+                                            <TextBlock Grid.Column="0"
+Text="Patcher Version"
+Foreground="White"
+FontSize="14"
+VerticalAlignment="Center"/>
+                                            <ComboBox Grid.Column="2"
+x:Name="Patcher_Version"
+Style="{StaticResource StyledComboBox}"
+SelectedIndex="1" 
+SelectionChanged="Patcher_Changed"
+Margin="10,0,0,0">
+                                                <ComboBoxItem Content="Legacy Patcher"/>
+                                                <ComboBoxItem Content="LTK Patcher"/>
+                                            </ComboBox>
+                                        </Grid>
+
+
+                                    </Grid>
                                 </Grid>
 
 
@@ -380,6 +416,8 @@
                                         <ComboBoxItem Content="Dupe"/>
                                     </ComboBox>
                                 </Grid>
+                                
+                                
                                 <Grid Margin="14,5,0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="120"/>
@@ -430,6 +468,8 @@ local:PlaceholderService.Placeholder=""
                             CaretBrush="White"/>
                                 </Grid>
 
+                                
+                                
                                 <Grid Margin="14,5,0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="120"/>

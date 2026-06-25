@@ -49,6 +49,9 @@ namespace ModLoader
             Details_columns_state.IsChecked = mainWindow.settings.detials_column_active;
             GamePathTextBox.Text = mainWindow.settings.gamepath ?? "";
             HashesUpdatesToggle.IsChecked = mainWindow.settings.auto_update_hashes;
+
+            Patcher_Version.SelectedIndex = mainWindow.settings.Loader_version;
+
             // CatchUpdatesToggle.IsChecked = mainWindow.settings.catch_updated;
             mainWindow.settings.catch_updated = false;
             ImportOverrideComboBox.SelectedIndex = mainWindow.settings.import_override;
@@ -99,7 +102,9 @@ namespace ModLoader
             HashesUpdatesToggle.Checked -= HashUpdates_Changed;
             HashesUpdatesToggle.Unchecked -= HashUpdates_Changed;
 
+
             ImportOverrideComboBox.SelectionChanged -= ImportOverride_Changed;
+            Patcher_Version.SelectionChanged -= Patcher_Changed;
             Startup_Choice.SelectionChanged -= Startup_Choice_Changed;
             Start_Normal.SelectionChanged -= Start_Normal_Changed;
 
@@ -145,6 +150,7 @@ namespace ModLoader
             HashesUpdatesToggle.Unchecked += HashUpdates_Changed;
 
             ImportOverrideComboBox.SelectionChanged += ImportOverride_Changed;
+            Patcher_Version.SelectionChanged += Patcher_Changed;
             Startup_Choice.SelectionChanged += Startup_Choice_Changed;
             Start_Normal.SelectionChanged += Start_Normal_Changed;
 
@@ -551,6 +557,13 @@ $Shortcut.Save()
             if (mainWindow?.settings == null) return;
 
             mainWindow.settings.import_override = ImportOverrideComboBox.SelectedIndex;
+            mainWindow.save_settings();
+        }
+        private void Patcher_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (mainWindow?.settings == null) return;
+
+            mainWindow.settings.Loader_version = Patcher_Version.SelectedIndex;
             mainWindow.save_settings();
         }
 
