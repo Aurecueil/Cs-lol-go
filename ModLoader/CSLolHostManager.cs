@@ -29,6 +29,7 @@ namespace ModManager
         private static readonly object _lock = new object();
         private static DateTime? _collectDeadline = null;
         private const int WAD_FAILURE_COLLECT_WINDOW_MS = 750;
+        private static bool _enableSkinhackDetection = false;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
 
@@ -40,7 +41,8 @@ namespace ModManager
             Action onStopped,
             Action onGameStatusChanged = null,
             Action<string, string> onWadScanFailed = null,
-            Action<string> onError = null)
+            Action<string> onError = null,
+            bool enableSkinhackDetection = true)
         {
             if (!File.Exists(HOST_EXE_PATH))
             {
@@ -51,6 +53,7 @@ namespace ModManager
             Stop();
 
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            _enableSkinhackDetection = enableSkinhackDetection;
 
             try
             {
@@ -129,7 +132,7 @@ namespace ModManager
                             {
                                 lock (_lock)
                                 {
-                                    if (_collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
+                                    if (_enableSkinhackDetection && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
                                     {
                                         onLog("Skinhack Detected, Modding Rejected");
                                         _cts.Cancel();
@@ -227,7 +230,7 @@ namespace ModManager
                     onLog($"[Host Protocol Error] {GetMessageContent(rest)}");
                     break;
                 case "status":
-                    HandleStatusTransition(rest, onLog);
+                    handleStatusTransition(rest, onLog);
                     break;
                 case "dll":
                     HandleDllTelemetry(rest, onLog, onWadScanFailed);
@@ -235,7 +238,7 @@ namespace ModManager
             }
         }
 
-        private static void HandleStatusTransition(string rest, Action<string> onLog)
+        private static void handleStatusTransition(string rest, Action<string> onLog)
         {
             string[] tokens = rest.Split(new[] { ' ' }, 3);
             if (tokens.Length < 2) return;
@@ -288,11 +291,14 @@ namespace ModManager
 
                 onWadScanFailed?.Invoke(wad, status);
 
-                lock (_lock)
+                if (_enableSkinhackDetection)
                 {
-                    if (!_collectDeadline.HasValue)
+                    lock (_lock)
                     {
-                        _collectDeadline = DateTime.UtcNow.AddMilliseconds(WAD_FAILURE_COLLECT_WINDOW_MS);
+                        if (!_collectDeadline.HasValue)
+                        {
+                            _collectDeadline = DateTime.UtcNow.AddMilliseconds(WAD_FAILURE_COLLECT_WINDOW_MS);
+                        }
                     }
                 }
             }

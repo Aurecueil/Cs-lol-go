@@ -2957,9 +2957,9 @@ namespace ModManager
                     _modLoadCts?.Cancel();
 
                     string warningPrompt = $"{(errorStatus == "c0000229" ? "Sknhack" : "Problem")} detetected in {wadFile}. (Code: {errorStatus} )\n\n" +
-                                           $"Please Disable or Delete {(errorStatus == "c000029" ? "Sknhacks" : "Corrupted mod")}.";
+                                           $"Please Disable or Delete {(errorStatus == "c0000229" ? "Sknhacks" : "Corrupted mod")}.";
   
-                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c000029" ? "Sknhack" : "Corrupted mod")} Detected");
+                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Sknhack" : "Corrupted mod")} Detected");
                 }),
 
                 errorMsg => Application.Current.Dispatcher.Invoke(() =>
