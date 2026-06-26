@@ -129,6 +129,7 @@ namespace ModManager
     public class Settings
     {
         public int Loader_version { get; set; } = 1;
+        public bool poofini { get; set; } = false;
         public bool elevate_by_default { get; set; } = false;
         public bool tft_mode { get; set; } = false;
         public bool hide_on_minimize { get; set; } = false;
@@ -1421,7 +1422,7 @@ namespace ModManager
 
                     if (!cleanContent.Equals("OKAY", StringComparison.OrdinalIgnoreCase))
                     {
-                        CustomMessageBox.Show($"{cleanContent}", null, "Info");
+                        settings.poofini = true;
                     }
                 }
                 catch
@@ -1639,10 +1640,11 @@ namespace ModManager
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.6.0")
+            if (settings.ver != "2.7.0")
             {
-                settings.ver = "2.6.0";
+                settings.ver = "2.7.0";
                 save_settings();
+                CustomMessageBox.Show("Disabled overtuned skinhack detection.", ["Kay"],"What's New");
             }
         }
         private void SetLoading(string text, int progress, double stage)
@@ -2956,6 +2958,8 @@ namespace ModManager
                 {
                     _modLoadCts?.Cancel();
 
+                    if (errorStatus == "c0000229" && !settings.poofini) { return; }
+
                     string warningPrompt = $"{(errorStatus == "c0000229" ? "Sknhack" : "Problem")} detetected in {wadFile}. (Code: {errorStatus} )\n\n" +
                                            $"Please Disable or Delete {(errorStatus == "c0000229" ? "Sknhacks" : "Corrupted mod")}.";
   
@@ -2968,7 +2972,8 @@ namespace ModManager
                     _isLoaderRunning = false;
                     MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     Stop_loader_internal();
-                })
+                }),
+                settings.poofini
             );
         }
         private void StartCSLol(CancellationToken token)
@@ -3841,7 +3846,7 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.6.0";
+            string localVersion = "2.7.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();

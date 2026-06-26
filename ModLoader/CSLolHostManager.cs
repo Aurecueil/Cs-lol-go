@@ -29,7 +29,7 @@ namespace ModManager
         private static readonly object _lock = new object();
         private static DateTime? _collectDeadline = null;
         private const int WAD_FAILURE_COLLECT_WINDOW_MS = 750;
-        private static bool _enableSkinhackDetection = false;
+        private static bool _poof = true;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
 
@@ -42,7 +42,7 @@ namespace ModManager
             Action onGameStatusChanged = null,
             Action<string, string> onWadScanFailed = null,
             Action<string> onError = null,
-            bool enableSkinhackDetection = true)
+            bool poof = false)
         {
             if (!File.Exists(HOST_EXE_PATH))
             {
@@ -53,7 +53,10 @@ namespace ModManager
             Stop();
 
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            _enableSkinhackDetection = enableSkinhackDetection;
+            _poof = poof;
+
+            // Compute the protocol flag bitmask: 0 if enabled, 4 (OPT_OUT_AH_V1) if disabled
+            int configFlags = _poof ? 0 : 4;
 
             try
             {
@@ -94,7 +97,8 @@ namespace ModManager
                         startInfo.UseShellExecute = true;
                         startInfo.Verb = "runas";
 
-                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags 0 --config-prefix \"{overlayPrefixPath}\" --start-scan";
+                        // Dynmically assign configFlags into the elevated process string arguments
+                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
                         onLog("Launching elevated host. Please accept the UAC prompt if it appears...");
                     }
@@ -120,7 +124,7 @@ namespace ModManager
                             writer.AutoFlush = true;
 
                             await writer.WriteLineAsync("config loglevel 16");
-                            await writer.WriteLineAsync("config flags 0");
+                            await writer.WriteLineAsync($"config flags {configFlags}"); // Dynamically assign flag via active stdin pipe stream
                             await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
                             await writer.WriteLineAsync("start scan");
 
@@ -132,7 +136,7 @@ namespace ModManager
                             {
                                 lock (_lock)
                                 {
-                                    if (_enableSkinhackDetection && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
+                                    if (_poof && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
                                     {
                                         onLog("Skinhack Detected, Modding Rejected");
                                         _cts.Cancel();
@@ -272,7 +276,6 @@ namespace ModManager
             if (tokens.Length < 4) return;
 
             string msgContent = tokens[3];
-            // onLog($"[Game Thread DLL] {msgContent}");
 
             if (msgContent.Contains("WAD scan failed"))
             {
@@ -291,7 +294,7 @@ namespace ModManager
 
                 onWadScanFailed?.Invoke(wad, status);
 
-                if (_enableSkinhackDetection)
+                if (_poof)
                 {
                     lock (_lock)
                     {
