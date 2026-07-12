@@ -3511,25 +3511,25 @@ namespace ModManager
 
                         case "CentralPoint=":
                             Central = new Vector3(
-                                float.Parse(inp[1]), float.Parse(inp[2]), float.Parse(inp[3]));
+                                float.Parse(inp[1], CultureInfo.InvariantCulture), float.Parse(inp[2], CultureInfo.InvariantCulture), float.Parse(inp[3], CultureInfo.InvariantCulture));
                             break;
 
                         case "PivotPoint=":
                             Pivot = new Vector3(
-                                float.Parse(inp[1]), float.Parse(inp[2]), float.Parse(inp[3]));
+                                float.Parse(inp[1], CultureInfo.InvariantCulture), float.Parse(inp[2], CultureInfo.InvariantCulture), float.Parse(inp[3], CultureInfo.InvariantCulture));
                             break;
 
                         case "Verts=":
-                            int vertexCount = int.Parse(inp[1]);
+                            int vertexCount = int.Parse(inp[1], CultureInfo.InvariantCulture);
                             for (int i = 0; i < vertexCount; i++)
                             {
                                 string[] v = reader.ReadLine().Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                                Positions.Add(new Vector3(float.Parse(v[0]), float.Parse(v[1]), float.Parse(v[2])));
+                                Positions.Add(new Vector3(float.Parse(v[0], CultureInfo.InvariantCulture), float.Parse(v[1], CultureInfo.InvariantCulture), float.Parse(v[2], CultureInfo.InvariantCulture)));
                             }
                             break;
 
                         case "Faces=":
-                            int faceCount = int.Parse(inp[1]);
+                            int faceCount = int.Parse(inp[1], CultureInfo.InvariantCulture);
                             for (int i = 0; i < faceCount; i++)
                             {
                                 // Replace tabs with spaces to handle both formatting styles
@@ -3537,16 +3537,16 @@ namespace ModManager
                                 string[] f = faceLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
                                 // Indices are in f[1], f[2], f[3]
-                                Indices.Add(int.Parse(f[1]));
-                                Indices.Add(int.Parse(f[2]));
-                                Indices.Add(int.Parse(f[3]));
+                                Indices.Add(int.Parse(f[1], CultureInfo.InvariantCulture));
+                                Indices.Add(int.Parse(f[2], CultureInfo.InvariantCulture));
+                                Indices.Add(int.Parse(f[3], CultureInfo.InvariantCulture));
 
                                 Material = f[4];
 
                                 // SCO UVs: U1 V1 U2 V2 U3 V3
-                                UVs.Add(new Vector2(float.Parse(f[5]), float.Parse(f[6])));
-                                UVs.Add(new Vector2(float.Parse(f[7]), float.Parse(f[8])));
-                                UVs.Add(new Vector2(float.Parse(f[9]), float.Parse(f[10])));
+                                UVs.Add(new Vector2(float.Parse(f[5], CultureInfo.InvariantCulture), float.Parse(f[6], CultureInfo.InvariantCulture)));
+                                UVs.Add(new Vector2(float.Parse(f[7], CultureInfo.InvariantCulture), float.Parse(f[8], CultureInfo.InvariantCulture)));
+                                UVs.Add(new Vector2(float.Parse(f[9], CultureInfo.InvariantCulture), float.Parse(f[10], CultureInfo.InvariantCulture)));
                             }
                             break;
                     }
@@ -3614,7 +3614,7 @@ namespace ModManager
         private void ParseVector3(string line, out Vector3 vec)
         {
             string[] p = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            vec = new Vector3(float.Parse(p[1]), float.Parse(p[2]), float.Parse(p[3]));
+            vec = new Vector3(float.Parse(p[1], CultureInfo.InvariantCulture), float.Parse(p[2], CultureInfo.InvariantCulture), float.Parse(p[3], CultureInfo.InvariantCulture));
         }
 
         private void WriteVec3(BinaryWriter bw, Vector3 v)
