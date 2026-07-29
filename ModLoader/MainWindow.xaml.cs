@@ -1005,7 +1005,7 @@ namespace ModManager
         {
             try
             {
-                string[] files = ["ltk_patcher_dll.dll", "ltk_patcher_host.exe", "cslol-dll.dll"];
+                string[] files = ["cslol-dll.dll"];
                 foreach (string file in files)
                 {
                     string url = $"https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/{file}";
@@ -1016,6 +1016,19 @@ namespace ModManager
                     using HttpClient client = new HttpClient();
                     byte[] data = await client.GetByteArrayAsync(url);
                     await File.WriteAllBytesAsync(savePath, data);
+
+                }
+                string[] files2 = ["ltk_patcher_dll.dll", "ltk_patcher_host.exe"];
+                foreach (string file2 in files2)
+                {
+                    string url2 = $"https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/tree/main/src-tauri/resources/{file2}";
+                    string savePath2 = Path.Combine("cslol-tools", file2);
+
+                    Directory.CreateDirectory(Path.GetDirectoryName(savePath2));
+
+                    using HttpClient client2 = new HttpClient();
+                    byte[] data2 = await client2.GetByteArrayAsync(url2);
+                    await File.WriteAllBytesAsync(savePath2, data2);
 
                 }
             }
