@@ -111,7 +111,7 @@ namespace ModManager
                     {
                         startInfo.UseShellExecute = true;
                         startInfo.Verb = "runas";
-                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-prefix \"{overlayPrefixPath}\" --start-scan";
+                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
                         onLog?.Invoke("Launching elevated patcher host...");
                     }
@@ -138,7 +138,7 @@ namespace ModManager
 
                             // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
-                            // await writer.WriteLineAsync($"config flags {configFlags}");
+                            await writer.WriteLineAsync($"config flags {configFlags}");
                             await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
                             await writer.WriteLineAsync("start scan");
 

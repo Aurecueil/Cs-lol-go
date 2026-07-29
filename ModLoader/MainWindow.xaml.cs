@@ -1003,35 +1003,36 @@ namespace ModManager
 
         static async Task DownloadCslolDll()
         {
-            try
-            {
-                string[] files = ["cslol-dll.dll"];
-                foreach (string file in files)
-                {
-                    string url = $"https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/{file}";
-                    string savePath = Path.Combine("cslol-tools", file);
+try
+{
+    string targetDir = "cslol-tools";
+    Directory.CreateDirectory(targetDir);
 
-                    Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+    using HttpClient client = new HttpClient();
 
-                    using HttpClient client = new HttpClient();
-                    byte[] data = await client.GetByteArrayAsync(url);
-                    await File.WriteAllBytesAsync(savePath, data);
+    var downloads = new (string Url, string FileName)[]
+    {
+        ("https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/cslol-dll.dll", "cslol-dll.dll"),
+        ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
+        ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
+    };
 
-                }
-                string[] files2 = ["ltk_patcher_dll.dll", "ltk_patcher_host.exe"];
-                foreach (string file2 in files2)
-                {
-                    string url2 = $"https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/tree/main/src-tauri/resources/{file2}";
-                    string savePath2 = Path.Combine("cslol-tools", file2);
+    foreach (var item in downloads)
+    {
+        string savePath = Path.Combine(targetDir, item.FileName);
 
-                    Directory.CreateDirectory(Path.GetDirectoryName(savePath2));
+        // Send a request to inspect the response header first
+        using HttpResponseMessage response = await client.GetAsync(item.Url);
+        
+        // Throws an exception if HTTP status is 404, 500, etc.
+        response.EnsureSuccessStatusCode(); 
 
-                    using HttpClient client2 = new HttpClient();
-                    byte[] data2 = await client2.GetByteArrayAsync(url2);
-                    await File.WriteAllBytesAsync(savePath2, data2);
+        byte[] data = await response.Content.ReadAsByteArrayAsync();
+        await File.WriteAllBytesAsync(savePath, data);
 
-                }
-            }
+        Console.WriteLine($"Successfully downloaded: {item.FileName}");
+    }
+}
             catch { }
         }
 
@@ -1657,7 +1658,7 @@ namespace ModManager
             {
                 settings.ver = "2.8.0";
                 save_settings();
-                CustomMessageBox.Show("Disabled overtuned skinhack detection.", ["Kay"],"What's New");
+                CustomMessageBox.Show("Disabled Legacy Patcher for now.\nUpdated to Newer Version of LTK Patcher\nIproved Patcher updating.", ["Kay"],"What's New");
             }
         }
         private void SetLoading(string text, int progress, double stage)
@@ -2593,6 +2594,11 @@ namespace ModManager
 
         public async void Start_loader(object sender, RoutedEventArgs e)
         {
+			if (settings.Loader_version == 0)
+			{
+				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher, new[] { "OK" }, "Legacy Patcher Disabled");
+				settings.Loader_version == 1;
+			}
             True_Start_loader();
         }
 
@@ -2806,7 +2812,8 @@ namespace ModManager
                 }
                 if (settings.Loader_version == 0)
                 {
-                    StartCSLol(token);
+                    // StartCSLol(token); Disabled ATM
+                    StartCSLol2(token);
                 }
                 else
                 {
@@ -2976,11 +2983,12 @@ namespace ModManager
                     string warningPrompt = $"{(errorStatus == "c0000229" ? "Sknhack" : "Problem")} detetected in {wadFile}. (Code: {errorStatus} )\n\n" +
                                            $"Please Disable or Delete {(errorStatus == "c0000229" ? "Sknhacks" : "Corrupted mod")}.";
   
-                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Sknhack" : "Corrupted mod")} Detected");
+                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Skinhack" : "Corrupted mod")} Detected");
                 }),
 
                 errorMsg => Application.Current.Dispatcher.Invoke(() =>
                 {
+					if (_isLoaderRunning) return;
                     ToggleFeed(false);
                     _isLoaderRunning = false;
                     MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);

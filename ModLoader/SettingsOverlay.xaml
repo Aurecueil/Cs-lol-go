@@ -380,7 +380,7 @@ Style="{StaticResource StyledComboBox}"
 SelectedIndex="1" 
 SelectionChanged="Patcher_Changed"
 Margin="10,0,0,0">
-                                                <ComboBoxItem Content="Legacy Patcher"/>
+                                                <ComboBoxItem Content="(Temp Disabled) Legacy Patcher"/>
                                                 <ComboBoxItem Content="LTK Patcher"/>
                                             </ComboBox>
                                         </Grid>
