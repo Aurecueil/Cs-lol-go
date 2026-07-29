@@ -20,7 +20,6 @@ namespace ModManager
         private static Process _hostProcess;
         private static CancellationTokenSource _cts;
 
-        // Path anchored to the application installation directory
         private static readonly string HOST_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_host.exe");
         private static readonly string DLL_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_dll.dll");
 
@@ -55,7 +54,6 @@ namespace ModManager
             string hostPath = GetAbsoluteHostPath();
             string dllPath = GetAbsoluteDllPath();
 
-            // Guard check for missing patcher files
             if (!File.Exists(hostPath))
             {
                 onError?.Invoke($"Patcher host missing at '{hostPath}'");
@@ -73,21 +71,19 @@ namespace ModManager
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             _poof = poof;
 
-            // Protocol flag bitmask: 0 if enabled, 4 (OPT_OUT_AH_V1) if disabled
             int configFlags = _poof ? 0 : 4;
 
             try
             {
-                // 1. Force overlay path to absolute
+                // Format overlay prefix path strictly for LTK Host driver
                 overlayPrefixPath = Path.GetFullPath(overlayPrefixPath);
 
-                // 2. Ensure folder layout exists on disk
                 if (!Directory.Exists(overlayPrefixPath))
                 {
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
-                // 3. Normalize path separators to forward slashes for the host driver
+                // Convert to forward slashes and ensure trailing slash
                 overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
                 if (!overlayPrefixPath.EndsWith("/"))
                 {
@@ -96,7 +92,7 @@ namespace ModManager
             }
             catch (Exception ex)
             {
-                onError?.Invoke($"Failed to resolve profile overlay path: {ex.Message}");
+                onError?.Invoke($"Failed to resolve overlay path: {ex.Message}");
                 return;
             }
 
@@ -117,7 +113,7 @@ namespace ModManager
                         startInfo.Verb = "runas";
                         startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
-                        onLog?.Invoke("Launching elevated patcher host. Please accept the UAC prompt...");
+                        onLog?.Invoke("Launching elevated patcher host...");
                     }
                     else
                     {
@@ -134,12 +130,13 @@ namespace ModManager
 
                     if (!elevate)
                     {
-                        onLog?.Invoke("Configuring patcher host via standard stream interface...");
+                        onLog?.Invoke("Sending configuration to patcher host...");
 
                         using (StreamWriter writer = _hostProcess.StandardInput)
                         {
                             writer.AutoFlush = true;
 
+                            // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
                             await writer.WriteLineAsync($"config flags {configFlags}");
                             await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
@@ -163,26 +160,21 @@ namespace ModManager
 
                             if (!_hostProcess.HasExited)
                             {
-                                try
-                                {
-                                    await writer.WriteLineAsync("stop");
-                                }
-                                catch { }
+                                try { await writer.WriteLineAsync("stop"); } catch { }
                             }
                         }
                     }
                     else
                     {
-                        onLog?.Invoke("Patcher host actively running with elevated privileges.");
+                        onLog?.Invoke("Patcher host running elevated...");
 
-                        // Elevated process tracking loop
                         while (!_cts.Token.IsCancellationRequested)
                         {
                             var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
 
                             if (runningHosts.Length == 0)
                             {
-                                onLog?.Invoke("Elevated patcher host process terminated.");
+                                onLog?.Invoke("Elevated patcher host closed.");
                                 break;
                             }
 
@@ -224,7 +216,7 @@ namespace ModManager
             }
             catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is NullReferenceException)
             {
-                onLog?.Invoke("[Host] Connection pipe closed.");
+                onLog?.Invoke("[Host] Stream closed.");
             }
             catch (Exception ex)
             {
@@ -250,7 +242,7 @@ namespace ModManager
                     onLog?.Invoke($"[Host] {GetMessageContent(rest)}");
                     break;
                 case "error":
-                    onLog?.Invoke($"[Host Protocol Error] {GetMessageContent(rest)}");
+                    onLog?.Invoke($"[Host Error] {GetMessageContent(rest)}");
                     break;
                 case "status":
                     HandleStatusTransition(rest, onLog, onGameStatusChanged);
@@ -278,19 +270,19 @@ namespace ModManager
                 case "injected":
                 case "hooked":
                 case "attached":
-                    onLog?.Invoke("GAME FOUND!");
+                    onLog?.Invoke("Game Process Found & Injected!");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "waiting":
-                    onLog?.Invoke("Waiting for game to exit...");
+                    onLog?.Invoke("Patcher active - Waiting for match end...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "exited":
-                    onLog?.Invoke("Waiting for game to start...");
+                    onLog?.Invoke("Game closed. Ready for next match...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "failed":
-                    onLog?.Invoke($"ERROR: {message}");
+                    onLog?.Invoke($"Patcher Error: {message}");
                     onGameStatusChanged?.Invoke();
                     break;
             }
@@ -353,15 +345,9 @@ namespace ModManager
             try
             {
                 var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
-
                 foreach (var p in runningHosts)
                 {
-                    try
-                    {
-                        p.Kill();
-                        p.Dispose();
-                    }
-                    catch { }
+                    try { p.Kill(); p.Dispose(); } catch { }
                 }
             }
             catch { }
