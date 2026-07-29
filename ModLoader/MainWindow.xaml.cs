@@ -2696,7 +2696,7 @@ namespace ModManager
                 isAppAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
             }
 
-            // 2. Find League and check its status
+            // 2. Find League and check its statuss
             var targetNames = new[] { "LeagueClient", "League of Legends" };
             bool isLeagueAdmin = false;
             bool foundLeague = false;
