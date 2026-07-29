@@ -2988,7 +2988,7 @@ try
 
                 errorMsg => Application.Current.Dispatcher.Invoke(() =>
                 {
-					if (_isLoaderRunning) return;
+					if (!_isLoaderRunning) return;
                     ToggleFeed(false);
                     _isLoaderRunning = false;
                     MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);

@@ -270,15 +270,15 @@ namespace ModManager
                 case "injected":
                 case "hooked":
                 case "attached":
-                    onLog?.Invoke("Game Process Found & Injected!");
+                    onLog?.Invoke("Game Found!");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "waiting":
-                    onLog?.Invoke("Patcher active - Waiting for match end...");
+                    onLog?.Invoke("Waiting for game to exit...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "exited":
-                    onLog?.Invoke("Game closed. Ready for next match...");
+                    onLog?.Invoke("Waiting for game to start...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "failed":
