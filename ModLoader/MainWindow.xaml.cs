@@ -2607,7 +2607,7 @@ try
 			if (settings.Loader_version == 0)
 			{
 				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher", ["OK"], "Legacy Patcher Disabled");
-				settings.Loader_version == 1;
+				settings.Loader_version = 1;
 			}
             ToggleOverlay(true);
             Feed.Text = "[INF] Checking Game Version";
