@@ -1640,9 +1640,9 @@ namespace ModManager
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.7.0")
+            if (settings.ver != "2.8.0")
             {
-                settings.ver = "2.7.0";
+                settings.ver = "2.8.0";
                 save_settings();
                 CustomMessageBox.Show("Disabled overtuned skinhack detection.", ["Kay"],"What's New");
             }
@@ -3846,7 +3846,7 @@ namespace ModManager
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.7.0";
+            string localVersion = "2.8.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();

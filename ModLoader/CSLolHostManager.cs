@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,7 +20,9 @@ namespace ModManager
         private static Process _hostProcess;
         private static CancellationTokenSource _cts;
 
-        private const string HOST_EXE_PATH = "cslol-tools/ltk_patcher_host.exe";
+        // Path anchored to the application installation directory
+        private static readonly string HOST_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_host.exe");
+        private static readonly string DLL_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_dll.dll");
 
         private static readonly object _lock = new object();
         private static DateTime? _collectDeadline = null;
@@ -27,6 +30,16 @@ namespace ModManager
         private static bool _poof = true;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
+
+        private static string GetAbsoluteHostPath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, HOST_REL_PATH);
+        }
+
+        private static string GetAbsoluteDllPath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DLL_REL_PATH);
+        }
 
         public static void Initialize(
             string overlayPrefixPath,
@@ -39,9 +52,19 @@ namespace ModManager
             Action<string> onError = null,
             bool poof = false)
         {
-            if (!File.Exists(HOST_EXE_PATH))
+            string hostPath = GetAbsoluteHostPath();
+            string dllPath = GetAbsoluteDllPath();
+
+            // Guard check for missing patcher files
+            if (!File.Exists(hostPath))
             {
-                onError?.Invoke($"Patcher host missing at '{HOST_EXE_PATH}'");
+                onError?.Invoke($"Patcher host missing at '{hostPath}'");
+                return;
+            }
+
+            if (!File.Exists(dllPath))
+            {
+                onError?.Invoke($"Patcher DLL missing at '{dllPath}'");
                 return;
             }
 
@@ -55,16 +78,16 @@ namespace ModManager
 
             try
             {
-                // 1. Force the path to be absolute
+                // 1. Force overlay path to absolute
                 overlayPrefixPath = Path.GetFullPath(overlayPrefixPath);
 
-                // 2. Ensure folder layout exists on disk for host directory checks
+                // 2. Ensure folder layout exists on disk
                 if (!Directory.Exists(overlayPrefixPath))
                 {
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
-                // 3. Convert path separators to forward slashes for the host protocol driver
+                // 3. Normalize path separators to forward slashes for the host driver
                 overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
                 if (!overlayPrefixPath.EndsWith("/"))
                 {
@@ -73,7 +96,7 @@ namespace ModManager
             }
             catch (Exception ex)
             {
-                onError?.Invoke($"Failed to resolve profile path: {ex.Message}");
+                onError?.Invoke($"Failed to resolve profile overlay path: {ex.Message}");
                 return;
             }
 
@@ -83,7 +106,8 @@ namespace ModManager
                 {
                     var startInfo = new ProcessStartInfo
                     {
-                        FileName = Path.GetFullPath(HOST_EXE_PATH),
+                        FileName = hostPath,
+                        WorkingDirectory = Path.GetDirectoryName(hostPath),
                         CreateNoWindow = true
                     };
 
@@ -93,7 +117,7 @@ namespace ModManager
                         startInfo.Verb = "runas";
                         startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
-                        onLog("Launching elevated patcher host. Please accept the UAC prompt if it appears...");
+                        onLog?.Invoke("Launching elevated patcher host. Please accept the UAC prompt...");
                     }
                     else
                     {
@@ -110,7 +134,7 @@ namespace ModManager
 
                     if (!elevate)
                     {
-                        onLog("Configuring patcher host via streams...");
+                        onLog?.Invoke("Configuring patcher host via standard stream interface...");
 
                         using (StreamWriter writer = _hostProcess.StandardInput)
                         {
@@ -122,7 +146,7 @@ namespace ModManager
                             await writer.WriteLineAsync("start scan");
 
                             _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
-                            _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog($"[host-stderr] {err}"), null, null);
+                            _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog?.Invoke($"[host-stderr] {err}"), null, null);
 
                             while (!_cts.Token.IsCancellationRequested && !_hostProcess.HasExited)
                             {
@@ -130,7 +154,7 @@ namespace ModManager
                                 {
                                     if (_poof && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
                                     {
-                                        onLog("Skinhack Detected, Modding Rejected");
+                                        onLog?.Invoke("Skinhack Detected, Modding Rejected");
                                         _cts.Cancel();
                                     }
                                 }
@@ -139,22 +163,26 @@ namespace ModManager
 
                             if (!_hostProcess.HasExited)
                             {
-                                await writer.WriteLineAsync("stop");
+                                try
+                                {
+                                    await writer.WriteLineAsync("stop");
+                                }
+                                catch { }
                             }
                         }
                     }
                     else
                     {
-                        onLog("Patcher host running with elevated privileges.");
+                        onLog?.Invoke("Patcher host actively running with elevated privileges.");
 
-                        // Elevated tracking loop
+                        // Elevated process tracking loop
                         while (!_cts.Token.IsCancellationRequested)
                         {
                             var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
 
                             if (runningHosts.Length == 0)
                             {
-                                onLog("Elevated patcher host process was closed.");
+                                onLog?.Invoke("Elevated patcher host process terminated.");
                                 break;
                             }
 
@@ -196,11 +224,11 @@ namespace ModManager
             }
             catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is NullReferenceException)
             {
-                onLog("[Host] Stream connection closed safely.");
+                onLog?.Invoke("[Host] Connection pipe closed.");
             }
             catch (Exception ex)
             {
-                onLog($"[Host] Unexpected stream error: {ex.Message}");
+                onLog?.Invoke($"[Host] Stream error: {ex.Message}");
             }
         }
 
@@ -219,10 +247,10 @@ namespace ModManager
             switch (keyword)
             {
                 case "ok":
-                    onLog($"[Host] {GetMessageContent(rest)}");
+                    onLog?.Invoke($"[Host] {GetMessageContent(rest)}");
                     break;
                 case "error":
-                    onLog($"[Host Protocol Error] {GetMessageContent(rest)}");
+                    onLog?.Invoke($"[Host Protocol Error] {GetMessageContent(rest)}");
                     break;
                 case "status":
                     HandleStatusTransition(rest, onLog, onGameStatusChanged);
@@ -244,25 +272,25 @@ namespace ModManager
             switch (state)
             {
                 case "injecting":
-                    onLog("Waiting for game to start...");
+                    onLog?.Invoke("Waiting for game to start...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "injected":
                 case "hooked":
                 case "attached":
-                    onLog("GAME FOUND!");
+                    onLog?.Invoke("GAME FOUND!");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "waiting":
-                    onLog("Waiting for game to exit...");
+                    onLog?.Invoke("Waiting for game to exit...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "exited":
-                    onLog("Waiting for game to start...");
+                    onLog?.Invoke("Waiting for game to start...");
                     onGameStatusChanged?.Invoke();
                     break;
                 case "failed":
-                    onLog($"ERROR: {message}");
+                    onLog?.Invoke($"ERROR: {message}");
                     onGameStatusChanged?.Invoke();
                     break;
             }
