@@ -2594,11 +2594,6 @@ try
 
         public async void Start_loader(object sender, RoutedEventArgs e)
         {
-			if (settings.Loader_version == 0)
-			{
-				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher", ["OK"], "Legacy Patcher Disabled");
-				settings.Loader_version == 1;
-			}
             True_Start_loader();
         }
 
@@ -2609,6 +2604,11 @@ try
                 CustomMessageBox.Show("Set Gamepath in settings first");
                 return;
             }
+			if (settings.Loader_version == 0)
+			{
+				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher", ["OK"], "Legacy Patcher Disabled");
+				settings.Loader_version == 1;
+			}
             ToggleOverlay(true);
             Feed.Text = "[INF] Checking Game Version";
             await CheckGameVersion();
