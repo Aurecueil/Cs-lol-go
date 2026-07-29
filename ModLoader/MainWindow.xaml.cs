@@ -2596,7 +2596,7 @@ try
         {
 			if (settings.Loader_version == 0)
 			{
-				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher", new[] { "OK" }, "Legacy Patcher Disabled");
+				CustomMessageBox.Show("Legacy Patcher is ATM Disabled, switching to LTK Patcher", ["OK"], "Legacy Patcher Disabled");
 				settings.Loader_version == 1;
 			}
             True_Start_loader();
