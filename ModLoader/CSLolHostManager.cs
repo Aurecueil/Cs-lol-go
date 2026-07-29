@@ -10,21 +10,16 @@ namespace ModManager
     {
         public static bool IsRunning()
         {
-            if (CSLolHostManager.IsRunning || CSLolManager.IsRunning)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return CSLolHostManager.IsRunning || CSLolManager.IsRunning;
         }
     }
+
     public static class CSLolHostManager
     {
         private static Process _hostProcess;
         private static CancellationTokenSource _cts;
-        private const string HOST_EXE_PATH = "cslol-tools/cslol-host.exe";
+
+        private const string HOST_EXE_PATH = "cslol-tools/ltk_patcher_host.exe";
 
         private static readonly object _lock = new object();
         private static DateTime? _collectDeadline = null;
@@ -46,7 +41,7 @@ namespace ModManager
         {
             if (!File.Exists(HOST_EXE_PATH))
             {
-                onError?.Invoke($"cslol-host.exe missing, try restarting cslol-go");
+                onError?.Invoke($"Patcher host missing at '{HOST_EXE_PATH}'");
                 return;
             }
 
@@ -55,22 +50,21 @@ namespace ModManager
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             _poof = poof;
 
-            // Compute the protocol flag bitmask: 0 if enabled, 4 (OPT_OUT_AH_V1) if disabled
+            // Protocol flag bitmask: 0 if enabled, 4 (OPT_OUT_AH_V1) if disabled
             int configFlags = _poof ? 0 : 4;
 
             try
             {
-                // 1. Force the path to be absolute / global
+                // 1. Force the path to be absolute
                 overlayPrefixPath = Path.GetFullPath(overlayPrefixPath);
 
-                // 2. CRITICAL: Physically ensure the folder layout exists on disk 
-                // so the host's directory-verification checks pass successfully.
+                // 2. Ensure folder layout exists on disk for host directory checks
                 if (!Directory.Exists(overlayPrefixPath))
                 {
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
-                // 3. Convert path separators to forward slashes for the Rust line protocol driver
+                // 3. Convert path separators to forward slashes for the host protocol driver
                 overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
                 if (!overlayPrefixPath.EndsWith("/"))
                 {
@@ -82,6 +76,7 @@ namespace ModManager
                 onError?.Invoke($"Failed to resolve profile path: {ex.Message}");
                 return;
             }
+
             Task.Run(async () =>
             {
                 try
@@ -96,11 +91,9 @@ namespace ModManager
                     {
                         startInfo.UseShellExecute = true;
                         startInfo.Verb = "runas";
-
-                        // Dynmically assign configFlags into the elevated process string arguments
                         startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
-                        onLog("Launching elevated host. Please accept the UAC prompt if it appears...");
+                        onLog("Launching elevated patcher host. Please accept the UAC prompt if it appears...");
                     }
                     else
                     {
@@ -114,23 +107,22 @@ namespace ModManager
                     _hostProcess = new Process { StartInfo = startInfo };
                     _hostProcess.Start();
                     var localProcess = _hostProcess;
-                    // FIX: Only touch streams if we are NOT elevated
+
                     if (!elevate)
                     {
-                        onLog("Configuring via streams...");
+                        onLog("Configuring patcher host via streams...");
 
                         using (StreamWriter writer = _hostProcess.StandardInput)
                         {
                             writer.AutoFlush = true;
 
                             await writer.WriteLineAsync("config loglevel 16");
-                            await writer.WriteLineAsync($"config flags {configFlags}"); // Dynamically assign flag via active stdin pipe stream
+                            await writer.WriteLineAsync($"config flags {configFlags}");
                             await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
                             await writer.WriteLineAsync("start scan");
 
-                            // ✅ Safely moved inside the non-elevated block
-                            _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onWadScanFailed);
-                            _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog($"[host-stderr] {err}"), null);
+                            _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
+                            _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog($"[host-stderr] {err}"), null, null);
 
                             while (!_cts.Token.IsCancellationRequested && !_hostProcess.HasExited)
                             {
@@ -153,25 +145,22 @@ namespace ModManager
                     }
                     else
                     {
-                        onLog("Host running with elevated privileges.");
+                        onLog("Patcher host running with elevated privileges.");
 
                         // Elevated tracking loop
                         while (!_cts.Token.IsCancellationRequested)
                         {
-                            // Check if cslol-host is still alive in Windows by its name
-                            var runningHosts = Process.GetProcessesByName("cslol-host");
+                            var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
 
                             if (runningHosts.Length == 0)
                             {
-                                // The process actually closed on its own (manually closed or crashed)
-                                onLog("Elevated host process was closed.");
+                                onLog("Elevated patcher host process was closed.");
                                 break;
                             }
 
-                            // Clean up the temporary process handles we fetched
                             foreach (var p in runningHosts) p.Dispose();
 
-                            await Task.Delay(250); // Chill for 250ms before checking again
+                            await Task.Delay(250);
                         }
                     }
                 }
@@ -185,39 +174,41 @@ namespace ModManager
                     onStopped?.Invoke();
                 }
             });
-
         }
 
-        private static async Task ConsumeStreamAsync(StreamReader reader, Action<string> onLog, Action<string, string> onWadScanFailed)
+        private static async Task ConsumeStreamAsync(
+            StreamReader reader,
+            Action<string> onLog,
+            Action onGameStatusChanged,
+            Action<string, string> onWadScanFailed)
         {
             try
             {
-                // 1. Guard check: make sure the stream reader isn't null to begin with
-                if (reader == null) return;
-                if (_hostProcess == null) return;
+                if (reader == null || _hostProcess == null) return;
 
                 while (_cts != null && !_cts.Token.IsCancellationRequested && !reader.EndOfStream)
                 {
                     string line = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(line)) continue;
 
-                    ParseProtocolLine(line, onLog, onWadScanFailed);
+                    ParseProtocolLine(line, onLog, onGameStatusChanged, onWadScanFailed);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is NullReferenceException)
             {
-                // 2. Safe Exit: The process was killed by Stop(), closing the pipe.
-                // We catch this quietly because it's an intentional shutdown.
                 onLog("[Host] Stream connection closed safely.");
             }
             catch (Exception ex)
             {
-                // Catch any actual unexpected errors
                 onLog($"[Host] Unexpected stream error: {ex.Message}");
             }
         }
 
-        private static void ParseProtocolLine(string line, Action<string> onLog, Action<string, string> onWadScanFailed)
+        private static void ParseProtocolLine(
+            string line,
+            Action<string> onLog,
+            Action onGameStatusChanged,
+            Action<string, string> onWadScanFailed)
         {
             string[] parts = line.Split(new[] { ' ' }, 2);
             if (parts.Length == 0) return;
@@ -234,7 +225,7 @@ namespace ModManager
                     onLog($"[Host Protocol Error] {GetMessageContent(rest)}");
                     break;
                 case "status":
-                    handleStatusTransition(rest, onLog);
+                    HandleStatusTransition(rest, onLog, onGameStatusChanged);
                     break;
                 case "dll":
                     HandleDllTelemetry(rest, onLog, onWadScanFailed);
@@ -242,7 +233,7 @@ namespace ModManager
             }
         }
 
-        private static void handleStatusTransition(string rest, Action<string> onLog)
+        private static void HandleStatusTransition(string rest, Action<string> onLog, Action onGameStatusChanged)
         {
             string[] tokens = rest.Split(new[] { ' ' }, 3);
             if (tokens.Length < 2) return;
@@ -254,18 +245,25 @@ namespace ModManager
             {
                 case "injecting":
                     onLog("Waiting for game to start...");
+                    onGameStatusChanged?.Invoke();
                     break;
                 case "injected":
+                case "hooked":
+                case "attached":
                     onLog("GAME FOUND!");
+                    onGameStatusChanged?.Invoke();
                     break;
                 case "waiting":
                     onLog("Waiting for game to exit...");
+                    onGameStatusChanged?.Invoke();
                     break;
                 case "exited":
                     onLog("Waiting for game to start...");
+                    onGameStatusChanged?.Invoke();
                     break;
                 case "failed":
                     onLog($"ERROR: {message}");
+                    onGameStatusChanged?.Invoke();
                     break;
             }
         }
@@ -317,26 +315,25 @@ namespace ModManager
         {
             try
             {
-                // 1. Try standard kill first
-                if (_hostProcess is null)
+                if (_hostProcess != null && !_hostProcess.HasExited)
                 {
-
-                }
-                else
-                {
-                    if (!_hostProcess.HasExited) { _hostProcess.Kill(); }
+                    _hostProcess.Kill();
                 }
             }
             catch { }
 
             try
             {
-                // 2. Elevated fallback: Kill by process name if standard handle lost association
-                var runningHosts = Process.GetProcessesByName("cslol-host");
+                var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
+
                 foreach (var p in runningHosts)
                 {
-                    p.Kill();
-                    p.Dispose();
+                    try
+                    {
+                        p.Kill();
+                        p.Dispose();
+                    }
+                    catch { }
                 }
             }
             catch { }
@@ -345,6 +342,7 @@ namespace ModManager
             _hostProcess = null;
             _cts?.Dispose();
             _cts = null;
+
             lock (_lock) _collectDeadline = null;
         }
 

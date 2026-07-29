@@ -1005,7 +1005,7 @@ namespace ModManager
         {
             try
             {
-                string[] files = ["cslol-hook-dll.dll", "cslol-host.exe", "cslol-dll.dll"];
+                string[] files = ["ltk_patcher_dll.dll", "ltk_patcher_host.exe", "cslol-dll.dll"];
                 foreach (string file in files)
                 {
                     string url = $"https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/{file}";
