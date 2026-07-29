@@ -111,7 +111,7 @@ namespace ModManager
                     {
                         startInfo.UseShellExecute = true;
                         startInfo.Verb = "runas";
-                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
+                        startInfo.Arguments = $"--elevate --config-loglevel 16  --config-prefix \"{overlayPrefixPath}\" --start-scan";
 
                         onLog?.Invoke("Launching elevated patcher host...");
                     }

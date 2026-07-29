@@ -2583,102 +2583,52 @@ namespace ModManager
             True_Start_loader();
         }
 
-        // Requires: using System.Security.Principal;
-
-private static bool ShouldElevateInjector(bool userOptedIn, bool leagueRunsAsAdmin)
-{
-    bool managerElevated = new WindowsPrincipal(WindowsIdentity.GetCurrent())
-        .IsInRole(WindowsBuiltInRole.Administrator);
-
-    // Never elevate the host if we're already elevated - it inherits our
-    // integrity level anyway, so --elevate would just be a redundant UAC prompt.
-    return !managerElevated && (userOptedIn || leagueRunsAsAdmin);
-}
-
-public async void True_Start_loader()
-{
-    if (!File.Exists(settings.gamepath))
-    {
-        CustomMessageBox.Show("Set Gamepath in settings first");
-        return;
-    }
-
-    ToggleOverlay(true);
-    Feed.Text = "[INF] Checking Game Version";
-    await CheckGameVersion();
-    Feed.Text = "[INF] Initializing";
-    currentProgress = 0;
-    SetProgress();
-    ProfileComboBox.IsEnabled = false;
-    refreshButton.IsEnabled = false;
-    CreateProfile.IsEnabled = false;
-    deleteteProfile.IsEnabled = false;
-
-    lock (_loaderLock)
-    {
-        if (_modLoadCts != null || _isLoaderRunning)
+        public async void True_Start_loader()
         {
-            return;
+            if (!File.Exists(settings.gamepath))
+            {
+                CustomMessageBox.Show("Set Gamepath in settings first");
+                return;
+            }
+            ToggleOverlay(true);
+            Feed.Text = "[INF] Checking Game Version";
+            await CheckGameVersion();
+            Feed.Text = "[INF] Initializing";
+            currentProgress = 0;
+            SetProgress();
+            ProfileComboBox.IsEnabled = false;
+            refreshButton.IsEnabled = false;
+            CreateProfile.IsEnabled = false;
+            deleteteProfile.IsEnabled = false;
+            lock (_loaderLock)
+            {
+                if (_modLoadCts != null || _isLoaderRunning)
+                {
+                    return;
+                }
+
+                _isLoaderRunning = true;
+                Load_check_box.IsEnabled = false;
+            }
+            Load_check_box.IsChecked = true;
+            UpdateContextMenuLoaderState();
+            try
+            {
+                ToggleFeed(true);
+                Load_Mods();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error starting loader: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Logger.LogError("Error starting loader: -->   ", ex);
+                await Stop_loader_internal();
+            }
+            finally
+            {}
+            Load_check_box.IsEnabled = true;
+            UpdateContextMenuLoaderState();
         }
-        _isLoaderRunning = true;
-        _modLoadCts = new CancellationTokenSource(); // now actually assigned
-        Load_check_box.IsEnabled = false;
-    }
-    Load_check_box.IsChecked = true;
-    UpdateContextMenuLoaderState();
 
-    try
-    {
-        ToggleFeed(true);
-
-        // "Building" stage: resolve enabled mods into the overlay folder.
-        // Nothing touches the game process yet.
-        Load_Mods();
-
-        // ASSUMPTION: Load_Mods() leaves the built overlay at settings.OverlayPath.
-        // Point this at wherever your overlay actually lands if that's not it.
-        string overlayPath = settings.OverlayPath;
-
-        bool elevate = ShouldElevateInjector(
-            userOptedIn: settings.ElevateInjector,        // ASSUMPTION: opt-in toggle in settings
-            leagueRunsAsAdmin: settings.LeagueRunsAsAdmin  // ASSUMPTION: see note below
-        );
-
-        // "Patching" stage: spawn ltk_patcher_host.exe and inject.
-        CSLolHostManager.Initialize(
-            overlayPrefixPath: overlayPath,
-            elevate: elevate,
-            token: _modLoadCts.Token,
-            onLog: msg => Dispatcher.Invoke(() => Feed.Text = msg),
-            onStopped: () => Dispatcher.Invoke(() =>
-            {
-                // Fires on every exit path (game closed, manual stop, or error) -
-                // reuse whatever Stop_loader_internal already does to clear
-                // _isLoaderRunning / _modLoadCts / UI state.
-                _ = Stop_loader_internal();
-            }),
-            onGameStatusChanged: () => Dispatcher.Invoke(SetProgress),
-            onWadScanFailed: (wad, status) => Dispatcher.Invoke(() =>
-                Feed.Text = $"[WARN] WAD scan failed ({status}): {wad}"),
-            onError: err => Dispatcher.Invoke(() =>
-            {
-                MessageBox.Show($"Patcher error: {err}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                Logger.LogError("Patcher error: -->   ", new Exception(err));
-                _ = Stop_loader_internal();
-            }),
-            poof: settings.EnforceSkinhackScan // ASSUMPTION: true = keep the strict default
-        );
-    }
-    catch (Exception ex)
-    {
-        MessageBox.Show($"Error starting loader: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        Logger.LogError("Error starting loader: -->   ", ex);
-        await Stop_loader_internal();
-    }
-
-    Load_check_box.IsEnabled = true;
-    UpdateContextMenuLoaderState();
-}
         public async void Stop_loader(object sender, RoutedEventArgs e)
         {
             Stop_loader_internal();        
