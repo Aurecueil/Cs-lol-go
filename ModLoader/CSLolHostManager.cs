@@ -139,7 +139,7 @@ namespace ModManager
                             // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
                             await writer.WriteLineAsync($"config flags {configFlags}");
-                            await writer.WriteLineAsync($"config prefix \"{overlayPrefixPath}\"");
+                            await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
                             await writer.WriteLineAsync("start scan");
 
                             _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
