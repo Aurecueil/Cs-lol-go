@@ -132,14 +132,14 @@ namespace ModManager
                     {
                         onLog?.Invoke("Sending configuration to patcher host...");
 
-                        using (StreamWriter writer = _hostProcess.StandardInput)
+                        using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.Encoding.UTF8Encoding(false)))
                         {
                             writer.AutoFlush = true;
 
                             // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
                             await writer.WriteLineAsync($"config flags {configFlags}");
-                            await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
+                            await writer.WriteLineAsync($"config prefix \"{overlayPrefixPath}\"");
                             await writer.WriteLineAsync("start scan");
 
                             _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
