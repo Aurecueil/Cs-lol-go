@@ -132,8 +132,8 @@ namespace ModManager
                     {
                         onLog?.Invoke("Sending configuration to patcher host...");
 
-                        using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.Encoding.UTF8Encoding(false)))
-                        {
+						using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.UTF8Encoding(false)))
+						{
                             writer.AutoFlush = true;
 
                             // Commands sent sequentially to LTK Host IPC
