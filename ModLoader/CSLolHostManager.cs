@@ -24,9 +24,11 @@ namespace ModManager
         private static readonly string DLL_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_dll.dll");
 
         private static readonly object _lock = new object();
+        private static readonly object _fileLogLock = new object();
         private static DateTime? _collectDeadline = null;
         private const int WAD_FAILURE_COLLECT_WINDOW_MS = 750;
         private static bool _poof = true;
+        private static string _patcherLogFilePath = null;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
 
@@ -83,6 +85,14 @@ namespace ModManager
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
+                // Resolve log file path at overlayPrefixPath/../patcher_log.txt
+                _patcherLogFilePath = Path.GetFullPath(Path.Combine(overlayPrefixPath, "..", "patcher_log.txt"));
+                string logDir = Path.GetDirectoryName(_patcherLogFilePath);
+                if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
+                {
+                    Directory.CreateDirectory(logDir);
+                }
+
                 // Convert to forward slashes and ensure trailing slash
                 overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
                 if (!overlayPrefixPath.EndsWith("/"))
@@ -132,13 +142,13 @@ namespace ModManager
                     {
                         onLog?.Invoke("Sending configuration to patcher host...");
 
-						using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.UTF8Encoding(false)))
-						{
+                        using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.UTF8Encoding(false)))
+                        {
                             writer.AutoFlush = true;
 
                             // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
-                            // await writer.WriteLineAsync($"config flags {configFlags}");
+                            await writer.WriteLineAsync($"config flags {configFlags}");
                             await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
                             await writer.WriteLineAsync("start scan");
 
@@ -211,6 +221,9 @@ namespace ModManager
                     string line = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(line)) continue;
 
+                    // Append full raw log to patcher_log.txt
+                    AppendToPatcherLog(line);
+
                     ParseProtocolLine(line, onLog, onGameStatusChanged, onWadScanFailed);
                 }
             }
@@ -222,6 +235,20 @@ namespace ModManager
             {
                 onLog?.Invoke($"[Host] Stream error: {ex.Message}");
             }
+        }
+
+        private static void AppendToPatcherLog(string line)
+        {
+            if (string.IsNullOrEmpty(_patcherLogFilePath)) return;
+
+            try
+            {
+                lock (_fileLogLock)
+                {
+                    File.AppendAllText(_patcherLogFilePath, line + Environment.NewLine);
+                }
+            }
+            catch { }
         }
 
         private static void ParseProtocolLine(
