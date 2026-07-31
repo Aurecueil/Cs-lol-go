@@ -1654,11 +1654,11 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.9.0")
+            if (settings.ver != "2.10.0")
             {
-                settings.ver = "2.9.0";
+                settings.ver = "2.10.0";
                 save_settings();
-                CustomMessageBox.Show("Fixed \"Patcher error: Prefix not configued (config prefix <path>)\"\nDisabled Legacy Patcher for now.\nUpdated to Newer Version of LTK Patcher\nIproved Patcher updating.", ["Kay"],"What's New");
+                CustomMessageBox.Show("Fixed \"Patcher error: Prefix not configued (config prefix <path>)\"\nDisabled Legacy Patcher for now.\nUpdated to Newer Version of LTK Patcher\nIproved Patcher updating.\nAdded Logging for LTK-Patcher as patcher_log.txt in /profiles/{profile_name}/", ["Kay"],"What's New");
             }
         }
         private void SetLoading(string text, int progress, double stage)
@@ -3867,7 +3867,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.9.0";
+            string localVersion = "2.10.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
