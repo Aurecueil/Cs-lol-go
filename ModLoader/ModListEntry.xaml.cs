@@ -405,7 +405,7 @@ namespace ModManager
             {
                 SetSelected(false);
                 fixerRunning = running;
-                whenrun.Visibility = Visibility.Visible;
+                whenrun.Visibility = Visibility.Collapsed; //fixini
                 block.Text = "Fixer is Running";
                 FixingIcon.Visibility = Visibility.Collapsed;
                 FixerOverlay.Visibility = Visibility.Visible;

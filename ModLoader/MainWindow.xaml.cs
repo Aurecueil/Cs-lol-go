@@ -19,6 +19,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using static ModManager.FixerUI;
+using static ModManager.Repatheruwu;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
@@ -1594,15 +1595,11 @@ try
                 };
                 hierarchyById[-1] = tft_root_folder;
 
-                if (settings.auto_update_hashes)
-                {
-                    StartHashUpdate();
-                }
                 SetLoading("WAD Index", 1, 0.51);
                 await Task.Run(() => LoadWadFiles());
                 SetLoading("Folder Index", 1, 0.68);
                 await Task.Run(() => LoadFolders());
-                SetLoading("Mods Index", 1, 0.85);
+                SetLoading("Mods Index (due to version 16.17 changes, loading (1-time) can be quite long)", 1, 0.85);
                 await Task.Run(() => LoadMods());
                 details_colums_change(settings.detials_column_active);
                 if (settings.tft_mode)
@@ -1613,6 +1610,10 @@ try
                 }
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
+                if (settings.auto_update_hashes)
+                {
+                    StartHashUpdate();
+                }
 
                 tftModButton.Checked += tft_mode_enable;
                 tftModButton.Unchecked += tft_mode_disable;
@@ -1654,14 +1655,14 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.10.0")
+            if (settings.ver != "2.11.0")
             {
-                settings.ver = "2.10.0";
+                settings.ver = "2.11.0";
                 save_settings();
-                CustomMessageBox.Show("Fixed \"Patcher error: Prefix not configued (config prefix <path>)\"\nDisabled Legacy Patcher for now.\nUpdated to Newer Version of LTK Patcher\nIproved Patcher updating.\nAdded Logging for LTK-Patcher as patcher_log.txt in /profiles/{profile_name}/", ["Kay"],"What's New");
+                CustomMessageBox.Show("Implemented Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nTopaz Fixer is temporarily disabled, as i didnt yet adjust it for the new changes", ["Kay"],"What's New");
             }
         }
-        private void SetLoading(string text, int progress, double stage)
+        public void SetLoading(string text, int progress, double stage)
         {
             LoadingText.Text = text;
 
@@ -3867,7 +3868,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.10.0";
+            string localVersion = "2.11.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -4706,6 +4707,7 @@ try
             string modFolderName = Path.GetFileName(modFolderPath);
             string metaPath = Path.Combine(modFolderPath, "META");
             string infoPath = Path.Combine(metaPath, "info.json");
+            string hashesPath = Path.Combine(metaPath, "files.txt");
             string detailsPath = Path.Combine(metaPath, "details.json");
             string wadPath = Path.Combine(modFolderPath, "WAD");
 
@@ -4746,6 +4748,28 @@ try
                 }
                 string defaultDetailsJson = JsonSerializer.Serialize(modDetails, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(detailsPath, defaultDetailsJson);
+            }
+
+            if (!File.Exists(hashesPath))
+            {
+
+                Dispatcher.Invoke(() => SetLoading($"Converting: {modFolderName}", 1, 0.85));
+                string backupDir = Path.Combine("backup", modFolderName);
+                if (Directory.Exists(modFolderPath))
+                {
+                    CopyDirectory(modFolderPath, backupDir);
+                }
+
+                // 1. Set up dependencies
+                var settings = new FixerSettings();
+                var extractor = new WadExtractor(settings);
+                var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
+
+                // 2. Instantiate the processor
+                var processor = new WadBatchProcessor(extractor, converter);
+
+                // 3. Call the method on the instance
+                processor.ProcessFolderAsync(wadPath);
             }
 
             string wadFolder = Path.Combine(modFolderPath, "WAD_base");

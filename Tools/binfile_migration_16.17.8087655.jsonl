@@ -1,0 +1,395 @@
+{"class": "0x13f50786", "field": "imagePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x1653d803", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x17539cc2", "field": "0x6e84dbd7", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x17539cc2", "field": "0xc49d0560", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x17539cc2", "field": "0xda990ca6", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x17539cc2", "field": "0xecdf7afb", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x19ff61ac", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x19ff61ac", "field": "PortraitIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x20ff220e", "field": "0xa0fa85ce", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x20ff220e", "field": "0xa5f13f37", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x20ff220e", "field": "0xbc4acbd2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x20ff220e", "field": "0xcac8c65f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x20ff220e", "field": "0xe5f3c5d4", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x22daa5b8", "field": "AugmentLargeIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x22daa5b8", "field": "AugmentSmallIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x2732cb3a", "field": "0x56dd40a3", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x2732cb3a", "field": "0x76d6827b", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x32902d31", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4d80ee3d", "field": "0xf7fe534f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4d80ee3d", "field": "EmptyTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "0x853847b9", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "0xaa4d7f80", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "0xaf82dc30", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "DoubleActive", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "DoubleCompleted", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "DoubleLocked", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "SingleActive", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "SingleCompleted", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x4fbb3f5d", "field": "SingleLocked", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "ClaimableDefaultIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "ClaimableHoverIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "CompleteDefaultIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "CompleteHoverIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "LockedDefaultIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x51db35d3", "field": "LockedHoverIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5c8aed6", "field": "0x982aa425", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x14d6671a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x16b9c0e7", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x16e21209", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x20b77151", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x2abb026a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x2e09a7c", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x2ee329e", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x314a63bb", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x3392c041", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x36b9f511", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x4026cb15", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x414d5717", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x4cbd596a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x58766309", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x61fb8b43", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x63d105a5", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x682d837f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x765c4429", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x78bfe425", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x7e458980", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x85806434", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x9504558", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x96349f57", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0x9a0caad2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xa807a4b2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xc1d8474a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xd0666cc4", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xde6d4894", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xde84022d", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xdf83f0d3", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xe98a6e08", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xf1cfe676", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xfa3657e2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "0xfbf4286e", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x5cb6b755", "field": "BackgroundTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x60e2ec74", "field": "LoadingScreenBackground", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6311fe74", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6685fe5a", "field": "0x16118b27", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6685fe5a", "field": "0x756be398", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6685fe5a", "field": "0xc8c5e272", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6685fe5a", "field": "0xd6ce8043", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x6a215e04", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7693d3be", "field": "TextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x791d1108", "field": "path", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0x1ef5b158", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0x20e0b520", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0x7dbd6ef1", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0x9290be1", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0xb94c1f8e", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0xbfdc3540", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x79ca73e7", "field": "0xf4186080", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7a1cab0d", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x2af14c7", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x3d0587a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x71089646", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x8df082e", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x8fb9b7b0", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0x934eeacd", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0xa521a0c5", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0xb96a54f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0xee6f7154", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "0xf02aa447", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x7ac70a36", "field": "DefaultTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x895afb93", "field": "BasicAttackIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x895afb93", "field": "ItemDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x895afb93", "field": "RuneDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x895afb93", "field": "UnknownDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x8d8b1535", "field": "0x3392c041", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x8d8b1535", "field": "0x58766309", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x8d8b1535", "field": "0x96349f57", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x8d8b1535", "field": "0xa807a4b2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x8d8b1535", "field": "0xd0666cc4", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x911f126a", "field": "0xe50e4f4f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x990115ea", "field": "0x3392c041", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x990115ea", "field": "0x58766309", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x990115ea", "field": "0x96349f57", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x990115ea", "field": "0xa807a4b2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x990115ea", "field": "0xd0666cc4", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0x25f550a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0x2fec612a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0x49a76d44", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0x68337617", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0x87753e0a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0xba54f86d", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0xcdf065dc", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0xd3a0a511", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0xd41df86e", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "0xe8b9cb1a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "ConicRangeIndicator", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa8fef3df", "field": "MinimapCircularRangeIndicator", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa9593c80", "field": "0x19d88086", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa9593c80", "field": "0x4cd9da85", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa9593c80", "field": "0x8aea4585", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xa9593c80", "field": "0xab0328f6", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xb3f382ff", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xb3f382ff", "field": "PortraitIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xba9f6aca", "field": "0x439b26dc", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xba9f6aca", "field": "FailureTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xc3a44766", "field": "HitTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xc3a44766", "field": "StunTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xca27818b", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xcae029f6", "field": "0x199afa35", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xcae029f6", "field": "0x9960a9ff", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd3d7f73c", "field": "value", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd3dda5e5", "field": "0xfc90acf2", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd56fb9cc", "field": "TextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "ActiveDefault", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "ActiveHover", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "ActiveSelected", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "CompleteDefault", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "CompleteHover", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "CompleteSelected", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "InactiveDefault", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "InactiveHover", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xd65c937c", "field": "InactiveSelected", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xdc24bc6f", "field": "0x439b26dc", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xdc24bc6f", "field": "FailureTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xe92f8b6c", "field": "0x147429f5", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xe92f8b6c", "field": "0x23ff90f5", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xe92f8b6c", "field": "0xc2e4a761", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xe92f8b6c", "field": "0xfff63be6", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xece8d41b", "field": "0x2da0899c", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xece8d41b", "field": "0xbe7286ec", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xf3fca686", "field": "0x6e84dbd7", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xf3fca686", "field": "0xc49d0560", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xf3fca686", "field": "0xda990ca6", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xf3fca686", "field": "0xecdf7afb", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0xfc6af367", "field": "0x5be53b44", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "AnimationResourceData", "field": "mAnimationFilePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "AugmentLevelTextureData", "field": "0x9fa8e559", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "AugmentModifier", "field": "0x6fd14d4c", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "AugmentSet", "field": "0x4217d741", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "BasePerk", "field": "mIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "BorderPropertyData", "field": "BorderPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CensoredImage", "field": "image", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ChallengeConfigData", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "Champion", "field": "CharacterSelectionUiPlaceholderIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "areaIndicatorTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "hoverIndicatorMinimapOverride", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "hoverIndicatorTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "hoverLineIndicatorBaseTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "hoverLineIndicatorTargetTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CharacterRecord", "field": "passive1IconName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ClashLogo", "field": "mLogoPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CompanionData", "field": "mLoadScreen", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "CSSIcon", "field": "texture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DamageSpellTextureData", "field": "BasicAttackIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DamageSpellTextureData", "field": "ItemDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DamageSpellTextureData", "field": "RuneDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DamageSpellTextureData", "field": "UnknownDamageIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DisplayStatUiData", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DynamicMaterialTextureSwapOption", "field": "TextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "DynamicSpotlightGeComponentDef", "field": "ProjectedTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "EmblemData", "field": "mImagePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "FloatTextIconData", "field": "mIconFileName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GameEntityIconTexture", "field": "ColorblindTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GameEntityIconTexture", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GameFontDescription", "field": "fillTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GameplayTextureSampler", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GearData", "field": "mPortraitIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GearData", "field": "mSelfOnlyPortraitIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "GearData", "field": "SquarePortraitIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "HudShopButton", "field": "0x7dffe581", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "IconElementGradientExtension", "field": "mAlphaTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "IconPath", "field": "image", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ItemDataClient", "field": "inventoryIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ItemModifier", "field": "inventoryIconToOverlay", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LaunchAreaData", "field": "IndicatorTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LobbyBottomButtons", "field": "ErrorTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LobbyBottomButtons", "field": "WarningTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LoLModesPhaseData", "field": "0x44bdfcf8", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LoLModesPhaseData", "field": "0x7011dd78", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LoLModesPhaseData", "field": "0xbafc35cb", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x1cb3b8e6", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x33f929a8", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x581ad352", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x59fbc855", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x95fd5384", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x95fde6c5", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0x9ae9629d", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0xabb1919f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "0xc73349d0", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "TeamEliminatedIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "TeamIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LolModesTeamDisplayData", "field": "TeamMatchupIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LooseUiTextureDataBase", "field": "TextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LootTableDialogViewController", "field": "RootArrowCollapsedTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LootTableDialogViewController", "field": "RootArrowExpandedTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LootTableDialogViewController", "field": "SubArrowCollapsedTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "LootTableDialogViewController", "field": "SubArrowExpandedTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapAlternateAsset", "field": "mFowOverlayTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapAlternateAsset", "field": "mGrassTintTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapMinimap", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapProjectedTexture", "field": "ProjectedTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapSkin", "field": "0xd0a4e40b", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapSkin", "field": "mGrassTintTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MasteryData", "field": "texture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MasteryData", "field": "TextureMini", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MatchmakingQueue", "field": "IllustrationIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MatchmakingQueue", "field": "SmallIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MinimapBackground", "field": "mTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MinimapBackgroundConfig", "field": "mDefaultTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MinimapIconTextureData", "field": "mBase", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MissileAttachedTargetingDefinition", "field": "mLineEndTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MissileAttachedTargetingDefinition", "field": "mLineTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ModeSelectViewController", "field": "0x175bb989", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ModeSelectViewController", "field": "DisabledIconTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "PerkStyle", "field": "mIconTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "RegaliaData", "field": "texture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "RetiredStatStoneData", "field": "StatStoneRetiredIconMiniName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "ShaderTexture", "field": "defaultTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "iconAvatar", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "emissiveTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "glossTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "normalMapTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "reflectionMap", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "RoughnessMetallicAoTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties", "field": "texture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties_MaterialOverride", "field": "glossTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties_MaterialOverride", "field": "normalMapTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties_MaterialOverride", "field": "RoughnessMetallicAoTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SkinMeshDataProperties_MaterialOverride", "field": "texture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SpellDataResource", "field": "ImgIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SpellDataResource", "field": "mMinimapIconName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StaticMaterialShaderSamplerDef", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StaticMaterialSharedTextureDef", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StatStoneCategory", "field": "gameIconFull", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StatStoneCategory", "field": "gameIconLit", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StatStoneCategory", "field": "gameIconMini", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StatStoneCategory", "field": "gameIconUnlit", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SummonerEmote", "field": "selectionIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "SummonerIconData", "field": "gameTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionAoe", "field": "textureRadiusOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionArc", "field": "textureArcOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionCone", "field": "textureConeMaxGrowName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionCone", "field": "textureConeOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionLine", "field": "textureBaseMaxGrowName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionLine", "field": "textureBaseOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionLine", "field": "textureTargetMaxGrowName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionLine", "field": "textureTargetOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionMultiAOE", "field": "innerTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionMultiAOE", "field": "leftTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionMultiAOE", "field": "rightTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionRange", "field": "textureMaxGrowName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionRange", "field": "textureOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionSkipTerrain", "field": "mBaseTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionSkipTerrain", "field": "mTargetTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionSkipTerrain", "field": "mTerrainTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionSpline", "field": "baseTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionSpline", "field": "frontTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TargeterDefinitionWall", "field": "textureWallOverrideName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TextureAndColorData", "field": "colorblindTextureFile", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TextureAndColorData", "field": "textureFile", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TextureOverride", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTAnnouncementData", "field": "mIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTAttachmentSlotStyleData", "field": "mOverlayIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftCraftingCelebrationViewController", "field": "0x729f2ae", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftCraftingCelebrationViewController", "field": "0x9395be56", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftEncounterData", "field": "0x74cf1ad1", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftEventTimer", "field": "0x2374a39f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftEventTimer", "field": "0x8938c438", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftItemData", "field": "mArmoryIconOverridePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftItemData", "field": "mIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftLobbyCustomAssets", "field": "0x19e7962f", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftLobbyCustomAssets", "field": "0x6349b77b", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftLobbyCustomAssets", "field": "0x90b42524", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftLobbyCustomAssets", "field": "CustomBackgroundTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftMapItemData", "field": "ArmoryIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftMapItemData", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftMapTraitData", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTNotificationData", "field": "mBottomLineIcon1Path", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTNotificationData", "field": "mBottomLineIcon2Path", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTNotificationData", "field": "mBottomLineIcon3Path", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTNotificationData", "field": "mIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftPlaybook", "field": "loadoutsIcon", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftPlaybook", "field": "RotationThrottler", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundActiveIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundResultDrawIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundResultLossIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundResultNoneIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundResultWinIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TFTRoundData", "field": "mRoundUpcomingIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftShopData", "field": "AbilityIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftShopData", "field": "PcSplashPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftShopData", "field": "SquareSplashPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftShopData", "field": "TeamPlannerPortraitPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftShopData", "field": "TeamPlannerSplashPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftStageUiData", "field": "StageIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftStageUiData", "field": "TooltipIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTooltipData", "field": "IconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTraitData", "field": "mIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesBannerData", "field": "0xe147c198", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesBannerData", "field": "BackgroundTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesBannerData", "field": "BannerTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesBannerData", "field": "PlatformTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesBannerData", "field": "ThumbnailTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "0x108492b7", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "0x9395be56", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "DefaultStandardItemRarityTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "DefaultStandardItemStarLevelTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "DefaultStandardItemThumbnailTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "TooltipViewController", "field": "0x56716e4a", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "0xe95d41cf", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "ArenaIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "BundleIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "MiscIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "TacticianIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiStorePurchaseRowData", "field": "TreasureTroveTokenIconPath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UnitStatusPriorityList", "field": "TextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "VfxMaterialOverrideDefinitionData", "field": "baseTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "VfxMaterialOverrideDefinitionData", "field": "glossTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "VfxMaterialOverrideDefinitionData", "field": "transitionTexture", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "VfxPrimitiveCameraSegmentSeriesBeam", "field": "0x18273a68", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "0x115b5460", "field": "TextureToOverride", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "0x1ff0e246", "field": "0x960dcbff", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "0x1ff0e246", "field": "0xe999961a", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "0x3b09052f", "field": "value", "from": {"type": "Embed", "class": "0x73b4a2eb"}, "to": {"type": "Pointer", "class": "0x73b4a2eb"}, "conversion": "none"}
+{"class": "0x60e2ec74", "field": "0xda6afd7c", "from": {"type": "List2", "value": "String"}, "to": {"type": "List2", "value": "File"}, "conversion": "hash_value"}
+{"class": "0x60e2ec74", "field": "LoadingScreenBackgroundOverride", "from": {"type": "Map", "key": "String", "value": "String"}, "to": {"type": "Map", "key": "String", "value": "File"}, "conversion": "hash_value"}
+{"class": "0x60e2ec74", "field": "MutatorControlledLoadingScreenBackgrounds", "from": {"type": "List2", "value": "String"}, "to": {"type": "List2", "value": "File"}, "conversion": "hash_value"}
+{"class": "0x63fbd3de", "field": "0x829c2960", "from": {"type": "Map", "key": "I32", "value": "String"}, "to": {"type": "Map", "key": "I32", "value": "File"}, "conversion": "hash_value"}
+{"class": "0x6db33e0c", "field": "0x829c2960", "from": {"type": "Map", "key": "I32", "value": "String"}, "to": {"type": "Map", "key": "I32", "value": "File"}, "conversion": "hash_value"}
+{"class": "0x73b4a2eb", "field": "items", "from": {"type": "List2", "value": "Embed", "class": "0xa7ca72c"}, "to": {"type": "List2", "value": "Embed", "class": "0x3b8d8b3f"}, "conversion": "none"}
+{"class": "0x9a4ba494", "field": "0x829c2960", "from": {"type": "Map", "key": "I32", "value": "String"}, "to": {"type": "Map", "key": "I32", "value": "File"}, "conversion": "hash_value"}
+{"class": "0xcae029f6", "field": "0x1cbe575d", "from": {"type": "List", "size": 3, "value": "String"}, "to": {"type": "List", "size": 3, "value": "File"}, "conversion": "hash_value"}
+{"class": "0xcae029f6", "field": "0x9f6876f5", "from": {"type": "List", "size": 3, "value": "String"}, "to": {"type": "List", "size": 3, "value": "File"}, "conversion": "hash_value"}
+{"class": "0xf25571f0", "field": "icons", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "Hash", "value": "File"}, "conversion": "hash_value"}
+{"class": "0xfcff6553", "field": "0xab317f76", "from": {"type": "Map", "key": "String", "value": "String"}, "to": {"type": "Map", "key": "String", "value": "File"}, "conversion": "hash_value"}
+{"class": "AugmentLevelTextureData", "field": "0x8c2ded48", "from": {"type": "List2", "value": "String"}, "to": {"type": "List2", "value": "File"}, "conversion": "hash_value"}
+{"class": "CensoredImage", "field": "UncensoredImages", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "Hash", "value": "File"}, "conversion": "hash_value"}
+{"class": "ChallengeConfigData", "field": "LevelToIconPath", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "CherryRoundsViewController", "field": "0xd24a0877", "from": {"type": "Map", "key": "U8", "value": "String"}, "to": {"type": "Map", "key": "U8", "value": "File"}, "conversion": "hash_value"}
+{"class": "FogOfWarProperties", "field": "MutatorToTextureMap", "from": {"type": "Map", "key": "String", "value": "String"}, "to": {"type": "Map", "key": "String", "value": "File"}, "conversion": "hash_value"}
+{"class": "HudReplaySliderIconData", "field": "mTooltipIconNames", "from": {"type": "List", "value": "String"}, "to": {"type": "List", "value": "File"}, "conversion": "hash_value"}
+{"class": "LoadingScreenChallengesData", "field": "ChallengeBorderCrystalsData", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "LoadingScreenChallengesData", "field": "ChallengeCrystalsData", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "LoadingScreenPlayerCardTftData", "field": "0xa89213f", "from": {"type": "List2", "value": "String"}, "to": {"type": "List2", "value": "File"}, "conversion": "hash_value"}
+{"class": "MinimapIconTextureData", "field": "mColorblind", "from": {"type": "Option", "value": "String"}, "to": {"type": "Option", "value": "File"}, "conversion": "hash_value"}
+{"class": "RichBackgroundGameModeBackground", "field": "BackgroundElementMap", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "0xffdf3bd9", "from": {"type": "Option", "value": "String"}, "to": {"type": "Option", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "alternateIconsCircle", "from": {"type": "List", "value": "String"}, "to": {"type": "List", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "alternateIconsSquare", "from": {"type": "List", "value": "String"}, "to": {"type": "List", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "iconCircle", "from": {"type": "Option", "value": "String"}, "to": {"type": "Option", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "iconSquare", "from": {"type": "Option", "value": "String"}, "to": {"type": "Option", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "uncensoredIconCircles", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "Hash", "value": "File"}, "conversion": "hash_value"}
+{"class": "SkinCharacterDataProperties", "field": "uncensoredIconSquares", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "Hash", "value": "File"}, "conversion": "hash_value"}
+{"class": "StaticMaterialShaderSamplerDef", "field": "uncensoredTextures", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "Hash", "value": "File"}, "conversion": "hash_value"}
+{"class": "StrawberryRoundsViewController", "field": "0xd24a0877", "from": {"type": "Map", "key": "U8", "value": "String"}, "to": {"type": "Map", "key": "U8", "value": "File"}, "conversion": "hash_value"}
+{"class": "TftCraftingCelebrationViewController", "field": "0xd36d5f6e", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "TftCraftingCelebrationViewController", "field": "0xfde8ebb2", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "TFTLobbyViewController", "field": "0x354d2b95", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "TFTLobbyViewController", "field": "0x47aa5f76", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "TFTLobbyViewController", "field": "0xe31300f", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}
+{"class": "TftMapCharacterSkinData", "field": "SquareIconTexturePath", "from": {"type": "Option", "value": "String"}, "to": {"type": "Option", "value": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "StandardItemRarityTexturePaths", "from": {"type": "Map", "key": "U32", "value": "String"}, "to": {"type": "Map", "key": "U32", "value": "File"}, "conversion": "hash_value"}
+{"class": "TftTrovesCelebrationViewControllerV2", "field": "StandardItemStarLevelTexturePaths", "from": {"type": "List", "size": 3, "value": "String"}, "to": {"type": "List", "size": 3, "value": "File"}, "conversion": "hash_value"}
+{"class": "UiElementParticleSystemData", "field": "TextureOverrides", "from": {"type": "Map", "key": "Hash", "value": "String"}, "to": {"type": "Map", "key": "File", "value": "String"}, "conversion": "hash_key"}
+{"class": "VfxAssetRemap", "field": "oldAsset", "from": {"type": "Hash"}, "to": {"type": "File"}, "conversion": "rehash"}

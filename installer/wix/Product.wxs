@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="cslol-go" Language="1033" Version="1.0.0.0" Manufacturer="cslol-go" UpgradeCode="a1b2c3d4-e5f6-47a8-9abc-0def12345678">
+	<Package InstallerVersion="500" Compressed="yes" InstallScope="perUser"/>
+
+	<MediaTemplate/>
+
+	<Directory Id="TARGETDIR" Name="SourceDir">
+	  <Directory Id="LocalAppDataFolder">
+		<Directory Id="INSTALLFOLDER" Name="cslol-go"/>
+	  </Directory>
+	  <Directory Id="ProgramMenuFolder">
+		<Directory Id="ApplicationProgramsFolder" Name="cslol-go"/>
+	  </Directory>
+	  <Directory Id="DesktopFolder"/>
+	</Directory>
+
+	<Feature Id="ProductFeature" Title="cslol-go" Level="1">
+	  <!-- Files harvested from the publish folder are included via the PublishFiles component group -->
+	  <ComponentGroupRef Id="PublishFiles" />
+	  <!-- The main executable component is declared here so we can add shortcuts tied to the exe -->
+	  <ComponentRef Id="ModExeComponent" />
+	</Feature>
+
+	<DirectoryRef Id="INSTALLFOLDER">
+	  <Component Id="ModExeComponent" Guid="*">
+		<File Id="ModExeFile" Source="$(var.PublishDir)\modloader.exe" KeyPath="yes">
+		  <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="cslol-go" WorkingDirectory="INSTALLFOLDER" Icon="ModExeIcon" Advertise="no"/>
+		  <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="cslol-go" WorkingDirectory="INSTALLFOLDER" Icon="ModExeIcon" Advertise="no"/>
+		</File>
+		<RemoveFolder Id="RemoveINSTALLFOLDER" On="uninstall" Directory="INSTALLFOLDER"/>
+		<RegistryValue Root="HKCU" Key="Software\cslol-go" Name="installed" Type="integer" Value="1" KeyPath="no"/>
+	  </Component>
+	</DirectoryRef>
+
+	<Icon Id="ModExeIcon" SourceFile="$(var.PublishDir)\modloader.exe"/>
+
+	<!-- Use a minimal UI; this produces an installer with basic dialogs. If you want a custom UI, we can add one. -->
+	<UIRef Id="WixUI_Minimal"/>
+
+  </Product>
+</Wix>
