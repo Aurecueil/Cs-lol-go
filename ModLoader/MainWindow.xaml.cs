@@ -17,6 +17,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using static ModManager.FixerUI;
 using static ModManager.Repatheruwu;
@@ -210,6 +211,15 @@ namespace ModManager
         public string Home { get; set; } = "";
         public string Name { get; set; } = "";
         public string Version { get; set; } = "1.0.0";
+        public List<Hashtables> Hashtables { get; set; } = new List<Hashtables>();
+    }
+
+    public class Hashtables
+    {
+        public string Path { get; set; } = "META/hashes/game.hashes.txt";
+        public string Category { get; set; } = "game";
+        public string Algorithm { get; set; } = "xxh64";
+        public int Bits { get; set; } = 64;
     }
     public class ModDetails
     {
@@ -4896,6 +4906,39 @@ try
                 File.WriteAllText(detailsPath, defaultDetailsJson);
             }
 
+            ModInfo modInfo = new ModInfo();
+            if (File.Exists(infoPath))
+            {
+                try
+                {
+                    string infoJson = File.ReadAllText(infoPath);
+                    modInfo = JsonSerializer.Deserialize<ModInfo>(infoJson);
+
+                    // modInfo.Author ??= settings.default_author;
+                    // modInfo.Description ??= "";
+                    // modInfo.Heart ??= settings.default_Hearth;
+                    // modInfo.Home ??= settings.default_home;
+                    // modInfo.Name ??= "null";
+                    // modInfo.Version ??= "1.0.0";
+                }
+                catch (Exception)
+                {
+                    modInfo.Name = modFolderName;
+                    modInfo.Author = settings.default_author;
+                    modInfo.Heart = settings.default_Hearth;
+                    modInfo.Home = settings.default_home;
+                    string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
+                    File.WriteAllText(infoPath, defaultDetailsJson);
+                }
+            }
+            else
+            {
+                modInfo.Name = modFolderName;
+                modInfo.Author = settings.default_author;
+                string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(infoPath, defaultDetailsJson);
+            }
+
             if (File.Exists(hashesPath))
             {
                 var settings = new FixerSettings();
@@ -4908,10 +4951,32 @@ try
                 processor.RunRecoveryPipelineAsync(wadPath);
 
                 File.Delete(hashesPath);
-                modDetails.check_up = 1;
+                modDetails.check_up = 2;
+                string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
+                if (File.Exists(game_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/game.hashes.txt",
+                        Category = "game",
+                        Algorithm = "xxh64",
+                        Bits = 64
+                    });
+                }
+                string binentries_hash_path = Path.Combine(metaPath, "hashes", "binentries.hashes.txt");
+                if (File.Exists(binentries_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/binentries.hashes.txt",
+                        Category = "binentries",
+                        Algorithm = "fnv1a_32",
+                        Bits = 32
+                    });
+                }
+                File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
             }
-
-            if (modDetails.check_up == 0)
+            if (modDetails.check_up < 2)
             {
                 Dispatcher.Invoke(() => SetLoading($"Backing-up: {modFolderName}", 1, 2137));
 
@@ -4930,6 +4995,30 @@ try
                 Dispatcher.Invoke(() => SetLoading($"Converting: {modFolderName}", 1, 2137));
 
                 processor.ProcessFolderAsync(wadPath);
+                string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
+                if (File.Exists(game_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/game.hashes.txt",
+                        Category = "game",
+                        Algorithm = "xxh64",
+                        Bits = 64
+                    });
+                }
+                string binentries_hash_path = Path.Combine(metaPath, "hashes", "binentries.hashes.txt");
+                if (File.Exists(binentries_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/binentries.hashes.txt",
+                        Category = "binentries",
+                        Algorithm = "fnv1a_32",
+                        Bits = 32
+                    });
+                }
+                modDetails.check_up = 2;
+                File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
             }
 
             string wadFolder = Path.Combine(modFolderPath, "WAD_base");
@@ -5020,38 +5109,7 @@ try
                     MessageBox.Show($"Error reading WAD directory for mod '{modFolderName}': {ex.Message}");
                 }
             }
-            ModInfo modInfo = new ModInfo();
-            if (File.Exists(infoPath))
-            {
-                try
-                {
-                    string infoJson = File.ReadAllText(infoPath);
-                    modInfo = JsonSerializer.Deserialize<ModInfo>(infoJson);
-
-                    // modInfo.Author ??= settings.default_author;
-                    // modInfo.Description ??= "";
-                    // modInfo.Heart ??= settings.default_Hearth;
-                    // modInfo.Home ??= settings.default_home;
-                    // modInfo.Name ??= "null";
-                    // modInfo.Version ??= "1.0.0";
-                }
-                catch (Exception)
-                {
-                    modInfo.Name = modFolderName;
-                    modInfo.Author = settings.default_author;
-                    modInfo.Heart = settings.default_Hearth;
-                    modInfo.Home = settings.default_home;
-                    string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
-                    File.WriteAllText(infoPath, defaultDetailsJson);
-                }
-            }
-            else
-            {
-                modInfo.Name = modFolderName;
-                modInfo.Author = settings.default_author;
-                string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(infoPath, defaultDetailsJson);
-            }
+            
             if (modInfo.Description.ToLower().Contains("alban1911") || modInfo.Description.ToLower().Contains("/rose") || modInfo.Description.ToLower().Contains("darkseal") || modInfo.Author.ToLower().Contains("darkseal") || modInfo.Author.ToLower().Contains("alban1911") || modInfo.Author == "Rose")
             {
                 return null;
