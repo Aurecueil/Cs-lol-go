@@ -434,7 +434,7 @@ namespace ModManager
             }
             if (info)
             {
-                EntryName.Text = $"➡️  {FolderElement.Name}";
+                EntryName.Text = $"➡️  {FolderElement.Name} ({FolderElement.Children.Count().ToString()})";
 
                 // Set details (collapsed for folders)
                 DetailsText.Visibility = Visibility.Collapsed;

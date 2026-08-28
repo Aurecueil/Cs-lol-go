@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,6 +28,7 @@ namespace ModManager
         private const int WAD_FAILURE_COLLECT_WINDOW_MS = 750;
         private static bool _poof = true;
         private static string _patcherLogFilePath = null;
+        private static string _lastGameStatus = null;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
 
@@ -48,7 +48,7 @@ namespace ModManager
             CancellationToken token,
             Action<string> onLog,
             Action onStopped,
-            Action onGameStatusChanged = null,
+            Action<string, string> onGameStatusChanged = null, // Updated signature
             Action<string, string> onWadScanFailed = null,
             Action<string> onError = null,
             bool poof = false)
@@ -70,6 +70,7 @@ namespace ModManager
 
             Stop();
 
+            _lastGameStatus = null;
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             _poof = poof;
 
@@ -77,7 +78,6 @@ namespace ModManager
 
             try
             {
-                // Format overlay prefix path strictly for LTK Host driver
                 overlayPrefixPath = Path.GetFullPath(overlayPrefixPath);
 
                 if (!Directory.Exists(overlayPrefixPath))
@@ -85,7 +85,6 @@ namespace ModManager
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
-                // Resolve log file path at overlayPrefixPath/../patcher_log.txt
                 _patcherLogFilePath = Path.GetFullPath(Path.Combine(overlayPrefixPath, "..", "patcher_log.txt"));
                 string logDir = Path.GetDirectoryName(_patcherLogFilePath);
                 if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
@@ -93,7 +92,6 @@ namespace ModManager
                     Directory.CreateDirectory(logDir);
                 }
 
-                // Convert to forward slashes and ensure trailing slash
                 overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
                 if (!overlayPrefixPath.EndsWith("/"))
                 {
@@ -146,7 +144,6 @@ namespace ModManager
                         {
                             writer.AutoFlush = true;
 
-                            // Commands sent sequentially to LTK Host IPC
                             await writer.WriteLineAsync("config loglevel 16");
                             await writer.WriteLineAsync("config log trace");
                             await writer.WriteLineAsync($"config flags {configFlags}");
@@ -210,7 +207,7 @@ namespace ModManager
         private static async Task ConsumeStreamAsync(
             StreamReader reader,
             Action<string> onLog,
-            Action onGameStatusChanged,
+            Action<string, string> onGameStatusChanged, // Updated type
             Action<string, string> onWadScanFailed)
         {
             try
@@ -222,7 +219,6 @@ namespace ModManager
                     string line = await reader.ReadLineAsync();
                     if (string.IsNullOrWhiteSpace(line)) continue;
 
-                    // Append full raw log to patcher_log.txt
                     AppendToPatcherLog(line);
 
                     ParseProtocolLine(line, onLog, onGameStatusChanged, onWadScanFailed);
@@ -255,7 +251,7 @@ namespace ModManager
         private static void ParseProtocolLine(
             string line,
             Action<string> onLog,
-            Action onGameStatusChanged,
+            Action<string, string> onGameStatusChanged, // Updated type
             Action<string, string> onWadScanFailed)
         {
             string[] parts = line.Split(new[] { ' ' }, 2);
@@ -281,39 +277,41 @@ namespace ModManager
             }
         }
 
-        private static void HandleStatusTransition(string rest, Action<string> onLog, Action onGameStatusChanged)
+        private static void HandleStatusTransition(
+            string rest,
+            Action<string> onLog,
+            Action<string, string> onGameStatusChanged) // Updated type
         {
             string[] tokens = rest.Split(new[] { ' ' }, 3);
             if (tokens.Length < 2) return;
 
             string state = tokens[1];
             string message = tokens.Length > 2 ? tokens[2] : "";
+            string previousState = _lastGameStatus;
+            _lastGameStatus = state;
 
             switch (state)
             {
                 case "injecting":
                     onLog?.Invoke("Waiting for game to start...");
-                    onGameStatusChanged?.Invoke();
                     break;
                 case "injected":
                 case "hooked":
                 case "attached":
                     onLog?.Invoke("Game Found!");
-                    onGameStatusChanged?.Invoke();
                     break;
                 case "waiting":
                     onLog?.Invoke("Waiting for game to exit...");
-                    onGameStatusChanged?.Invoke();
                     break;
                 case "exited":
                     onLog?.Invoke("Waiting for game to start...");
-                    onGameStatusChanged?.Invoke();
                     break;
                 case "failed":
                     onLog?.Invoke($"Patcher Error: {message}");
-                    onGameStatusChanged?.Invoke();
                     break;
             }
+
+            onGameStatusChanged?.Invoke(previousState, state);
         }
 
         private static void HandleDllTelemetry(string rest, Action<string> onLog, Action<string, string> onWadScanFailed)

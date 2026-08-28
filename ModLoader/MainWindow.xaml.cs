@@ -216,6 +216,7 @@ namespace ModManager
         public int Priority { get; set; } = 10;
         public bool override_ { get; set; } = false;
         public string InnerPath { get; set; } = "";
+        public int check_up { get; set; } = 0;
 
         public bool Random { get; set; } = false;
         public List<LayerInfo> Layers { get; set; } = new();
@@ -460,6 +461,8 @@ namespace ModManager
         {
             if (e.Key == Key.Escape)
             {
+                Keyboard.ClearFocus();
+                SearchBox.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
                 var metaEditor = OverlayHost.Children
         .OfType<MetaEdior>()
         .FirstOrDefault();
@@ -536,6 +539,28 @@ namespace ModManager
             else if (e.Key == Key.F5 && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
             {
                 Internal_restart(Current_location_folder);
+            }
+            else if (e.Key == Key.O && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
+            {
+                SettingsButton_Click(null, null);
+            }
+            else if (e.Key == Key.F && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
+            {
+                SearchBox.Focus();
+            }
+            else if (e.Key == Key.T && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
+            {
+                Create_Folder(null, null);
+            }
+            else if ((e.Key == Key.Up || e.SystemKey == Key.Up) && Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
+            {
+                if (Current_location_folder <= 0) return;
+                hierarchyById.TryGetValue(Current_location_folder, out var currentFolder);
+                RefreshModListPanel(currentFolder.parent);
+            }
+            else if (e.Key == Key.N && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !ShouldBlockShortcuts() && refreshButton.IsEnabled)
+            {
+                AddMod_diag(null, null);
             }
             else if (e.Key == Key.R && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !(SearchBox.IsFocused) && !ShouldBlockShortcuts())
             {
@@ -1204,7 +1229,13 @@ try
         {
         "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.0",
         "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.1",
-        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.binentries.txt"
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.2",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.3",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.4",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.5",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.6",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.7",
+        "https://api.github.com/repos/CommunityDragon/Data/contents/hashes/lol/hashes.game.txt.8"
         };
 
         private const string DownloadUrl = "https://raw.communitydragon.org/binviewer/hashes/hashes.game.txt";
@@ -1238,8 +1269,83 @@ try
             return output;
         }
 
+        public static async Task BuildOptimizedBinaryFileAsync(Stream sourceStream, string destBinPath)
+        {
+            var map = new Dictionary<ulong, string>(4_000_000);
 
+            using (var reader = new StreamReader(sourceStream, Encoding.UTF8))
+            {
+                string? line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (TryParseLineSafe(line, out ulong hash, out string path))
+                    {
+                        map[hash] = path;
+                    }
+                }
+            }
 
+            var sortedEntries = new (ulong Hash, byte[] Utf8Bytes)[map.Count];
+            int idx = 0;
+            foreach (var kvp in map)
+            {
+                sortedEntries[idx++] = (kvp.Key, Encoding.UTF8.GetBytes(kvp.Value));
+            }
+
+            Array.Sort(sortedEntries, (a, b) => a.Hash.CompareTo(b.Hash));
+
+            string tempBinPath = destBinPath + ".tmp";
+            using (var outFs = new FileStream(tempBinPath, FileMode.Create, FileAccess.Write, FileShare.None, 4 * 1024 * 1024))
+            using (var bw = new BinaryWriter(outFs, Encoding.UTF8))
+            {
+                int count = sortedEntries.Length;
+                bw.Write(count);
+
+                // 1. Write Header Index Table (16 bytes per entry aligned)
+                int currentStringOffset = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    bw.Write(sortedEntries[i].Hash);                       // 8 bytes (ulong)
+                    bw.Write(currentStringOffset);                          // 4 bytes (int)
+                    bw.Write((ushort)sortedEntries[i].Utf8Bytes.Length);    // 2 bytes (ushort)
+                    bw.Write((ushort)0);                                    // 2 bytes (padding)
+
+                    currentStringOffset += sortedEntries[i].Utf8Bytes.Length;
+                }
+
+                // 2. Write Contiguous String Arena
+                for (int i = 0; i < count; i++)
+                {
+                    bw.Write(sortedEntries[i].Utf8Bytes);
+                }
+
+                bw.Flush();
+            }
+
+            File.Move(tempBinPath, destBinPath, overwrite: true);
+        }
+        // Separate synchronous method handles parsing safely in C# 12
+        private static bool TryParseLineSafe(string line, out ulong hash, out string path)
+        {
+            hash = 0;
+            path = string.Empty;
+
+            line = line.Trim();
+            if (line.Length < 18) return false;
+
+            int spaceIdx = line.IndexOf(' ');
+            if (spaceIdx <= 0) return false;
+
+            string hexStr = line.Substring(0, spaceIdx);
+            if (ulong.TryParse(hexStr, System.Globalization.NumberStyles.HexNumber, null, out hash))
+            {
+                path = line.Substring(spaceIdx + 1).Trim();
+                return true;
+            }
+
+            return false;
+        }
+        private bool hash_done_update = false;
         public void StartHashUpdate()
         {
             Task.Run(async () =>
@@ -1249,23 +1355,33 @@ try
                 {
                     Dispatcher.Invoke(() => Feed2.Text = "Checking for hash updates...");
 
+                    string gameTxtPath = Path.Combine(BasePath, "hashes.game.txt");
+                    string gameBinPath = Path.Combine(BasePath, "hashes.game.bin");
+                    string checkFilePath = Path.Combine(BasePath, "hashes.check.txt");
+
                     Directory.CreateDirectory(BasePath);
 
                     long lastUpdateTicks = 0;
-                    if (File.Exists(CheckFilePath))
-                        long.TryParse(File.ReadAllText(CheckFilePath).Trim(), out lastUpdateTicks);
-
+                    if (File.Exists(checkFilePath))
+                    {
+                        long.TryParse(File.ReadAllText(checkFilePath).Trim(), out lastUpdateTicks);
+                    }
                     DateTimeOffset lastUpdate = new DateTimeOffset(lastUpdateTicks, TimeSpan.Zero);
-                    bool needsUpdate = !File.Exists(HashesFilePath);
-                    if (!needsUpdate) {
 
+                    bool binExists = File.Exists(gameBinPath);
+                    bool txtExists = File.Exists(gameTxtPath);
+
+                    bool needsUpdate = (!binExists && !txtExists) || lastUpdateTicks == 0;
+
+                    if (!needsUpdate)
+                    {
                         foreach (var url in GitHubUrls)
                         {
                             Dispatcher.Invoke(() => Feed2.Text = $"Checking {Path.GetFileName(url)}...");
 
                             var curlOutput = await RunCurlCommandAsync(url);
-
                             DateTimeOffset? remoteModified = null;
+
                             if (!string.IsNullOrEmpty(curlOutput))
                             {
                                 var lines = curlOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -1283,8 +1399,7 @@ try
 
                             if (remoteModified.HasValue)
                             {
-
-                                if (remoteModified.Value > lastUpdate || lastUpdateTicks == 0)
+                                if (remoteModified.Value > lastUpdate)
                                 {
                                     needsUpdate = true;
                                     Dispatcher.Invoke(() => Feed2.Text = $"Update detected on {Path.GetFileName(url)}.");
@@ -1296,9 +1411,38 @@ try
                                 Dispatcher.Invoke(() => Feed2.Text = $"Could not check {Path.GetFileName(url)}.");
                             }
                         }
-
-
                     }
+
+                    // Branch 1: Download & convert directly to .bin
+                    if (needsUpdate)
+                    {
+                        using var httpClient = new HttpClient();
+                        Dispatcher.Invoke(() => Feed2.Text = "Downloading and converting game hashes to binary...");
+
+                        using var httpStream = await httpClient.GetStreamAsync(DownloadUrl);
+                        await BuildOptimizedBinaryFileAsync(httpStream, gameBinPath);
+
+                        // Optional: If you no longer need the local .txt file, remove it
+                        if (File.Exists(gameTxtPath))
+                        {
+                            try { File.Delete(gameTxtPath); } catch { }
+                        }
+
+                        await File.WriteAllTextAsync(checkFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
+                        Dispatcher.Invoke(() => Feed2.Text = "Hashes updated and converted to binary.");
+                    }
+                    // Branch 2: Local .txt exists, no remote update required, but .bin does not exist yet -> Convert
+                    else if (!binExists && txtExists)
+                    {
+                        Dispatcher.Invoke(() => Feed2.Text = "Converting existing text hashes to binary...");
+
+                        using var fileStream = new FileStream(gameTxtPath, FileMode.Open, FileAccess.Read, FileShare.Read, 512 * 1024, useAsync: true);
+                        await BuildOptimizedBinaryFileAsync(fileStream, gameBinPath);
+
+                        Dispatcher.Invoke(() => Feed2.Text = "Conversion complete.");
+                    }
+
+
                     if (!File.Exists(BinEntriesFilePath) || needsUpdate)
                     {
                         using var httpClient = new HttpClient();
@@ -1336,20 +1480,6 @@ try
                             Dispatcher.Invoke(() => Feed2.Text = $"Warning: Failed to update shaders. {ex.Message}");
                         }
                     }
-                    if (needsUpdate)
-                    {
-                        using var httpClient = new HttpClient();
-
-                        // --- Existing Logic: Download Game Hashes ---
-                        Dispatcher.Invoke(() => Feed2.Text = "Downloading game hashes...");
-                        var content = await httpClient.GetStringAsync(DownloadUrl);
-                        await File.WriteAllTextAsync(HashesFilePath, content);
-
-
-                        // --- Finalize ---
-                        await File.WriteAllTextAsync(CheckFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
-                        Dispatcher.Invoke(() => Feed2.Text = "Hashes updated successfully.");
-                    }
                     Dispatcher.Invoke(() => Feed2.Text = "Hashes are up-to-date.");
                 }
                 catch (Exception ex)
@@ -1358,6 +1488,7 @@ try
                 }
                 finally
                 {
+                    hash_done_update = true;
                     await Task.Delay(1000);
                     Dispatcher.Invoke(() => ToggleFeed(false, 2));
                 }
@@ -1498,7 +1629,7 @@ try
             CleanUpOldBackups();
             ModListEntry.MainWindowInstance = this;
 
-            SetLoading("Settings", 1, 0.17);
+            SetLoading("Settings", 1, 0);
             load_settings();
             colorManager = new Color_menager(settings);
             Application.Current.Resources["AccentColor"] = settings.theme_color;
@@ -1562,7 +1693,7 @@ try
                     this.Icon = BitmapFrame.Create(new Uri(relativePath, UriKind.Absolute));
                 }
 
-                SetLoading("Leagus Path", 1, 0.34);
+                SetLoading("Leagus Path", 1, 0);
                 detectGamePath();
                 CheckGameVersion();
                 var root_folder = new HierarchyElement
@@ -1595,11 +1726,21 @@ try
                 };
                 hierarchyById[-1] = tft_root_folder;
 
-                SetLoading("WAD Index", 1, 0.51);
+                if (!File.Exists("cslol-tools/hashes.game.bin"))
+                {
+                    SetLoading("Updating Hashes (might take a while)", 1, 0);
+                    StartHashUpdate();
+                    while (!hash_done_update)
+                    {
+                        await Task.Delay(500);
+                    }
+                }
+
+                SetLoading("WAD Index", 1, 0);
                 await Task.Run(() => LoadWadFiles());
-                SetLoading("Folder Index", 1, 0.68);
+                SetLoading("Folder `", 1, 0);
                 await Task.Run(() => LoadFolders());
-                SetLoading("Mods Index (due to version 16.17 changes, loading (1-time) can be quite long)", 1, 0.85);
+                SetLoading("Mods", 1, 0);
                 await Task.Run(() => LoadMods());
                 details_colums_change(settings.detials_column_active);
                 if (settings.tft_mode)
@@ -1655,22 +1796,25 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.11.0")
+            if (settings.ver != "2.12.0")
             {
-                settings.ver = "2.11.0";
+                settings.ver = "2.12.0";
                 save_settings();
-                CustomMessageBox.Show("Implemented Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nTopaz Fixer is temporarily disabled, as i didnt yet adjust it for the new changes", ["Kay"],"What's New");
+                CustomMessageBox.Show("Improved Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nTopaz Fixer is temporarily disabled, as i didnt yet adjust it for the new changes\n\nFixed most instances of \"Cannot acces files bc it is being used by another process\"\n\nINtroduced new keyboard shortcuts:\n- Ctrl+O -> Open Settings\n- Ctrl+F -> Focus Searchbar\n- Ctrl+N -> Create Mod\n- Ctrl+T -> New Folder\n- Alt+ArrowUp -> Go to Parent Directory", ["Kay"],"What's New");
             }
         }
         public void SetLoading(string text, int progress, double stage)
         {
             LoadingText.Text = text;
 
-            switch (progress)
+            if (stage != 2137)
             {
-                case 1: Stage1.Width = 300 * stage; Stage1_b.Width = 300 * stage; break;
-                case 2: Stage2.Width = 300 * stage; Stage2_b.Width = 300 * stage; break;
-                case 3: Stage3.Width = 300 * stage; break;
+                switch (progress)
+                {
+                    case 1: Stage1.Width = 300 * stage; Stage1_b.Width = 300 * stage; break;
+                    case 2: Stage2.Width = 300 * stage; Stage2_b.Width = 300 * stage; break;
+                    case 3: Stage3.Width = 300 * stage; break;
+                }
             }
             Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
         }
@@ -2935,68 +3079,69 @@ try
             }
 
             CSLolHostManager.Initialize(
-                overlayPath,
-                requiresElevation,
-                token,
+        overlayPath,
+        requiresElevation,
+        token,
 
-                text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
+        text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
 
-                () => Application.Current.Dispatcher.Invoke(() =>
+        () => Application.Current.Dispatcher.Invoke(() =>
+        {
+            ToggleFeed(false);
+            _isLoaderRunning = false;
+            _modLoadCts = null;
+        }),
+
+        // Callback takes (oldState, newState)
+        (oldState, newState) => Application.Current.Dispatcher.Invoke(async () =>
+        {
+            if (oldState == "waiting" && newState != "waiting")
+            {
+                if (!token.IsCancellationRequested && settings.reinitialize)
                 {
-                    ToggleFeed(false);
-                    _isLoaderRunning = false;
-                    _modLoadCts = null;
-                }),
-
-                () => Application.Current.Dispatcher.Invoke(async () =>
-                {
-                    if (!token.IsCancellationRequested)
+                    try
                     {
-                        if (settings.reinitialize)
-                        {
-                            try
-                            {
-                                Thread.Sleep(500);
-                                Feed.Text = "Re-Loading Mods...";
-                                ToggleOverlay(true);
-                                ClearPaintActiveMods();
-                                await InitializeModsAsync(token);
-                                Feed.Text = "Mods re-loaded. Waiting for game to start...";
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                        }
+                        await Task.Delay(1500, token);
+                        Feed.Text = "Re-Loading Mods...";
+                        ToggleOverlay(true);
+                        ClearPaintActiveMods();
+                        await InitializeModsAsync(token);
+                        Feed.Text = "Mods re-loaded. Waiting for game to start...";
                     }
-                }),
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }),
 
-                (wadFile, errorStatus) => Application.Current.Dispatcher.Invoke(() =>
-                {
-                    _modLoadCts?.Cancel();
+        (wadFile, errorStatus) => Application.Current.Dispatcher.Invoke(() =>
+        {
+            _modLoadCts?.Cancel();
 
-                    if (errorStatus == "c0000229" && !settings.poofini) { return; }
+            if (errorStatus == "c0000229" && !settings.poofini) { return; }
 
-                    string warningPrompt = $"{(errorStatus == "c0000229" ? "Sknhack" : "Problem")} detetected in {wadFile}. (Code: {errorStatus} )\n\n" +
-                                           $"Please Disable or Delete {(errorStatus == "c0000229" ? "Sknhacks" : "Corrupted mod")}.";
-  
-                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Skinhack" : "Corrupted mod")} Detected");
-                }),
+            string warningPrompt = $"{(errorStatus == "c0000229" ? "Skinhack" : "Problem")} detected in {wadFile}. (Code: {errorStatus} )\n\n" +
+                                   $"Please Disable or Delete {(errorStatus == "c0000229" ? "Skinhacks" : "Corrupted mod")}.";
 
-                errorMsg => Application.Current.Dispatcher.Invoke(() =>
-                {
-					if (!_isLoaderRunning) return;
-                    ToggleFeed(false);
-                    _isLoaderRunning = false;
-                    MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Stop_loader_internal();
-                }),
-                settings.poofini
-            );
+            CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Skinhack" : "Corrupted mod")} Detected");
+        }),
+
+        errorMsg => Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (!_isLoaderRunning) return;
+            ToggleFeed(false);
+            _isLoaderRunning = false;
+            MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            Stop_loader_internal();
+        }),
+        settings.poofini
+    );
+
         }
         private void StartCSLol(CancellationToken token)
         {
@@ -3266,6 +3411,12 @@ try
 
         public async Task WriteWads(CancellationToken token)
         {
+            if (_currentRunner != null)
+            {
+                _currentRunner.KillProcess();
+                _currentRunner = null;
+            }
+
             mods_loaded_in.UnionWith(mods_loaded_in_over);
             string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
             string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
@@ -3285,9 +3436,6 @@ try
             }
             else
             {
-
-
-
                 var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}/overlay\" --game:\"{game_path}\" --mods:{mod_list}";
 
 
@@ -3868,7 +4016,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.11.0";
+            string localVersion = "2.12.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -4404,7 +4552,7 @@ try
             {
                 return;
             }
-
+            
             foreach (var draggedElement in draggedElements)
             {
                 if (draggedElement.Item1 == dropTarget.Item1)
@@ -4421,8 +4569,6 @@ try
 
                     CurrenFolderLocation.Children.Remove(match);
                     DropTargetElement.Children.Add(match);
-
-
 
                     if (match.Item2 == true)
                     {
@@ -4443,8 +4589,6 @@ try
                                 MessageBox.Show($"Failed to update details.json:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                             }
                         }
-                        
-
                     }
                     else
                     {
@@ -4467,11 +4611,13 @@ try
                             updt(cchildElement);
                         }
                     }
-
+                    
 
 
                 }
             }
+
+            // cachedUIElements[(dropTarget.Item2, dropTarget.Item1)].RefreshDisplay(true);
             RefreshModListPanel(Current_location_folder);
         }
         public static void SaveOrUpdateHierarchyElement(
@@ -4570,19 +4716,21 @@ try
 
 
             string[] modFolders = Directory.GetDirectories(installedPath);
-            //int j = 0;
+            double j = 0;
+            double total = modFolders.Length;
             foreach (string modFolderPath in modFolders)
             {
-                //j++;
+                string modFolderName = Path.GetFileName(modFolderPath);
+                j++;
 
                 try
                 {
+                    Dispatcher.Invoke(() => SetLoading($"Loading: {modFolderName}", 1, j/total));
                     CreateModFromFolder(modFolderPath);
 
                 }
                 catch (Exception ex)
                 {
-                    string modFolderName = Path.GetFileName(modFolderPath);
                     MessageBox.Show($"Error loading mod from folder '{modFolderName}': {ex.Message}");
                 }
 
@@ -4716,8 +4864,6 @@ try
                 Directory.CreateDirectory(metaPath);
             }
 
-            
-
             ModDetails modDetails = new ModDetails(); // Default values
             if (File.Exists(detailsPath))
             {
@@ -4750,12 +4896,27 @@ try
                 File.WriteAllText(detailsPath, defaultDetailsJson);
             }
 
-            if (!File.Exists(hashesPath))
+            if (File.Exists(hashesPath))
             {
+                var settings = new FixerSettings();
+                var extractor = new WadExtractor(settings);
+                var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
+                var processor = new WadBatchProcessor(extractor, converter);
 
-                Dispatcher.Invoke(() => SetLoading($"Converting: {modFolderName}", 1, 0.85));
+                Dispatcher.Invoke(() => SetLoading($"Additional Fix: {modFolderName}", 1, 2137));
+
+                processor.RunRecoveryPipelineAsync(wadPath);
+
+                File.Delete(hashesPath);
+                modDetails.check_up = 1;
+            }
+
+            if (modDetails.check_up == 0)
+            {
+                Dispatcher.Invoke(() => SetLoading($"Backing-up: {modFolderName}", 1, 2137));
+
                 string backupDir = Path.Combine("backup", modFolderName);
-                if (Directory.Exists(modFolderPath))
+                if (Directory.Exists(modFolderPath) && !Directory.Exists(backupDir))
                 {
                     CopyDirectory(modFolderPath, backupDir);
                 }
@@ -4765,10 +4926,9 @@ try
                 var extractor = new WadExtractor(settings);
                 var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
 
-                // 2. Instantiate the processor
                 var processor = new WadBatchProcessor(extractor, converter);
+                Dispatcher.Invoke(() => SetLoading($"Converting: {modFolderName}", 1, 2137));
 
-                // 3. Call the method on the instance
                 processor.ProcessFolderAsync(wadPath);
             }
 
