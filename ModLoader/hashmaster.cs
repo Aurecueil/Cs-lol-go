@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Hashing;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
+using System.Security.Policy;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -123,6 +125,10 @@ public static class HashMaster
     }
     public static ulong HashPath(ReadOnlySpan<char> path)
     {
+        if (path.Length == 16 && ulong.TryParse(path, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong parsedHash))
+        {
+            return parsedHash;
+        }
         int maxByteCount = Encoding.UTF8.GetMaxByteCount(path.Length);
         byte[]? rented = null;
         Span<byte> utf8Buf = maxByteCount <= 512 ? stackalloc byte[512] : (rented = ArrayPool<byte>.Shared.Rent(maxByteCount));
@@ -154,7 +160,62 @@ public static class HashMaster
             if (rented != null) ArrayPool<byte>.Shared.Return(rented);
         }
     }
+    public static List<ulong> HashPaths(IReadOnlyList<string> paths)
+    {
+        var hashes = new List<ulong>(paths.Count);
 
+        // Shared reusable buffer for UTF-8 bytes to prevent rent/return churn in a tight loop
+        byte[] utf8SharedBuf = ArrayPool<byte>.Shared.Rent(1024);
+
+        try
+        {
+            for (int p = 0; p < paths.Count; p++)
+            {
+                ReadOnlySpan<char> path = paths[p].AsSpan();
+
+                if (path.Length == 16 && ulong.TryParse(path, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong parsedHash))
+                {
+                    hashes.Add(parsedHash);
+                    continue;
+                }
+
+                int maxByteCount = Encoding.UTF8.GetMaxByteCount(path.Length);
+
+                // Dynamically resize shared buffer if encountering an unusually large path
+                if (maxByteCount > utf8SharedBuf.Length)
+                {
+                    ArrayPool<byte>.Shared.Return(utf8SharedBuf);
+                    utf8SharedBuf = ArrayPool<byte>.Shared.Rent(maxByteCount);
+                }
+
+                int byteCount = 0;
+                for (int i = 0; i < path.Length; i++)
+                {
+                    char c = path[i];
+                    if (c == '\\') c = '/';
+                    else if (c is >= 'A' and <= 'Z') c = (char)(c + 32);
+
+                    if (c <= 0x7F)
+                    {
+                        utf8SharedBuf[byteCount++] = (byte)c;
+                    }
+                    else
+                    {
+                        Span<char> singleChar = stackalloc char[] { c };
+                        byteCount += Encoding.UTF8.GetBytes(singleChar, utf8SharedBuf.AsSpan(byteCount));
+                    }
+                }
+
+                hashes.Add(XxHash64.HashToUInt64(utf8SharedBuf.AsSpan(0, byteCount), seed: 0));
+            }
+
+            return hashes;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(utf8SharedBuf);
+        }
+    }
     public static ulong HashPath(string path, bool not_x16 = false) => HashPath(path.AsSpan());
 
     // --- BATCH UNHASH (ASYNC WRAPPER) ---
@@ -501,6 +562,193 @@ public static class HashMaster
 
         _isLoaded = true;
     }
+    // --- ASYNC BATCH FIND MATCHES ---
+    public static List<WadExtractor.Target> FindMatches(
+    List<WadExtractor.Target> targets,
+    bool useBaseName = true,
+    double matchPercent = 100.0)
+    {
+        Lock.Wait();
+        try
+        {
+            EnsureLoaded();
+            ResetTimer();
+
+            return FindMatchesInternal(targets, useBaseName, matchPercent);
+        }
+        finally
+        {
+            Lock.Release();
+        }
+    }
+    public static async Task<List<WadExtractor.Target>> FindMatchesAsync(
+        List<WadExtractor.Target> targets,
+        bool useBaseName = true,
+        double matchPercent = 100.0,
+        CancellationToken ct = default)
+    {
+        await Lock.WaitAsync(ct);
+        try
+        {
+            EnsureLoaded();
+            ResetTimer();
+
+            return FindMatchesInternal(targets, useBaseName, matchPercent);
+        }
+        finally
+        {
+            Lock.Release();
+        }
+    }
+
+    private static List<WadExtractor.Target> FindMatchesInternal(
+        List<WadExtractor.Target> targets,
+        bool useBaseName,
+        double matchPercent)
+    {
+        // Pre-extract search terms and extensions to avoid recomputing per candidate
+        var searchSpecs = new (string SearchTerm, string TargetExt)[targets.Count];
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            var target = targets[i];
+            target.Hashes = new List<string>();
+
+            if (string.IsNullOrEmpty(target.OriginalPath))
+            {
+                searchSpecs[i] = (string.Empty, string.Empty);
+                continue;
+            }
+
+            string searchTerm = useBaseName
+                ? GetBaseName(target.OriginalPath.AsSpan())
+                : GetDataRelativePath(target.OriginalPath.AsSpan(), matchPercent);
+
+            string targetExt = Path.GetExtension(target.OriginalPath).ToLowerInvariant();
+            searchSpecs[i] = (searchTerm, targetExt);
+        }
+
+        // 1. Scan memory-mapped string arena
+        if (_index != null && _stringArena != null)
+        {
+            ReadOnlySpan<HashIndexRecord> index = _index.AsSpan();
+            for (int i = 0; i < index.Length; i++)
+            {
+                ref readonly var record = ref index[i];
+                ReadOnlySpan<byte> strBytes = _stringArena.AsSpan(record.StringOffset, record.StringLength);
+                string path = Encoding.UTF8.GetString(strBytes);
+
+                MatchPathAgainstTargets(path, targets, searchSpecs);
+            }
+        }
+
+        // 2. Scan custom in-memory entries
+        if (_customEntries != null)
+        {
+            foreach (var path in _customEntries.Values)
+            {
+                MatchPathAgainstTargets(path, targets, searchSpecs);
+            }
+        }
+
+        // 3. Post-process sorting for prefix-based searches
+        if (!useBaseName)
+        {
+            foreach (var target in targets)
+            {
+                if (target.Hashes.Count > 1)
+                {
+                    target.Hashes.Sort((a, b) => b.Length.CompareTo(a.Length));
+                }
+            }
+        }
+
+        return targets;
+    }
+
+    private static void MatchPathAgainstTargets(
+        string path,
+        List<WadExtractor.Target> targets,
+        (string SearchTerm, string TargetExt)[] searchSpecs)
+    {
+        string? pathExt = null; // Lazy-evaluated only on substring hit
+
+        for (int j = 0; j < targets.Count; j++)
+        {
+            var (searchTerm, targetExt) = searchSpecs[j];
+            if (string.IsNullOrEmpty(searchTerm)) continue;
+
+            if (path.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                pathExt ??= Path.GetExtension(path).ToLowerInvariant();
+
+                if (IsExtensionCompatible(targetExt, pathExt))
+                {
+                    targets[j].Hashes.Add(path);
+                }
+            }
+        }
+    }
+
+    private static bool IsExtensionCompatible(string targetExt, string pathExt)
+    {
+        return pathExt == targetExt ||
+               (targetExt == ".sco" && pathExt == ".scb") ||
+               (targetExt == ".dds" && pathExt == ".tex") ||
+               (targetExt == ".tex" && pathExt == ".dds");
+    }
+
+    private static string GetBaseName(ReadOnlySpan<char> path)
+    {
+        if (path.IsEmpty) return string.Empty;
+
+        // Find last directory separator
+        int lastSlash = path.LastIndexOfAny('/', '\\');
+        ReadOnlySpan<char> fileName = lastSlash >= 0 ? path.Slice(lastSlash + 1) : path;
+
+        // Find first dot in filename (e.g., "character.skin01.dds" -> "character")
+        int firstDot = fileName.IndexOf('.');
+        ReadOnlySpan<char> baseName = firstDot >= 0 ? fileName.Slice(0, firstDot) : fileName;
+
+        return baseName.ToString().ToLowerInvariant();
+    }
+
+    private static string GetDataRelativePath(ReadOnlySpan<char> path, double percent)
+    {
+        if (path.IsEmpty) return string.Empty;
+
+        // Find "data/" or "data\" without allocating
+        int idx = -1;
+        for (int i = 0; i <= path.Length - 5; i++)
+        {
+            if ((path[i] == 'd' || path[i] == 'D') &&
+                (path[i + 1] == 'a' || path[i + 1] == 'A') &&
+                (path[i + 2] == 't' || path[i + 2] == 'T') &&
+                (path[i + 3] == 'a' || path[i + 3] == 'A') &&
+                (path[i + 4] == '/' || path[i + 4] == '\\'))
+            {
+                idx = i;
+                break;
+            }
+        }
+
+        ReadOnlySpan<char> relative = (idx != -1) ? path.Slice(idx + 5) : path;
+        if (relative.IsEmpty) return string.Empty;
+
+        int cutoff = (int)Math.Round(relative.Length * (percent / 100.0));
+        cutoff = Math.Clamp(cutoff, 0, relative.Length);
+
+        // Normalize separators while allocating output string
+        Span<char> buffer = stackalloc char[cutoff];
+        for (int i = 0; i < cutoff; i++)
+        {
+            char c = relative[i];
+            buffer[i] = (c == '\\') ? '/' : char.ToLowerInvariant(c);
+        }
+
+        return buffer.ToString();
+    }
+
 
     private static void PersistCustomEntriesInternal()
     {

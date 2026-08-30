@@ -8,11 +8,13 @@ using System.IO.Compression;
 using System.IO.Hashing;
 using System.Net.Http;
 using System.Runtime.ConstrainedExecution;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Documents;
 using ZstdSharp;
+using static ModManager.Repatheruwu;
 using static ModManager.Repatheruwu.WadExtractor;
 using static System.Net.Mime.MediaTypeNames;
 using Path = System.IO.Path;
@@ -78,7 +80,6 @@ namespace ModManager
         public string repath_path_path { get; set; } = "";
         public bool in_file_path { get; set; } = true;
         public bool cls_assets { get; set; } = true;
-        public string gamehashes_path { get; set; } = "cslol-tools\\hashes.game.txt";
         public string shaderhashes_path { get; set; } = "cslol-tools\\hashes.shaders.txt";
         public List<string> base_wad_path { get; set; } = [];
         public List<string> OldLookUp { get; set; } = [];
@@ -104,7 +105,7 @@ namespace ModManager
         public List<string> Missing_Files { get; set; } = new List<string>();
         public List<string> CharraBlackList = ["viegowraith"];
         public List<string> CharraBlackList_Lux = ["luxair", "luxdark", "luxfire", "luxice", "luxmagma", "luxmystic", "luxnature", "luxstorm", "luxwater"];
-        public uint bnk_version { get; set; } = 145; 
+        public uint bnk_version { get; set; } = 145;
         public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
         public List<ShaderEntry> shaders { get; set; } = null;
         public string ManfiestDL { get; set; } = Path.Combine("cslol-tools", "ManifestDownloader.exe");
@@ -189,7 +190,6 @@ namespace ModManager
         public FixerSettings Settings { get; private set; }
         private WadExtractor _wadExtractor;
         private PathFixer _pathFixer;
-        private Hashes _hashes;
         private IFixerLogger x;
 
         // Constants for Logging Colors
@@ -204,7 +204,6 @@ namespace ModManager
             Settings = new FixerSettings();
             _wadExtractor = new WadExtractor(Settings);
             _pathFixer = new PathFixer(Settings);
-            _hashes = new Hashes(Settings);
         }
 
         public static uint FNV1aHash(string input)
@@ -224,13 +223,6 @@ namespace ModManager
             return hash;
         }
 
-        public static ulong HashPath(string path, bool not_x16 = false)
-        {
-            string norm = path.Replace('\\', '/').ToLowerInvariant(); ;
-            byte[] data = Encoding.UTF8.GetBytes(norm);
-            ulong h = XxHash64.HashToUInt64(data, seed: 0);
-            return h;
-        }
         // League of legends Bin elements hash
         public enum Defi : uint
         {
@@ -447,7 +439,7 @@ namespace ModManager
             {
                 Hashes = new List<string> { shaderbinpath },
                 OutputPath = Settings.inputDir,
-                OutputString = $"{HashPath(shaderbinpath).ToString("x16")}.bin",
+                OutputString = $"{HashMaster.HashPath(shaderbinpath).ToString("x16")}.bin",
                 BinStringRef = null,
                 OriginalPath = shaderbinpath,
             };
@@ -472,9 +464,9 @@ namespace ModManager
                     var entryKey = (BinHash)kvp.Key;
                     var entryData = (BinEmbed)kvp.Value;
                     uint hash = entryKey.Value.Hash;
-                
+
                     if (hash == 0) continue;
-                
+
                     if (entryData.Name.Hash == 0x205255d6) // CustomShaderDef
                     {
                         existingHashes.Add(entryKey.Value.Hash);
@@ -589,7 +581,7 @@ namespace ModManager
             }
             else
             {
-                return (Shader.Hash, Shader.Path,"");
+                return (Shader.Hash, Shader.Path, "");
             }
         }
 
@@ -686,7 +678,7 @@ namespace ModManager
                         // linkedList.Items.AdFd(new BinString($"data/{name}_skin{skinNo}_concat.bin"));
                     }
                 }
-                if (Settings.Character.ToLower() == "lux" && Settings.skinNo==7)
+                if (Settings.Character.ToLower() == "lux" && Settings.skinNo == 7)
                 {
                     foreach (string luxi in Settings.CharraBlackList_Lux)
                     {
@@ -747,8 +739,8 @@ namespace ModManager
                         uint newRRHash = FNV1aHash($"Characters/{Settings.Character}/Skins/Skin{i}/Resources");
 
                         skinKeyRef.Value = new FNV1a(newSkinHash);
-                        if(rrLinkRef?.Value != null) rrLinkRef.Value = new FNV1a(newRRHash);
-                        if(rrKeyRef != null) rrKeyRef.Value = new FNV1a(newRRHash);
+                        if (rrLinkRef?.Value != null) rrLinkRef.Value = new FNV1a(newRRHash);
+                        if (rrKeyRef != null) rrKeyRef.Value = new FNV1a(newRRHash);
 
                         Save_Bin(linkedList, binentries, $"{Settings.outputDir}/{binPath}");
                     }
@@ -819,7 +811,7 @@ namespace ModManager
                     ToCheckup = _wadExtractor.FindAndSwapReferences(Settings.AllWadPaths, ToCheckup);
                     if (ToCheckup.Count > 0)
                     {
-                        ToCheckup = _hashes.FindMatches(ToCheckup);
+                        ToCheckup = HashMaster.FindMatches(ToCheckup);
                         ToCheckup.RemoveAll(t =>
                         {
                             if (t.Hashes.Count == 0)
@@ -873,7 +865,7 @@ namespace ModManager
                     foreach (var kv in Audio_to_dl)
                     {
                         string VO_path = Path.Combine("manifests", $".lang_{Settings.bnk_version}");
-                        string VO_wad = Path.Combine(VO_path, "DATA","FINAL","Champions",$"{Settings.Character}.{kv.Key}.wad.client");
+                        string VO_wad = Path.Combine(VO_path, "DATA", "FINAL", "Champions", $"{Settings.Character}.{kv.Key}.wad.client");
                         if (!File.Exists(VO_wad))
                         {
                             x.LowerLog($"[WAIT] Downloading {Settings.Character}.{kv.Key}.wad.client to fix events.bnk", CLR_MOD);
@@ -909,9 +901,9 @@ namespace ModManager
                         {
                             x.LowerLog($"[FIXI] Fixing VO", CLR_ACT);
                             var left = _wadExtractor.ExtractAndSwapReferences([VO_wad], kv.Value);
-                            if( left.Count != 0)
+                            if (left.Count != 0)
                             {
-                                left = _hashes.FindMatches(left);
+                                left = HashMaster.FindMatches(left);
                                 left = _wadExtractor.ExtractAndSwapReferences([VO_wad], kv.Value);
                             }
                             foreach (var tar in left)
@@ -959,7 +951,8 @@ namespace ModManager
                         }
 
                         processing.Remove(target);
-                    }else if (ver > Settings.bnk_version)
+                    }
+                    else if (ver > Settings.bnk_version)
                     {
                         x.LowerLog("[INFO] UR APP NEED UPDATE BTW, DID U KNOW THAT?????", CLR_GOOD);
                     }
@@ -1021,7 +1014,7 @@ namespace ModManager
             if (Settings.binless)
             {
                 x.LowerLog("[CHEK] Double checking files . . .", CLR_ACT);
-                processing = _hashes.FindMatches(processing);
+                processing = HashMaster.FindMatches(processing);
                 processing.RemoveAll(t =>
                 {
                     if (t.Hashes.Count == 0)
@@ -1133,7 +1126,7 @@ namespace ModManager
                         }
                     }
                     var leftover = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bnk);
-                    leftover = _hashes.FindMatches(leftover);
+                    leftover = HashMaster.FindMatches(leftover);
                     _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, leftover);
                 }
             }
@@ -1153,7 +1146,7 @@ namespace ModManager
                 return processing;
             }
             // Use _hashes instance
-            processing = _hashes.FindMatches(processing);
+            processing = HashMaster.FindMatches(processing);
 
             processing.RemoveAll(t =>
             {
@@ -1213,7 +1206,7 @@ namespace ModManager
             }
             else
             {
-                string hashed = $"{HashPath(path).ToString("x16")}.bin";
+                string hashed = $"{HashMaster.HashPath(path).ToString("x16")}.bin";
                 if (!File.Exists($"{Settings.inputDir}/{hashed}")) return null;
                 var data = File.ReadAllBytes($"{Settings.inputDir}/{hashed}");
                 return new BinReader(data).Read();
@@ -1226,7 +1219,7 @@ namespace ModManager
             foreach (string path in bins_to_check)
             {
                 if (File.Exists($"{Settings.inputDir}/{path}")) continue;
-                string hashed = $"{HashPath(path).ToString("x16")}.bin";
+                string hashed = $"{HashMaster.HashPath(path).ToString("x16")}.bin";
                 if (File.Exists($"{Settings.inputDir}/{hashed}")) continue;
 
                 WadExtractor.Target found = bins_hashed.FirstOrDefault(t => t.OriginalPath == hashed);
@@ -1272,7 +1265,7 @@ namespace ModManager
 
             bins_hashed = _wadExtractor.ExtractAndSwapReferences(Settings.AllWadPaths, bins_hashed);
             if (bins_hashed.Count() < 1) return null;
-            bins_hashed = _hashes.FindMatches(bins_hashed, false);
+            bins_hashed = HashMaster.FindMatches(bins_hashed, false);
 
             bins_hashed.RemoveAll(t =>
             {
@@ -1344,6 +1337,7 @@ namespace ModManager
 
             var collectedIcons = new List<WadExtractor.Target>();
             var collectedIconsFiles = new List<WadExtractor.TargetFile>();
+            Merge_files_into_string_target(collectedIcons, collectedIconsFiles);
             foreach (var kvp in Elements.Values)
             {
                 FindStringsRecursive(kvp.Value, collectedIcons, collectedIconsFiles);
@@ -1362,7 +1356,7 @@ namespace ModManager
 "assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_5.tex", "assets/characters/samira/skins/skin30/particles/samira_skin30_z_stylemeter_letter_6.tex",];
                 foreach (string rank in ranks)
                 {
-                    collectedIcons.Add(new WadExtractor.Target { OriginalPath = rank, Hashes = [rank.Replace(".tex", ".dds"), rank], OutputPath = Settings.outputDir, OutputString =rank, BinStringRef=null});
+                    collectedIcons.Add(new WadExtractor.Target { OriginalPath = rank, Hashes = [rank.Replace(".tex", ".dds"), rank], OutputPath = Settings.outputDir, OutputString = rank, BinStringRef = null });
                 }
             }
             foreach (var tar in collectedIcons)
@@ -1416,10 +1410,12 @@ namespace ModManager
                 {
                     bin = LoadBin(path);
                 }
-                catch (Exception e){
+                catch (Exception e)
+                {
                     x.UpperLog($"[FAIL] Failed to read {trimmedPath}, {e}", CLR_ERR);
                     Settings.Missing_Bins.Add($"[Read Error] {path}");
-                    continue; }
+                    continue;
+                }
                 if (bin == null) continue;
 
                 Console.WriteLine($"Loaded: {path}");
@@ -1804,7 +1800,8 @@ namespace ModManager
                 }
             }
 
-            if (Settings.FixiShape) {
+            if (Settings.FixiShape)
+            {
                 foreach (var entry in VFXEntries)
                 {
                     // Ensure we are working with a BinEmbed (the root definition)
@@ -2069,8 +2066,8 @@ namespace ModManager
 
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
-                if (Settings.CharraBlackList_Lux.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase) && Settings.skinNo!=7) continue;  
-                if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false, ""));  
+                if (Settings.CharraBlackList_Lux.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase) && Settings.skinNo != 7) continue;
+                if (!Settings.CharraBlackList.Contains(characterToLoad, StringComparer.OrdinalIgnoreCase)) Characters.Enqueue((characterToLoad, Settings.skinNo, false, ""));
             }
 
             var finalMap = new BinMap(BinType.Hash, BinType.Embed);
@@ -2144,7 +2141,7 @@ namespace ModManager
             // rootValue is the 0xbc037de7 container
             List<BinField>? tableData = GetItemsFromBinValue(rootValue);
             if (tableData == null) return;
-        
+
             foreach (var td in tableData)
             {
                 if (td.Key.Hash == 0xa7084719) // "list[pointer]" usually
@@ -2156,7 +2153,7 @@ namespace ModManager
                         {
                             List<BinField>? smollShits = GetItemsFromBinValue(shit);
                             if (smollShits == null) continue;
-        
+
                             foreach (var smoll_shit in smollShits)
                             {
                                 if (smoll_shit.Key.Hash == 0xe44b7382)
@@ -2166,7 +2163,7 @@ namespace ModManager
                                     {
                                         float d0 = (f32List.Items[0] as BinF32)?.Value ?? -999;
                                         float d1 = (f32List.Items[1] as BinF32)?.Value ?? -999;
-        
+
                                         if (d0 == 0 && d1 >= 1)
                                         {
                                             flags = true;
@@ -2185,13 +2182,13 @@ namespace ModManager
                 }
             }
         }
-        
+
         private void AnalyzeNestedTableForRotation(BinValue rootValue, ref bool emitRotation)
         {
             // rootValue is 0xbc037de7 container
             List<BinField>? tableData = GetItemsFromBinValue(rootValue);
             if (tableData == null) return;
-        
+
             foreach (var td in tableData)
             {
                 if (td.Key.Hash == 0xa7084719)
@@ -2202,7 +2199,7 @@ namespace ModManager
                         {
                             List<BinField>? smollShits = GetItemsFromBinValue(shit);
                             if (smollShits == null) continue;
-        
+
                             foreach (var smoll_shit in smollShits)
                             {
                                 if (smoll_shit.Key.Hash == 0xe44b7382)
@@ -2211,7 +2208,7 @@ namespace ModManager
                                     {
                                         float d0 = (f32List.Items[0] as BinF32)?.Value ?? -999;
                                         float d1 = (f32List.Items[1] as BinF32)?.Value ?? -999;
-        
+
                                         if (d0 == 0 && d1 > 1)
                                         {
                                             emitRotation = true;
@@ -2231,74 +2228,108 @@ namespace ModManager
             HashMaster.ResolveTargetFilePathsAsync(files);
             foreach (var file in files)
             {
-                string s = file.path;
-                var string_out = s;
-                if (!Settings.binless)
+                if (file.path is not null)
                 {
-                    string_out = _pathFixer.FixPath(s);
+                    string s = file.path;
+                    var string_out = s;
+                    if (!Settings.binless)
+                    {
+                        string_out = _pathFixer.FixPath(s);
 
-                }
-                var hashes = new List<string> { s };
+                    }
+                    var hashes = new List<string> { s };
 
-                if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                    hashes.Add(Path.ChangeExtension(s, ".dds"));
-                if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                    hashes.Add(Path.ChangeExtension(s, ".tex"));
-                if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
-                {
-                    string_out.Replace(".sco", ".scb");
-                    hashes.Add(Path.ChangeExtension(s, ".scb"));
-                }
-                if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
-                    hashes.Add(Path.ChangeExtension(s, ".sco"));
+                    if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                        hashes.Add(Path.ChangeExtension(s, ".dds"));
+                    if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                        hashes.Add(Path.ChangeExtension(s, ".tex"));
+                    if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string_out.Replace(".sco", ".scb");
+                        hashes.Add(Path.ChangeExtension(s, ".scb"));
+                    }
+                    if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
+                        hashes.Add(Path.ChangeExtension(s, ".sco"));
 
-                if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
-                    hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
-                if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
-                    hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
+                    if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
+                        hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
+                    if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
+                        hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                WadExtractor.Target found = results.FirstOrDefault(t =>
-                {
-                    // 1. Check for an exact match first
-                    if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
-                        return true;
-
-                    // 2. Check for interchangeable extensions (.dds <-> .tex)
-                    string ext = Path.GetExtension(s);
-                    if (string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(ext, ".tex", StringComparison.OrdinalIgnoreCase))
+                    WadExtractor.Target found = results.FirstOrDefault(t =>
                     {
-                        string baseName = Path.ChangeExtension(s, null); // Get path without extension
-                        string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
-                        string alternativePath = baseName + targetExt;
+                        // 1. Check for an exact match first
+                        if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
+                            return true;
 
-                        return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
-                    }
+                        // 2. Check for interchangeable extensions (.dds <-> .tex)
+                        string ext = Path.GetExtension(s);
+                        if (string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(ext, ".tex", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string baseName = Path.ChangeExtension(s, null); // Get path without extension
+                            string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
+                            string alternativePath = baseName + targetExt;
 
-                    if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string alternativePath = Path.ChangeExtension(s, "scb");
+                            return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                        }
 
-                        return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
-                    }
-                    return false;
-                });
+                        if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string alternativePath = Path.ChangeExtension(s, "scb");
+
+                            return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                        }
+                        return false;
+                    });
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-                if (found != null)
-                {
-                    found.BinFileRef.AddRange(file.BinFileRef);
+                    if (found != null)
+                    {
+                        x.UpperLog($"{found.BinFileRef.Count}");
+                        x.UpperLog($"{file.BinFileRef.Count}");
+                        x.UpperLog($"---");
+                        found.BinFileRef.AddRange(file.BinFileRef);
+                    }
+                    else
+                    {
+                        results.Add(new WadExtractor.Target
+                        {
+                            BinFileRef = file.BinFileRef,
+                            OriginalPath = s,
+                            Hashes = hashes,
+                            OutputPath = Settings.outputDir,
+                            OutputString = string_out,
+                        });
+                    }
                 }
                 else
                 {
-                    results.Add(new WadExtractor.Target
+                    string s = $"{file.hash:x16}";
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+                    WadExtractor.Target found = results.FirstOrDefault(t =>
                     {
-                        BinFileRef = file.BinFileRef,
-                        OriginalPath = s,
-                        Hashes = hashes,
-                        OutputPath = Settings.outputDir,
-                        OutputString = string_out,
+                        // 1. Check for an exact match first
+                        if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                        return false;
                     });
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+                    if (found != null)
+                    {
+                        found.BinFileRef.AddRange(file.BinFileRef);
+                    }
+                    else
+                    {
+                        results.Add(new WadExtractor.Target
+                        {
+                            BinFileRef = file.BinFileRef,
+                            OriginalPath = s,
+                            Hashes = [s],
+                            OutputPath = Settings.outputDir,
+                            OutputString = s,
+                        });
+                    }
                 }
             }
         }
@@ -2316,76 +2347,76 @@ namespace ModManager
 
                     if (!string.IsNullOrWhiteSpace(s) && s.Contains('.') && s.Contains('/'))
                     {
-                            var string_out = s;
-                            if (!Settings.binless)
-                            {
-                                string_out = _pathFixer.FixPath(s);
+                        var string_out = s;
+                        if (!Settings.binless)
+                        {
+                            string_out = _pathFixer.FixPath(s);
 
-                            }
-                            var hashes = new List<string> { s };
+                        }
+                        var hashes = new List<string> { s };
 
-                            if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                                hashes.Add(Path.ChangeExtension(s, ".dds"));
-                            if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                                hashes.Add(Path.ChangeExtension(s, ".tex"));
-                            if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
-                            {
-                                string_out.Replace(".sco", ".scb");
-                                hashes.Add(Path.ChangeExtension(s, ".scb"));
-                            }
-                            if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
-                                hashes.Add(Path.ChangeExtension(s, ".sco"));
+                        if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                            hashes.Add(Path.ChangeExtension(s, ".dds"));
+                        if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                            hashes.Add(Path.ChangeExtension(s, ".tex"));
+                        if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string_out.Replace(".sco", ".scb");
+                            hashes.Add(Path.ChangeExtension(s, ".scb"));
+                        }
+                        if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
+                            hashes.Add(Path.ChangeExtension(s, ".sco"));
 
-                            if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
-                                hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
-                            if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
-                                hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
+                        if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
+                            hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
+                        if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
+                            hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                            WadExtractor.Target found = results.FirstOrDefault(t =>
+                        WadExtractor.Target found = results.FirstOrDefault(t =>
+                        {
+                            // 1. Check for an exact match first
+                            if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
+                                return true;
+
+                            // 2. Check for interchangeable extensions (.dds <-> .tex)
+                            string ext = Path.GetExtension(s);
+                            if (string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(ext, ".tex", StringComparison.OrdinalIgnoreCase))
                             {
-                                // 1. Check for an exact match first
-                                if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
-                                    return true;
+                                string baseName = Path.ChangeExtension(s, null); // Get path without extension
+                                string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
+                                string alternativePath = baseName + targetExt;
 
-                                // 2. Check for interchangeable extensions (.dds <-> .tex)
-                                string ext = Path.GetExtension(s);
-                                if (string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(ext, ".tex", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    string baseName = Path.ChangeExtension(s, null); // Get path without extension
-                                    string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
-                                    string alternativePath = baseName + targetExt;
+                                return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                            }
 
-                                    return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
-                                }
+                            if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string alternativePath = Path.ChangeExtension(s, "scb");
 
-                                if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    string alternativePath = Path.ChangeExtension(s, "scb");
+                                return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                            }
 
-                                    return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
-                                }
-
-                                return false;
-                            });
+                            return false;
+                        });
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-                            if (found != null)
+                        if (found != null)
+                        {
+                            found.BinStringRef.Add(str);
+                        }
+                        else
+                        {
+                            results.Add(new WadExtractor.Target
                             {
-                                found.BinStringRef.Add(str);
-                            }
-                            else
-                            {
-                                results.Add(new WadExtractor.Target
-                                {
-                                    BinStringRef = [str],
-                                    OriginalPath = s,
-                                    Hashes = hashes,
-                                    OutputPath = Settings.outputDir,
-                                    OutputString = string_out,
-                                });
-                            }
-                        
+                                BinStringRef = [str],
+                                OriginalPath = s,
+                                Hashes = hashes,
+                                OutputPath = Settings.outputDir,
+                                OutputString = string_out,
+                            });
+                        }
+
                     }
                     break;
 
@@ -2399,11 +2430,12 @@ namespace ModManager
                         existingFile.BinFileRef?.Add(fileNode);
                     }
                     else
-                    {files.Add(new WadExtractor.TargetFile
+                    {
+                        files.Add(new WadExtractor.TargetFile
                         {
-                        BinFileRef = [fileNode],
-                        hash = hash
-                    });
+                            BinFileRef = [fileNode],
+                            hash = hash
+                        });
                     }
                     break;
 
@@ -2467,7 +2499,6 @@ namespace ModManager
         {
             private FixerSettings _settings;
             public IFixerLogger x;
-            public Hashes _hash;
 
             // Reusing log colors from parent
             private const string CLR_ACT = "#2a84d2";
@@ -2489,7 +2520,7 @@ namespace ModManager
                 for (int i = 0; i < 100; i++)
                 {
                     string path = $"data/characters/{character}/skins/skin{i}.bin";
-                    skinHashes[Repatheruwu.HashPath(path)] = i;
+                    skinHashes[HashMaster.HashPath(path)] = i;
                 }
 
                 byte[] entryBuffer = new byte[32];
@@ -2514,7 +2545,7 @@ namespace ModManager
                                 continue;
                             }
 
-                            relativePath = $"{Repatheruwu.HashPath(relativePath):8}.bin";
+                            relativePath = $"{HashMaster.HashPath(relativePath):8}.bin";
 
                             // Combine the directory with the relative path
                             fullPath = Path.Combine(wadPath, relativePath);
@@ -2606,13 +2637,13 @@ namespace ModManager
                         else
                         {
                             // Root file, but not a valid hash name -> Hash the path normally
-                            pathHash = Repatheruwu.HashPath(wadPath);
+                            pathHash = HashMaster.HashPath(wadPath);
                         }
                     }
                     else
                     {
                         // File is in a subdirectory -> Hash the path normally
-                        pathHash = Repatheruwu.HashPath(wadPath);
+                        pathHash = HashMaster.HashPath(wadPath);
                     }
                     // --- End of Modified Logic ---
 
@@ -2675,7 +2706,7 @@ namespace ModManager
             }
             public (uint version, uint id) CheckLanguageID(List<string> wadPaths, string target)
             {
-                ulong targetHash = Repatheruwu.HashPath(target);
+                ulong targetHash = HashMaster.HashPath(target);
                 byte[] entryBuffer = new byte[32];
 
                 foreach (var wadPath in wadPaths)
@@ -2747,10 +2778,10 @@ namespace ModManager
             }
             public class Target
             {
-                public List<BinString> BinStringRef { get; set; }
-                public List<BinFile> BinFileRef { get; set; }
+                public List<BinString> BinStringRef { get; set; } = new List<BinString>();
+                public List<BinFile> BinFileRef { get; set; } = new List<BinFile>();
                 public string OriginalPath { get; set; }
-                public List<ulong> Hashes { get; set; }
+                public List<string> Hashes { get; set; }
                 public string OutputPath { get; set; }
                 public string OutputString { get; set; }
             }
@@ -2787,7 +2818,7 @@ namespace ModManager
                     for (int i = 0; i < t.Hashes.Count; i++)
                     {
                         var h = t.Hashes[i];
-                        ulong hashVal = Repatheruwu.HashPath(h);
+                        ulong hashVal = HashMaster.HashPath(h);
                         if (!lookup.ContainsKey(hashVal))
                         {
                             lookup[hashVal] = (t, Path.GetExtension(h), i);
@@ -2847,7 +2878,7 @@ namespace ModManager
                         foreach (var job in jobs)
                         {
                             foreach (var h in job.Target.Hashes)
-                                lookup.Remove(Repatheruwu.HashPath(h));
+                                lookup.Remove(HashMaster.HashPath(h));
                         }
 
                         if (jobs.Count == 0) continue;
@@ -2918,7 +2949,7 @@ namespace ModManager
                                     : final_out;
 
                                 string ext = Path.GetExtension(job.Target.OriginalPath);
-                                if (ext.ToLower()!=".bin")
+                                if (ext.ToLower() != ".bin")
                                 {
                                     string left = job.Target.OriginalPath.Length > 55
         ? $"{job.Target.OriginalPath[..26]}...{job.Target.OriginalPath[^26..]}"
@@ -2934,6 +2965,13 @@ namespace ModManager
                                     foreach (BinString s in job.Target.BinStringRef)
                                     {
                                         s.Value = final_out;
+                                    }
+                                }
+                                if (job.Target.BinFileRef != null)
+                                {
+                                    foreach (BinFile s in job.Target.BinFileRef)
+                                    {
+                                        s.Value = new XXH64 { Hash = HashMaster.HashPath(final_out) };
                                     }
                                 }
                                 targets.Remove(job.Target);
@@ -2966,7 +3004,7 @@ namespace ModManager
                     for (int i = 0; i < t.Hashes.Count; i++)
                     {
                         var h = t.Hashes[i];
-                        ulong hashVal = Repatheruwu.HashPath(h);
+                        ulong hashVal = HashMaster.HashPath(h);
 
                         // Only add if not already present (prioritizing the first occurrence if duplicates exist)
                         if (!lookup.ContainsKey(hashVal))
@@ -3032,7 +3070,7 @@ namespace ModManager
                             // Remove all hashes for this target from lookup so we don't process it again in other WADs
                             foreach (var h in t.Hashes)
                             {
-                                lookup.Remove(Repatheruwu.HashPath(h));
+                                lookup.Remove(HashMaster.HashPath(h));
                             }
 
                             if (t.BinStringRef != null)
@@ -3041,6 +3079,10 @@ namespace ModManager
                                 foreach (BinString s in t.BinStringRef)
                                 {
                                     s.Value = foundString;
+                                }
+                                foreach (BinFile f in t.BinFileRef)
+                                {
+                                    f.Value = new XXH64 { Hash = HashMaster.HashPath(foundString) };
                                 }
 
                                 // --- Logging (Reusing your style) ---
@@ -3121,7 +3163,7 @@ namespace ModManager
                         .ToLowerInvariant();
 
                     // cslol-tools uses XXH64 for path hashing
-                    ulong pathHash = Repatheruwu.HashPath(relativePath);
+                    ulong pathHash = HashMaster.HashPath(relativePath);
                     byte[] originalBytes = File.ReadAllBytes(file);
 
                     // Logic matches cslol-tools (Magic bytes are safer, but extension works for basic mods)
@@ -3388,7 +3430,8 @@ namespace ModManager
                     if (rootIndex != -1) break;
                 }
 
-                if (rootIndex == -1) {
+                if (rootIndex == -1)
+                {
                     string ext = parts.Length > 0
                     ? Path.GetExtension(parts[^1]).ToLower()
                     : "";
@@ -3398,7 +3441,8 @@ namespace ModManager
                     var list = parts.ToList();
                     list.Insert(0, prefixRoot);
                     parts = list.ToArray();
-                } else
+                }
+                else
                 {
                     parts = parts.Skip(rootIndex).ToArray();
                 }
@@ -3450,112 +3494,6 @@ namespace ModManager
             }
         }
 
-        public class Hashes
-        {
-            private FixerSettings _settings;
-            private List<string> _cachedPaths;
-            public FixerUI x;
-
-            public Hashes(FixerSettings settings)
-            {
-                _settings = settings;
-            }
-
-            private List<string> LoadPathsOnly(string path)
-            {
-                var paths = new List<string>();
-
-                if (!File.Exists(path)) return paths;
-
-                foreach (var line in File.ReadLines(path))
-                {
-                    int spaceIndex = line.IndexOf(' ');
-                    if (spaceIndex >= 0 && spaceIndex < line.Length - 1)
-                    {
-                        paths.Add(line.Substring(spaceIndex + 1).Trim());
-                    }
-                }
-
-                return paths;
-            }
-
-            private List<string> GetCachedPaths()
-            {
-                if (_cachedPaths == null)
-                {
-                    _cachedPaths = LoadPathsOnly(_settings.gamehashes_path);
-                }
-                return _cachedPaths;
-            }
-
-            public List<WadExtractor.Target> FindMatches(List<WadExtractor.Target> targets, bool useBaseName = true)
-            {
-                var loadedPaths = GetCachedPaths();
-                loadedPaths.AddRange(bonusPaths);
-
-                foreach (var target in targets)
-                {
-                    target.Hashes = new List<string>();
-
-                    if (string.IsNullOrEmpty(target.OriginalPath)) continue;
-
-                    string searchTerm = useBaseName
-                        ? GetBaseName(target.OriginalPath)
-                        : GetDataRelativePath(target.OriginalPath);
-
-                    if (string.IsNullOrWhiteSpace(searchTerm)) continue;
-
-                    string targetExt = Path.GetExtension(target.OriginalPath).ToLowerInvariant();
-
-                    foreach (var path in loadedPaths)
-                    {
-                        if (path.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase) < 0)
-                            continue;
-
-                        string pathExt = Path.GetExtension(path).ToLowerInvariant();
-
-                        if (pathExt == targetExt ||
-                            (targetExt == ".sco" && pathExt == ".scb") ||
-                            (targetExt == ".dds" && pathExt == ".tex") ||
-                            (targetExt == ".tex" && pathExt == ".dds")
-                            )
-                        {
-                            target.Hashes.Add(path);
-                        }
-                    }
-                    if (!useBaseName && target.Hashes.Count > 1)
-                    {
-                        target.Hashes.Sort((a, b) => b.Length.CompareTo(a.Length));
-                    }
-                }
-
-                return targets;
-            }
-
-            private static string GetBaseName(string path)
-            {
-                return path
-                    .Replace("\\", "/")
-                    .Split('/')
-                    .Last()
-                    .Split('.')
-                    .First()
-                    .ToLowerInvariant();
-            }
-
-            private string GetDataRelativePath(string path)
-            {
-                string p = path.Replace("\\", "/").ToLowerInvariant();
-                int idx = p.IndexOf("data/", StringComparison.OrdinalIgnoreCase);
-
-                string relative = (idx != -1) ? p.Substring(idx + 5) : p;
-                if (relative.Length == 0) return "";
-
-                int cutoff = (int)Math.Round(relative.Length * (_settings.percent / 100.0));
-                return relative.Substring(0, cutoff);
-            }
-
-        }
 
     }
     public enum SOFlag : uint

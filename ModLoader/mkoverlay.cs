@@ -129,7 +129,7 @@ namespace ModLoader
                 if (!relPath.Contains('/') && ulong.TryParse(Path.GetFileNameWithoutExtension(file), System.Globalization.NumberStyles.HexNumber, null, out ulong mh))
                     pathHash = mh;
                 else
-                    pathHash = Repatheruwu.HashPath(relPath);
+                    pathHash = HashMaster.HashPath(relPath);
 
                 bool shouldStayRaw = RawExtensions.Contains(Path.GetExtension(file)) || raw.Length < 128;
 
