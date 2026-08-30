@@ -30,7 +30,7 @@
                               SelectionChanged="ShowSelectedLayerSetting"
                               Margin="0,0,5,0"/>
 
-                    <Button x:Name="FixingIcon" Style="{StaticResource roundHighlight}" IsEnabled="False"
+                    <Button x:Name="FixingIcon" Style="{StaticResource roundHighlight}"
                             ToolTip="Fixing" Cursor="Hand" Click="Fixer_settings_panel_open"
                             BorderThickness="0" Background="Transparent" Visibility="Collapsed">
                         <TextBlock Text="🔧" Style="{StaticResource IconTextBlockStyle}" 
@@ -123,7 +123,6 @@
                    Margin="8,5,4,5"/>
 
                     <Button Style="{StaticResource roundHighlight}"
-                            IsEnabled="False"
                 ToolTip="Fixing"
                 Cursor="Hand"
                 Click="Fixer_settings_panel_open"
@@ -133,7 +132,6 @@
                 VerticalAlignment="Center">
 
                         <TextBlock Text="🔧" x:Name="whenrun" Visibility="Collapsed"
-                            IsEnabled="False"
                        Style="{StaticResource IconTextBlockStyle}"
                        Foreground="White"
                        FontSize="15"

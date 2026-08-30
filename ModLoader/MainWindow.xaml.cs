@@ -1787,7 +1787,8 @@ try
                 }
                 update_tile_contrains();
 
-                await PreCacheAllUIElements();
+                // await PreCacheAllUIElements();
+
                 ToggleOverlayRow.SizeChanged += (s, e) => SetProgress();
 
                 _isInitializing = false;

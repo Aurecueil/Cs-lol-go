@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static ModManager.Repatheruwu;
 
 public static class HashMaster
 {
@@ -288,6 +289,119 @@ public static class HashMaster
 
         return results;
     }
+
+    // --- ASYNC BATCH RESOLVER ---
+    public static async Task ResolveTargetFilePathsAsync(
+        IEnumerable<WadExtractor.TargetFile> targets,
+        CancellationToken ct = default)
+    {
+        await Lock.WaitAsync(ct);
+        try
+        {
+            EnsureLoaded();
+            ResetTimer();
+
+            ResolveTargetFilePathsInternal(targets);
+        }
+        finally
+        {
+            Lock.Release();
+        }
+    }
+    // --- ADD TEMPORARY HASHES FROM FILE ---
+    public static async Task AddTemporaryHashesFromFileAsync(string textFilePath, CancellationToken ct = default)
+    {
+        if (!File.Exists(textFilePath)) return;
+
+        await Lock.WaitAsync(ct);
+        try
+        {
+            EnsureLoaded();
+            ResetTimer();
+
+            using var fs = new FileStream(textFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan);
+            using var reader = new StreamReader(fs, Encoding.UTF8);
+
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
+            {
+                // Skip empty/whitespace-only lines if needed
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                line = line.Trim();
+                _customEntries![HashPath(line)] = line;
+            }
+        }
+        finally
+        {
+            Lock.Release();
+        }
+    }
+    // --- SYNCHRONOUS IN-PLACE RESOLVER ---
+    private static void ResolveTargetFilePathsInternal(IEnumerable<WadExtractor.TargetFile> targets)
+    {
+        // Fast paths if no index data exists
+        bool hasCustom = _customEntries is { Count: > 0 };
+        bool hasGameData = _index is { Length: > 0 } && _stringArena != null;
+
+        if (!hasCustom && !hasGameData) return;
+
+        ReadOnlySpan<HashIndexRecord> index = hasGameData ? _index.AsSpan() : default;
+
+        foreach (var target in targets)
+        {
+            if (target == null) continue;
+
+            ulong h = target.hash;
+
+            // 1. Check custom entries dictionary first
+            if (hasCustom && _customEntries!.TryGetValue(h, out string? customPath))
+            {
+                target.path = customPath;
+                continue;
+            }
+
+            // 2. Binary search game hashes
+            if (hasGameData)
+            {
+                string? gamePath = LookupGameHashDirect(h, index);
+                if (gamePath != null)
+                {
+                    target.path = gamePath;
+                }
+            }
+        }
+    }
+
+    // Direct span-based lookup without null checks on every loop cycle
+    private static string? LookupGameHashDirect(ulong targetHash, ReadOnlySpan<HashIndexRecord> index)
+    {
+        int low = 0;
+        int high = index.Length - 1;
+
+        while (low <= high)
+        {
+            int mid = low + ((high - low) >> 1);
+            ref readonly var record = ref index[mid];
+
+            if (record.Hash < targetHash)
+            {
+                low = mid + 1;
+            }
+            else if (record.Hash > targetHash)
+            {
+                high = mid - 1;
+            }
+            else
+            {
+                ReadOnlySpan<byte> strBytes = _stringArena.AsSpan(record.StringOffset, record.StringLength);
+                return Encoding.UTF8.GetString(strBytes);
+            }
+        }
+
+        return null;
+    }
+
 
     // --- ADD CUSTOM HASHES ---
     public static async Task AddCustomHashesAsync(IEnumerable<string> paths, CancellationToken ct = default)

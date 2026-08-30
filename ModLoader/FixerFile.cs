@@ -10,8 +10,10 @@ using System.Net.Http;
 using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Documents;
 using ZstdSharp;
+using static ModManager.Repatheruwu.WadExtractor;
 using static System.Net.Mime.MediaTypeNames;
 using Path = System.IO.Path;
 using SearchOption = System.IO.SearchOption;
@@ -1341,9 +1343,10 @@ namespace ModManager
             }
 
             var collectedIcons = new List<WadExtractor.Target>();
+            var collectedIconsFiles = new List<WadExtractor.TargetFile>();
             foreach (var kvp in Elements.Values)
             {
-                FindStringsRecursive(kvp.Value, collectedIcons);
+                FindStringsRecursive(kvp.Value, collectedIcons, collectedIconsFiles);
             }
 
             collectedIcons.RemoveAll(target =>
@@ -1383,6 +1386,7 @@ namespace ModManager
             var OtherEntries = new Dictionary<uint, KeyValuePair<BinValue, BinValue>>();
 
             var collectedStrings = new List<WadExtractor.Target>();
+            var collectedFiles = new List<WadExtractor.TargetFile>();
 
             var loaded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var loaded_linked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -2048,7 +2052,7 @@ namespace ModManager
             {
                 foreach (var kvp in source.Values)
                 {
-                    FindStringsRecursive(kvp.Value, collectedStrings);
+                    FindStringsRecursive(kvp.Value, collectedStrings, collectedFiles);
                 }
             }
 
@@ -2060,6 +2064,8 @@ namespace ModManager
             ScanStrings(CACEntries);
             ScanStrings(AnimEntries);
             ScanStrings(OtherEntries);
+
+            Merge_files_into_string_target(collectedStrings, collectedFiles);
 
             foreach (string characterToLoad in ExtraCharactersToLoad)
             {
@@ -2220,23 +2226,96 @@ namespace ModManager
             }
         }
 
-        public void FindStringsRecursive(BinValue value, List<WadExtractor.Target> results)
+        public void Merge_files_into_string_target(List<WadExtractor.Target> results, List<WadExtractor.TargetFile> files)
+        {
+            HashMaster.ResolveTargetFilePathsAsync(files);
+            foreach (var file in files)
+            {
+                string s = file.path;
+                var string_out = s;
+                if (!Settings.binless)
+                {
+                    string_out = _pathFixer.FixPath(s);
+
+                }
+                var hashes = new List<string> { s };
+
+                if (s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                    hashes.Add(Path.ChangeExtension(s, ".dds"));
+                if (s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                    hashes.Add(Path.ChangeExtension(s, ".tex"));
+                if (s.EndsWith(".sco", StringComparison.OrdinalIgnoreCase))
+                {
+                    string_out.Replace(".sco", ".scb");
+                    hashes.Add(Path.ChangeExtension(s, ".scb"));
+                }
+                if (s.EndsWith(".scb", StringComparison.OrdinalIgnoreCase))
+                    hashes.Add(Path.ChangeExtension(s, ".sco"));
+
+                if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2_slow.anm")
+                    hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_2.anm");
+                if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
+                    hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
+
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+                WadExtractor.Target found = results.FirstOrDefault(t =>
+                {
+                    // 1. Check for an exact match first
+                    if (string.Equals(t.OriginalPath, s, StringComparison.OrdinalIgnoreCase))
+                        return true;
+
+                    // 2. Check for interchangeable extensions (.dds <-> .tex)
+                    string ext = Path.GetExtension(s);
+                    if (string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(ext, ".tex", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string baseName = Path.ChangeExtension(s, null); // Get path without extension
+                        string targetExt = string.Equals(ext, ".dds", StringComparison.OrdinalIgnoreCase) ? ".tex" : ".dds";
+                        string alternativePath = baseName + targetExt;
+
+                        return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (string.Equals(ext, ".sco", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string alternativePath = Path.ChangeExtension(s, "scb");
+
+                        return string.Equals(t.OriginalPath, alternativePath, StringComparison.OrdinalIgnoreCase);
+                    }
+                    return false;
+                });
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+                if (found != null)
+                {
+                    found.BinFileRef.AddRange(file.BinFileRef);
+                }
+                else
+                {
+                    results.Add(new WadExtractor.Target
+                    {
+                        BinFileRef = file.BinFileRef,
+                        OriginalPath = s,
+                        Hashes = hashes,
+                        OutputPath = Settings.outputDir,
+                        OutputString = string_out,
+                    });
+                }
+            }
+        }
+        public void FindStringsRecursive(BinValue value, List<WadExtractor.Target> results, List<WadExtractor.TargetFile> files)
         {
             if (value is null) return;
 
             // Recursive Action helper
-            void Recurse(BinValue v) => FindStringsRecursive(v, results);
+            void Recurse(BinValue v) => FindStringsRecursive(v, results, files);
 
             switch (value)
             {
                 case BinString str:
                     string s = str.Value;
 
-                    if (!string.IsNullOrWhiteSpace(s) && s.Contains('.'))
+                    if (!string.IsNullOrWhiteSpace(s) && s.Contains('.') && s.Contains('/'))
                     {
-                        int lastDot = s.LastIndexOf('.');
-                        if (lastDot < s.Length - 1 && (s.Length - lastDot) <= 6)
-                        {
                             var string_out = s;
                             if (!Settings.binless)
                             {
@@ -2262,6 +2341,7 @@ namespace ModManager
                             if (s.ToLower() == "assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1_slow.anm")
                                 hashes.Add("assets/characters/taliyah/skins/base/particles/taliyah_base_e_stone_mine_1.anm");
 
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                             WadExtractor.Target found = results.FirstOrDefault(t =>
                             {
                                 // 1. Check for an exact match first
@@ -2289,6 +2369,7 @@ namespace ModManager
 
                                 return false;
                             });
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
                             if (found != null)
                             {
                                 found.BinStringRef.Add(str);
@@ -2304,9 +2385,28 @@ namespace ModManager
                                     OutputString = string_out,
                                 });
                             }
-                        }
+                        
                     }
                     break;
+
+                // --- BinFile Handling ---
+                case BinFile fileNode when fileNode.Value.Hash != 0:
+                    ulong hash = fileNode.Value.Hash;
+                    WadExtractor.TargetFile? existingFile = results.OfType<WadExtractor.TargetFile>().FirstOrDefault(t => t.hash == hash);
+
+                    if (existingFile != null)
+                    {
+                        existingFile.BinFileRef?.Add(fileNode);
+                    }
+                    else
+                    {files.Add(new WadExtractor.TargetFile
+                        {
+                        BinFileRef = [fileNode],
+                        hash = hash
+                    });
+                    }
+                    break;
+
 
                 // --- Container Traversal ---
                 case BinEmbed embed:
@@ -2648,10 +2748,18 @@ namespace ModManager
             public class Target
             {
                 public List<BinString> BinStringRef { get; set; }
+                public List<BinFile> BinFileRef { get; set; }
                 public string OriginalPath { get; set; }
-                public List<string> Hashes { get; set; }
+                public List<ulong> Hashes { get; set; }
                 public string OutputPath { get; set; }
                 public string OutputString { get; set; }
+            }
+
+            public class TargetFile
+            {
+                public List<BinFile> BinFileRef { get; set; }
+                public ulong hash { get; set; }
+                public string path { get; set; }
             }
 
             private struct ExtractionJob

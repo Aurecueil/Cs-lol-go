@@ -850,7 +850,11 @@ namespace ModManager
                         LowerLog("[INFO] Manifest Ready", "#2dc55e");
                     }
 
-
+                string hash = Path.Combine(modMeta, "hashes", "game.hashes.txt");
+                if (File.Exists(hash))
+                {
+                    HashMaster.AddTemporaryHashesFromFileAsync(hash);
+                }
                 // Finally, run the Fixer logic
                 // Since this runs on the background thread now, FixiniYoursSkini MUST use 
                 // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
