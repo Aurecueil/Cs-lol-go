@@ -2913,7 +2913,9 @@ namespace ModManager
                                 string final_out = job.Target.OutputString;
                                 if (!_settings.binless)
                                 {
-                                    final_out = Path.ChangeExtension(job.Target.OutputString, job.Extension);
+                                    final_out = string.IsNullOrEmpty(job.Extension)
+                                        ? job.Target.OutputString
+                                        : Path.ChangeExtension(job.Target.OutputString, job.Extension);
                                 }
                                 if (string.IsNullOrEmpty(Path.GetFileNameWithoutExtension(final_out))) final_out = Path.Combine(Path.GetDirectoryName(final_out) ?? "", $"dot_{Guid.NewGuid().ToString().Substring(0, 4)}{job.Extension}");
                                 if (!string.IsNullOrEmpty(job.Target.OutputPath))
@@ -2971,7 +2973,10 @@ namespace ModManager
                                 {
                                     foreach (BinFile s in job.Target.BinFileRef)
                                     {
+                                        // ulong pre = s.Value.Hash;
+                                        // ulong post = HashMaster.HashPath(final_out);
                                         s.Value = new XXH64 { Hash = HashMaster.HashPath(final_out) };
+                                        // x.LowerLog($"{pre:x16} -> {post:x16}  ({final_out})");
                                     }
                                 }
                                 targets.Remove(job.Target);
@@ -3082,7 +3087,10 @@ namespace ModManager
                                 }
                                 foreach (BinFile f in t.BinFileRef)
                                 {
+                                    // ulong pre = f.Value.Hash;
+                                    // ulong post = HashMaster.HashPath(foundString);
                                     f.Value = new XXH64 { Hash = HashMaster.HashPath(foundString) };
+                                    // x.LowerLog($"{pre:x16} -> {post:x16}  ({foundString})");
                                 }
 
                                 // --- Logging (Reusing your style) ---

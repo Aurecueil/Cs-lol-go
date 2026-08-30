@@ -850,10 +850,26 @@ namespace ModManager
                         LowerLog("[INFO] Manifest Ready", "#2dc55e");
                     }
 
-                string hash = Path.Combine(modMeta, "hashes", "game.hashes.txt");
-                if (File.Exists(hash))
+                HashSet<string> hashtables = new(StringComparer.OrdinalIgnoreCase)
+{
+    Path.Combine(modMeta, "hashes", "game.hashes.txt"),
+    Path.Combine(modMeta, "files.txt"),
+    Path.Combine(modMeta, "hashes.txt")
+};
+
+                foreach (var table in ModElement.Info.Hashtables)
                 {
-                    HashMaster.AddTemporaryHashesFromFileAsync(hash);
+                    if (string.Equals(table.Category, "game", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hashtables.Add(Path.Combine(modDir, table.Path));
+                    }
+                }
+                foreach (var hash in hashtables)
+                {
+                    if (File.Exists(hash))
+                    {
+                        HashMaster.AddTemporaryHashesFromFileAsync(hash);
+                    }
                 }
                 // Finally, run the Fixer logic
                 // Since this runs on the background thread now, FixiniYoursSkini MUST use 

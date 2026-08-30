@@ -1807,11 +1807,11 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.12.0")
+            if (settings.ver != "2.13.0")
             {
-                settings.ver = "2.12.0";
+                settings.ver = "2.13.0";
                 save_settings();
-                CustomMessageBox.Show("Improved Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nTopaz Fixer is temporarily disabled, as i didnt yet adjust it for the new changes\n\nFixed most instances of \"Cannot acces files bc it is being used by another process\"\n\nINtroduced new keyboard shortcuts:\n- Ctrl+O -> Open Settings\n- Ctrl+F -> Focus Searchbar\n- Ctrl+N -> Create Mod\n- Ctrl+T -> New Folder\n- Alt+ArrowUp -> Go to Parent Directory", ["Kay"],"What's New");
+                CustomMessageBox.Show("Topaz Fixer is back online, have fun\n\nImproved Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nFixed most instances of \"Cannot acces files bc it is being used by another process\"\n\nINtroduced new keyboard shortcuts:\n- Ctrl+O -> Open Settings\n- Ctrl+F -> Focus Searchbar\n- Ctrl+N -> Create Mod\n- Ctrl+T -> New Folder\n- Alt+ArrowUp -> Go to Parent Directory", ["Kay"],"What's New");
             }
         }
         public void SetLoading(string text, int progress, double stage)
@@ -4027,7 +4027,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.12.0";
+            string localVersion = "2.13.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
