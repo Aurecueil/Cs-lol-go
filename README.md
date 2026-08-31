@@ -21,7 +21,12 @@
 - Mod thumbnails
 - Instant profiles
 
-# Installation
+<h1>
+  Installation
+  <a href="https://www.youtube.com/watch?v=z3xMxmOcD9w" align="right">
+    <img src="https://img.shields.io/badge/YouTube-Watch_Video_Tutorial-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=18181b" alt="Watch Tutorial on YouTube" valign="middle" />
+  </a>
+</h1>
 
 <table align="center">
   <tr>
@@ -42,15 +47,6 @@
   </tr>
 </table>
 
-## Video Tutorial
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=z3xMxmOcD9w">
-    <img src="https://img.youtube.com/vi/z3xMxmOcD9w/hqdefault.jpg" width="700" alt="cslol-go tutorial" />
-  </a>
-  <br>
-  <em>▶️ <b>How to Install Custom Skins for League of Legends (2026)</b></em>
-</p>
 
 # Updates
 cslol-go automatically checks for the latest version when you open the app. If there is a newer version, the app will display a message box.
@@ -73,7 +69,12 @@ The buttons on a mod tile are as follows (left to right):
 1. ✏️Edit
 1. ❌Delete
 
-## Topaz Mod Fixer
+<h1>
+  Topaz Mod Fixer
+  <a href="https://www.youtube.com/watch?v=kFsdUW3-mqU" align="right">
+    <img src="https://img.shields.io/badge/YouTube-Watch_Video_Tutorial-FF0000?style=for-the-badge&logo=youtube&logoColor=white&labelColor=18181b" alt="Watch Tutorial on YouTube" valign="middle" />
+  </a>
+</h1>
 <table align="center">
   <tr>
     <td align="center">
@@ -88,17 +89,6 @@ The buttons on a mod tile are as follows (left to right):
     </td>
   </tr>
 </table>
-
-## Video Tutorial
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=kFsdUW3-mqU">
-    <img src="https://img.youtube.com/vi/kFsdUW3-mqU/maxresdefault.jpg" width="700" alt="Topaz Fixer Tutorial" />
-  </a>
-  <br>
-  <em>▶️ <b>How to Fix Broken LoL Mods with Topaz Fixer</b></em>
-</p>
-
 
 > [!IMPORTANT]
 > Fixer will attempt to autofill settings, but remember to check if both character and skin number are correct
