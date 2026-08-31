@@ -42,6 +42,16 @@
   </tr>
 </table>
 
+## Video Tutorial
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=z3xMxmOcD9w">
+    <img src="https://img.youtube.com/vi/z3xMxmOcD9w/hqdefault.jpg" width="700" alt="cslol-go tutorial" />
+  </a>
+  <br>
+  <em>▶️ <b>How to Install Custom Skins for League of Legends (2026)</b></em>
+</p>
+
 # Updates
 cslol-go automatically checks for the latest version when you open the app. If there is a newer version, the app will display a message box.
 
@@ -78,6 +88,16 @@ The buttons on a mod tile are as follows (left to right):
     </td>
   </tr>
 </table>
+
+## Video Tutorial
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=kFsdUW3-mqU">
+    <img src="https://img.youtube.com/vi/kFsdUW3-mqU/maxresdefault.jpg" width="700" alt="Topaz Fixer Tutorial" />
+  </a>
+  <br>
+  <em>▶️ <b>How to Fix Broken LoL Mods with Topaz Fixer</b></em>
+</p>
 
 
 > [!IMPORTANT]
@@ -132,7 +152,6 @@ Actions are executed in a fixed order, the order of the flags do not affect exec
 - `--dbu` to prevent the app from being brought to front
 
 # Credits:
-- [Divine skins (HUGE help)](https://divineskins.gg/)
 - [League Toolkit](https://github.com/LeagueToolkit)
 - [Jade's RitoBin](https://github.com/RitoShark/Jade-League-Bin-Editor)
 - [Manifest Downloader](https://github.com/Morilli/ManifestDownloader)
