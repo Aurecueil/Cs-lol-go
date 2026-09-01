@@ -33,7 +33,7 @@
     <td>
       <p> 
         
-1. Download: [cslol-go.zip](https://github.com/Aurecueil/Cs-lol-go/releases/download/2.13/cslol-go.zip)
+1. Download: [cslol-go.zip](.../releases/latest/download/cslol-go.zip)
 2. Extract: `cslol-go.zip`
 3. Run `ModLoader.exe`
 
