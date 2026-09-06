@@ -131,6 +131,8 @@ namespace ModManager
     }
     public class Settings
     {
+        public bool in_file_path { get; set; } = true;
+        public string repath_affix { get; set; } = "";
         public int Loader_version { get; set; } = 1;
         public bool poofini { get; set; } = false;
         public bool elevate_by_default { get; set; } = false;
@@ -1788,11 +1790,20 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.13.0")
+            if (settings.ver != "2.14.0")
             {
-                settings.ver = "2.13.0";
+                settings.ver = "2.14.0";
                 save_settings();
-                CustomMessageBox.Show("Topaz Fixer is back online, have fun\n\nImproved Simple Fix for patch 26.17 file changes \nAll your mods are backuped in /backups/, in case of unexpected behaviours\n\nFixed most instances of \"Cannot acces files bc it is being used by another process\"\n\nINtroduced new keyboard shortcuts:\n- Ctrl+O -> Open Settings\n- Ctrl+F -> Focus Searchbar\n- Ctrl+N -> Create Mod\n- Ctrl+T -> New Folder\n- Alt+ArrowUp -> Go to Parent Directory", ["Kay"],"What's New");
+                string whats_new = """
+                    .modpkg now imports and exports sucesfully
+                    .modpkg is now default export (.fantome is still aviable)
+                    Fixed issue with Topaz fixer that caused incorrect textures on the model (forgot about mets on 16.17 fixer update)
+                    Fixer now allows to set custom repath affix (related settings are persistent)
+                    Fixer wad packing option is no longer aviable
+                    Bin fallback is no longer modifiable
+                    Fixer now provides short summary in lower log
+                    """;
+                CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
         }
         public void SetLoading(string text, int progress, double stage)
@@ -4007,7 +4018,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.12.0";
+            string localVersion = "2.14.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();

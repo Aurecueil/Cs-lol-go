@@ -104,6 +104,11 @@ namespace ModManager
 
         public List<string> Missing_Bins { get; set; } = new List<string>();
         public List<string> Missing_Files { get; set; } = new List<string>();
+        public List<string> Missing_VFX { get; set; } = new List<string>();
+        public int Missing_SCP { get; set; } = 0;
+        public int Missing_RR { get; set; } = 0;
+        public int Missing_AGD { get; set; } = 0;
+        public int Missing_CAC { get; set; } = 0;
         public List<string> CharraBlackList = ["viegowraith"];
         public List<string> CharraBlackList_Lux = ["luxair", "luxdark", "luxfire", "luxice", "luxmagma", "luxmystic", "luxnature", "luxstorm", "luxwater"];
         public uint bnk_version { get; set; } = 145;
@@ -387,13 +392,13 @@ namespace ModManager
                 return;
             }
 
-            string shortChar = charra.Length > 4
-    ? charra.Substring(0, 4)
-    : charra;
-            string prefix = $"{shortChar}_skin{entries[0]}_";
+    //         string shortChar = charra.Length > 4
+    //              ? charra.Substring(0, 4)
+    //              : charra;
+    //         string prefix = $"{shortChar}_skin{entries[0]}";
             foreach (var entry in entries)
             {
-                Characters.Enqueue((charra, entry, true, prefix));
+                Characters.Enqueue((charra, entry, true, ""));
             }
         }
         private Dictionary<uint, ShaderEntry> _byHash = new Dictionary<uint, ShaderEntry>();
@@ -645,7 +650,7 @@ namespace ModManager
     ? Current_Char.Substring(0, 4)
     : Current_Char;
                 if (Settings.repath_path_path == "")
-                    Settings.repath_path_path = $".{shortChar}{skinNo}_";
+                    Settings.repath_path_path = $"@{shortChar}{skinNo}";
                 string binPath = $"data/characters/{Settings.Character}/skins/skin{Settings.skinNo}.bin";
                 var check = CheckLinked([binPath]);
                 if (check != null)
@@ -660,6 +665,17 @@ namespace ModManager
                 {
                     x.LowerLog($"[SKIP] Coudnt Find SkinCharacterProperties, Skipping {Settings.Character} skin {Settings.skinNo}", CLR_WARN);
                     continue;
+                }
+                if (HpBar)
+                {
+                    Settings.Missing_SCP += binentries.Items.Any(x =>
+                        ((BinEmbed)x.Value).Name.Hash == (uint)Defi.SkinCharacterDataProperties) ? 0 : 1;
+                    Settings.Missing_RR += binentries.Items.Any(x =>
+                        ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ResourceResolver) ? 0 : 1;
+                    Settings.Missing_AGD += concat.Items.Any(x =>
+                        ((BinEmbed)x.Value).Name.Hash == (uint)Defi.AnimationGraphData) ? 0 : 1;
+                    Settings.Missing_CAC += concat.Items.Any(x =>
+                        ((BinEmbed)x.Value).Name.Hash == (uint)Defi.ContextualActionData) ? 0 : 1;
                 }
                 x.LowerLog($"[PROC] Processing Assets", CLR_ACT);
 
@@ -764,28 +780,154 @@ namespace ModManager
 
             if (Directory.Exists(Settings.inputDir)) Directory.Delete(Settings.inputDir, true);
 
-            foreach (string bin in Settings.Missing_Files)
+            // ==================== DEFINITION & ASSET AUDIT ====================
+            var uniqueMissingBins = Settings.Missing_Bins.Distinct().ToList();
+            var uniqueMissingVfx = Settings.Missing_VFX?.Distinct().ToList() ?? new List<string>();
+            var uniqueMissingFiles = Settings.Missing_Files.Distinct().ToList();
+
+            // Core Definition Checks (Bools)
+            bool hasMissingSkinProps = Settings.Missing_SCP > 0;
+            bool hasMissingAnimGraph = Settings.Missing_AGD > 0;
+            bool hasMissingRr = Settings.Missing_RR > 0;
+            bool hasMissingCac = Settings.Missing_CAC > 0;
+
+            // Categorized Asset Files
+            var missingAnmFiles = uniqueMissingFiles.Where(f => f.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)).ToList();
+            var missingMeshFiles = uniqueMissingFiles.Where(f => f.EndsWith(".scb", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".sco", StringComparison.OrdinalIgnoreCase)).ToList();
+            var missingTexFiles = uniqueMissingFiles.Where(f => f.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList();
+            var missingAudioFiles = uniqueMissingFiles.Where(f => f.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase)).ToList();
+            var missingOtherFiles = uniqueMissingFiles.Except(missingAnmFiles)
+                                                      .Except(missingMeshFiles)
+                                                      .Except(missingTexFiles)
+                                                      .Except(missingAudioFiles).ToList();
+
+            bool hasMissingAnm = missingAnmFiles.Count > 0;
+            bool hasMissingMesh = missingMeshFiles.Count > 0;
+            bool hasMissingTextures = missingTexFiles.Count > 0;
+            bool hasMissingAudio = missingAudioFiles.Count > 0;
+            bool hasMissingVfx = uniqueMissingVfx.Count > 0;
+
+            bool isClean = !hasMissingSkinProps && !hasMissingAnimGraph && !hasMissingAnm
+                        && !hasMissingRr && !hasMissingVfx && !hasMissingCac
+                        && !hasMissingMesh && !hasMissingTextures && !hasMissingAudio;
+
+            // ==================== DETAILED REPORT (UPPER LOG) ====================
+            // Order mirrors LowerLog evaluation: Definitions -> Animations -> Meshes -> Textures -> Audio -> Bins/Other
+
+            if (uniqueMissingBins.Count > 0)
             {
-                x.UpperLog($"[MISS] {bin}", CLR_WARN);
+                foreach (var bin in uniqueMissingBins)
+                {
+                    x.UpperLog(bin.StartsWith("[") ? bin : $"[MISS] {bin}", CLR_ERR);
+                }
+            }
+            if (hasMissingAnm)
+            {
+                foreach (var anm in missingAnmFiles)
+                {
+                    x.UpperLog($"[MISS] {anm}", CLR_ERR);
+                }
+            }
+            if (hasMissingMesh)
+            {
+                foreach (var mesh in missingMeshFiles)
+                {
+                    x.UpperLog($"[MISS] {mesh}", CLR_WARN);
+                }
+            }
+            if (hasMissingTextures)
+            {
+                foreach (var tex in missingTexFiles)
+                {
+                    x.UpperLog($"[MISS] {tex}", CLR_WARN);
+                }
+            }
+            if (hasMissingAudio)
+            {
+                foreach (var audio in missingAudioFiles)
+                {
+                    x.UpperLog($"[MISS] {audio}", CLR_WARN);
+                }
             }
 
-            if (Settings.Missing_Bins.Count() > 2)
+            if (missingOtherFiles.Count > 0)
             {
-                x.LowerLog($"[WARN] Done. . . BUT {Settings.Missing_Bins.Count()} bins are missing", CLR_WARN);
-                foreach (string bin in Settings.Missing_Bins)
+                foreach (var file in missingOtherFiles)
                 {
-                    x.UpperLog($"{bin}", CLR_ERR);
+                    x.UpperLog($"[MISS] {file}", CLR_WARN);
                 }
-                x.LowerLog($"[TIP]  Try using Manifest downloader if needed", CLR_WARN);
+            }
+
+            x.LowerLog("─────────────────────────────────────────", CLR_ACT);
+
+            if (isClean)
+            {
+                x.LowerLog("[DONE] Mod if Fixed, Good luck have fun ^^", CLR_GOOD);
+                x.UpperLog("[Done] Fin", CLR_GOOD);
             }
             else
             {
-                foreach (string bin in Settings.Missing_Bins)
+
+                if (hasMissingMesh)
                 {
-                    x.UpperLog($"{bin}", CLR_ERR);
+                    x.LowerLog($"[WARN] Missing ({missingMeshFiles.Count}) SCB files, elements of VFX might be missing", CLR_WARN);
                 }
-                x.LowerLog($"[DONE] Finished ^^", CLR_GOOD);
-                x.UpperLog($"[DONE] Finished ^^", CLR_GOOD);
+
+                if (hasMissingTextures)
+                {
+                    x.LowerLog($"[WARN] Missing some ({missingTexFiles.Count}) textures", CLR_WARN);
+                }
+                if (hasMissingVfx)
+                {
+                    x.LowerLog($"[WARN] Some ({uniqueMissingVfx.Count}) VFX are missing:", CLR_WARN);
+                    foreach (var vfx in uniqueMissingVfx)
+                    {
+                        x.LowerLog($"  [MISS] {vfx}", CLR_WARN);
+                    }
+                }
+                // Major Systems / VFX
+                if (hasMissingRr)
+                {
+                    x.LowerLog("[WARN] Missing Resource Resolver, VFX will be missing!!!!", CLR_ERR);
+                }
+
+
+                if (hasMissingAudio)
+                {
+                    x.LowerLog($"[WARN] Missing ({missingAudioFiles.Count}) soundbanks, silence expected", CLR_WARN);
+                }
+
+                if (hasMissingAnimGraph)
+                {
+                    x.LowerLog("[CRIT] Missing AnimationGraphData, Crash is guaranteed!!!!!", CLR_ERR);
+                }
+
+                if (hasMissingAnm)
+                {
+                    x.LowerLog("[CRIT] Missing .anm files, Crash is very likely!!!!!", CLR_ERR);
+                }
+
+                // Fatal / Guaranteed Crash
+                if (hasMissingSkinProps)
+                {
+                    x.LowerLog("[CRIT] Missing SkinCharacterDataProperties, Crash is guaranteed!!!!!", CLR_ERR);
+                }
+
+                // Audio & Aesthetics
+                if (hasMissingCac)
+                {
+                    x.LowerLog("[WARN] Missing Contextual Action Data (CAC), Voiceover will be missing!!!!", CLR_ERR);
+                }
+
+                // Verdict
+                if (hasMissingSkinProps || hasMissingAnimGraph || hasMissingAnm)
+                {
+                    x.LowerLog("[FINL] CRASH?", CLR_ERR);
+                }
+                else
+                {
+                    x.LowerLog("[FINL] Stuff might be missing, but should work i guess", CLR_WARN);
+                }
             }
         }
 
@@ -1782,6 +1924,14 @@ namespace ModManager
             }
 
             Validate(VFXEntries, rrValues);
+
+            foreach (uint key in VFXEntries.Keys)
+            {
+                if (key != 0 && !rrValues.Contains(key))
+                {
+                    Settings.Missing_VFX.Add($"{key:x16}");
+                }
+            }
 
             foreach (var entry in StaticMatEntries)
             {
@@ -3619,6 +3769,7 @@ namespace ModManager
 
                 string repath = _settings.repath_path_path;
                 bool inFilePath = _settings.in_file_path;
+                if (inFilePath && !repath.EndsWith("_")) repath = $"{repath}_";
 
                 if (firstFolder == "data" || firstFolder == "assets")
                 {

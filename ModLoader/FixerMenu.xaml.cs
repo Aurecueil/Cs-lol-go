@@ -40,6 +40,8 @@ namespace ModManager
             this.DataContext = this;
 
             chkNoSkinLight.IsChecked = Main.settings.No_Skinni;
+            chkRepathInPath.IsChecked = Main.settings.in_file_path;
+            txtAffix.Text = Main.settings.repath_affix;
             chkNoSkinLight.Checked += udptNoSkinniSetting;
             chkNoSkinLight.Unchecked += udptNoSkinniSetting;
 
@@ -61,7 +63,7 @@ namespace ModManager
 
         private async void udptNoSkinniSetting(object sender, RoutedEventArgs e)
         {
-
+            Main.settings.repath_affix = txtAffix.Text;
             Main.settings.No_Skinni = chkNoSkinLight.IsChecked ?? false;
             Main.save_settings();
         }
@@ -112,7 +114,11 @@ namespace ModManager
         private ObservableCollection<Manifest> _manifestList;
         private ICollectionView _manifestView;
         private Manifest? _lastManifestSelection = null;
-
+        public void update_affix_persistent(object _, RoutedEventArgs e)
+        {
+            Main.settings.in_file_path = chkRepathInPath.IsChecked ?? false;
+            Main.save_settings();
+        }
         private void LoadManifests()
         {
             string path = Path.Combine("cslol-tools", "manifests.json");
@@ -412,10 +418,109 @@ namespace ModManager
             Regex regex = new Regex("[^0-9]+");
             e.Handled = regex.IsMatch(e.Text);
         }
+        private static readonly char[] InvalidFolderChars = Path.GetInvalidFileNameChars();
 
+        private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+        // 1. Catches space key directly (PreviewTextInput sometimes ignores pure spacebar hits)
         private void TextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Space) e.Handled = true;
+            if (sender is not TextBox textBox) return;
+
+            // Block space if cursor is at position 0 (prevents leading spaces)
+            if (e.Key == Key.Space && textBox.SelectionStart == 0)
+            {
+                e.Handled = true;
+            }
+        }
+
+        // 2. Real-time typing validation
+        private void SanitizeValidationTextBox(object sender, TextCompositionEventArgs e)
+        {
+            if (sender is not TextBox textBox) return;
+
+            // Block any invalid file/path characters (\ / : * ? " < > | and control chars)
+            if (e.Text.IndexOfAny(InvalidFolderChars) >= 0)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Block leading space from IME/composition input
+            if (e.Text.StartsWith(' ') && textBox.SelectionStart == 0)
+            {
+                e.Handled = true;
+            }
+        }
+
+        // 3. Paste validation (Ctrl+V or Right-Click Paste)
+        private void TextBox_Pasting_text(object sender, DataObjectPastingEventArgs e)
+        {
+            if (sender is not TextBox textBox) return;
+
+            if (e.DataObject.GetDataPresent(DataFormats.UnicodeText) ||
+                e.DataObject.GetDataPresent(DataFormats.Text))
+            {
+                string pasteText = (string)(e.DataObject.GetData(DataFormats.UnicodeText)
+                                         ?? e.DataObject.GetData(DataFormats.Text));
+
+                if (string.IsNullOrEmpty(pasteText))
+                {
+                    e.CancelCommand();
+                    return;
+                }
+
+                // Immediately block if the pasted text contains illegal chars
+                if (pasteText.IndexOfAny(InvalidFolderChars) >= 0)
+                {
+                    e.CancelCommand();
+                    return;
+                }
+
+                // Simulate the resulting text after the paste
+                string currentText = textBox.Text;
+                int selStart = textBox.SelectionStart;
+                int selLength = textBox.SelectionLength;
+
+                string projectedText = currentText.Remove(selStart, selLength).Insert(selStart, pasteText);
+
+                // Block if it starts with a space, is all whitespace, or exceeds 255 chars
+                if (projectedText.StartsWith(' ') ||
+                    string.IsNullOrWhiteSpace(projectedText) ||
+                    projectedText.Length > 255)
+                {
+                    e.CancelCommand();
+                }
+            }
+            else
+            {
+                e.CancelCommand();
+            }
+        }
+
+        // 4. Clean up trailing spaces, trailing dots, and reserved names on focus loss
+        private void TextBox_LostFocus_txt(object sender, RoutedEventArgs e)
+        {
+            udptNoSkinniSetting(null, null); // Update persistent settings on focus loss
+
+            if (sender is not TextBox textBox) return;
+
+            // Trim leading spaces, trailing spaces, and trailing periods
+            string cleaned = textBox.Text.Trim().TrimEnd('.');
+
+            // Prefix with an underscore if the user typed a reserved Windows device name
+            string baseName = cleaned.Split('.')[0];
+            if (ReservedDeviceNames.Contains(baseName))
+            {
+                cleaned = "_" + cleaned;
+            }
+
+            textBox.Text = cleaned;
         }
 
         private void TextBox_Pasting(object sender, DataObjectPastingEventArgs e)
@@ -703,8 +808,11 @@ namespace ModManager
             // Ensure directory existence for Settings path calculation
             string gameDataPath = Path.Combine(Path.GetDirectoryName(Main.settings.gamepath), "DATA", "FINAL");
 
+            Fixer.Settings.repath_path_path = txtAffix.Text;
+            Fixer.Settings.in_file_path = chkRepathInPath.IsChecked == true;
+
             // Store settings
-            bool folder = chkKeepFolder.IsChecked == false;
+            bool folder = true;
             Fixer.Settings.folder = folder;
             if (folder)
             {
@@ -728,7 +836,7 @@ namespace ModManager
             Fixer.Settings.keep_Icons = chkKeepIcons.IsChecked == true;
             Fixer.Settings.SoundOption = cmbSound.SelectedIndex;
             Fixer.Settings.AnimOption = cmbAnim.SelectedIndex;
-            Fixer.Settings.percent = sliderValue.Value;
+            // Fixer.Settings.percent = sliderValue.Value;
             Fixer.Settings.SmallMod = chkSmallMod.IsChecked == true;
 
             // Capture booleans for logic inside the thread
@@ -953,6 +1061,11 @@ namespace ModManager
                 progressBar.Value = percent;
                 txtProgress.Text = $"{percent}%";
             });
+        }
+
+        private void btnToggleAdvanced_Checked(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }
