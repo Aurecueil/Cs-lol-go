@@ -2740,12 +2740,14 @@ namespace ModManager
                         {
                             // Root file, but not a valid hash name -> Hash the path normally
                             pathHash = HashMaster.HashPath(wadPath);
+                            HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
                         }
                     }
                     else
                     {
                         // File is in a subdirectory -> Hash the path normally
                         pathHash = HashMaster.HashPath(wadPath);
+                        HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
                     }
                     // --- End of Modified Logic ---
 
@@ -2811,7 +2813,7 @@ namespace ModManager
             {
                 if (wadPaths == null || wadPaths.Count == 0) return;
 
-                var targetFileNames = new List<string> { "hashes.game.txt" };
+                var targetFileNames = new List<string> { "hashes.game.txt", "files.txt", "hashes.txt" };
 
                 var targetHashes = new HashSet<ulong>();
                 foreach (var target in targetFileNames)

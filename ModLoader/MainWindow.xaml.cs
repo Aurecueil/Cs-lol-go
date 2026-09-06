@@ -21,6 +21,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using static ModManager.FixerUI;
 using static ModManager.Repatheruwu;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
@@ -1567,25 +1568,6 @@ try
 
             Wad_champs_dict = result;
         }
-        private async void awaitKillSwitch()
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                try
-                {
-                    string content = await client.GetStringAsync($"https://raw.githubusercontent.com/Aurecueil/Temp/main/images/good?t={DateTime.UtcNow.Ticks}");
-                    string cleanContent = content.Trim();
-
-                    if (!cleanContent.Equals("OKAY", StringComparison.OrdinalIgnoreCase))
-                    {
-                        settings.poofini = true;
-                    }
-                }
-                catch
-                {
-                }
-            }
-        }
         static async void CleanUpOldBackups()
         {
             string path = "backup";
@@ -1668,7 +1650,6 @@ try
                 await CheckForAppUpdates();
             }
             catch { }
-            awaitKillSwitch();
             DownloadCslolDll();
 
             try
@@ -2318,9 +2299,9 @@ try
             var saveDialog = new SaveFileDialog
             {
                 Title = "Export Mod",
-                Filter = "Fantome Files (*.fantome)|*.fantome|Mod Package (*.modpkg)|*.modpkg",
-                FileName = $"{sanitized}.fantome",
-                DefaultExt = ".fantome"
+                Filter = "Mod Package (*.modpkg)|*.modpkg|Fantome Files (*.fantome)|*.fantome",
+                FileName = $"{sanitized}.modpkg",
+                DefaultExt = ".modpkg"
             };
 
             if (saveDialog.ShowDialog() != true) {
@@ -2473,7 +2454,6 @@ try
                         SiteName = "cslol-go manager",
                         SiteUrl = "https://github.com/Aurecueil/Cs-lol-go/releases/latest",
                         ModId = "0",
-                        ReleaseId = "0",
                     };
 
                     string rf_path = Path.Combine(metaSource, "rf.json");
@@ -2483,7 +2463,7 @@ try
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
                         JsonElement root = doc.RootElement;
                         dyustry.ModId = root.GetProperty("modId").GetString();
-                        dyustry.ReleaseId = root.GetProperty("releaseId").GetString();
+                        // dyustry.ReleaseId = root.GetProperty("releaseId").GetString();
                         dyustry.SiteName = "RuneForge";
                         dyustry.SiteUrl = "https://runeforge.dev/mods/";
                         dyustry.SiteId = "runeforge";
@@ -4027,7 +4007,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.13.0";
+            string localVersion = "2.12.0";
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -4037,7 +4017,7 @@ try
                 File.WriteAllText(versionFile, localVersion);
             }
 
-                using HttpClient http = new();
+            using HttpClient http = new();
             http.DefaultRequestHeaders.UserAgent.ParseAdd("cslol-go-check-update");
 
             string json = await http.GetStringAsync(
@@ -4051,7 +4031,6 @@ try
                 .TrimStart('v');
 
 
-
             if (!Version.TryParse(remoteVersion, out var r) ||
                 !Version.TryParse(localVersion, out var l) ||
                 r <= l)
@@ -4063,8 +4042,25 @@ try
     (r.Major == l.Major && r.Minor == l.Minor && r.Build > l.Build);
             if (!isNewSignificantVersion)
                 return;
+            string releaseNotes = doc.RootElement.TryGetProperty("body", out var bodyProp) && bodyProp.ValueKind == JsonValueKind.String
+    ? bodyProp.GetString() ?? null
+    : null;
 
-            var res = CustomMessageBox.Show("Update Found! Do you want to auto-pdate the app?", ["Update", "Ignore"], "New Update");
+            if (releaseNotes is not null)
+            {
+                releaseNotes = $"""
+                    Update Found!
+                    
+                    {releaseNotes}
+
+
+                    Do you want to auto-update the app?
+                    """;
+            }else
+            {
+                releaseNotes = "Update Found! Do you want to auto-update the app?";
+            }
+            var res = CustomMessageBox.Show(releaseNotes, ["Update", "Ignore"], $"Version {remoteVersion} is available!!");
 
             if (res == "Ignore")
             {
@@ -5736,7 +5732,7 @@ try
                 var obj = new
                 {
                     modId = info.Metadata.Distributor.ModId,
-                    releaseId = info.Metadata.Distributor.ReleaseId,
+                    // releaseId = info.Metadata.Distributor.ReleaseId,
                 };
 
                 string json_rf = JsonSerializer.Serialize(obj, new JsonSerializerOptions

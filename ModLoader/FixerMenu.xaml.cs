@@ -851,11 +851,11 @@ namespace ModManager
                     }
 
                 HashSet<string> hashtables = new(StringComparer.OrdinalIgnoreCase)
-{
-    Path.Combine(modMeta, "hashes", "game.hashes.txt"),
-    Path.Combine(modMeta, "files.txt"),
-    Path.Combine(modMeta, "hashes.txt")
-};
+                {
+                    Path.Combine(modMeta, "hashes", "game.hashes.txt"),
+                    Path.Combine(modMeta, "files.txt"),
+                    Path.Combine(modMeta, "hashes.txt")
+                };
 
                 foreach (var table in ModElement.Info.Hashtables)
                 {

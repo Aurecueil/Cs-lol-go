@@ -17,6 +17,7 @@ namespace ModPkgLibSpace
 
         // Meta Chunk Paths
         public const string METADATA_CHUNK_PATH = "_meta_/info.msgpack";
+        public const string METADATA_ALT_CHUNK_PATH = "_meta_/metadata.msgpack";
         public const string THUMBNAIL_CHUNK_PATH = "_meta_/thumbnail.webp";
         public const string README_CHUNK_PATH = "_meta_/README.md";
     }
@@ -47,29 +48,38 @@ namespace ModPkgLibSpace
         public uint LayerIndex { get; set; }
         public uint WadIndex { get; set; }
 
-        public const int ChunkHeaderSize = 8 + 8 + 1 + 8 + 8 + 8 + 8 + 4 + 4 + 4; // 77 bytes
+        public ulong LayerHash { get; set; }
+
+        public const int ChunkHeaderSize = 8 + 8 + 1 + 8 + 8 + 8 + 8 + 4 + 4 + 4; // 61 bytes
     }
 
     public class ModpkgLayer
     {
         public string Name { get; set; }
         public int Priority { get; set; }
-        public string Description { get; set; } // Modernized addition
-        public Dictionary<string, Dictionary<string, string>> StringOverrides { get; set; } = new(); // Modernized addition
+        public string Description { get; set; }
 
-        public ModpkgLayer(string name, int priority)
-        {
-            Name = name;
-            Priority = priority;
-            Description = string.Empty;
-        }
-
-        public ModpkgLayer(string name, int priority, string description, Dictionary<string, Dictionary<string, string>> stringOverrides = null)
+        public ModpkgLayer(string name, int priority, string description = null)
         {
             Name = name;
             Priority = priority;
             Description = description ?? string.Empty;
-            if (stringOverrides != null) StringOverrides = stringOverrides;
+        }
+    }
+
+    public class ModpkgLayerMetadata
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Priority { get; set; }
+        public string Description { get; set; }
+
+        public ModpkgLayerMetadata() { }
+
+        public ModpkgLayerMetadata(string name, int priority, string description = null)
+        {
+            Name = name;
+            Priority = priority;
+            Description = description;
         }
     }
 
@@ -114,40 +124,33 @@ namespace ModPkgLibSpace
 
     public class DistributorInfo
     {
-        public string SiteId { get; set; } = "unknown";
-        public string SiteName { get; set; } = "Unknown Site";
-        public string SiteUrl { get; set; } = "";
-        public string ModId { get; set; } = "0";
-        public string ReleaseId { get; set; } = "0";
+        public string SiteId { get; set; } = string.Empty;
+        public string SiteName { get; set; } = string.Empty;
+        public string SiteUrl { get; set; } = string.Empty;
+        public string ModId { get; set; } = string.Empty;
+
+        public DistributorInfo() { }
+
+        public DistributorInfo(string siteId, string siteName, string siteUrl, string modId)
+        {
+            SiteId = siteId;
+            SiteName = siteName;
+            SiteUrl = siteUrl;
+            ModId = modId;
+        }
     }
 
     public class ModpkgMetadata
     {
         public uint SchemaVersion { get; set; } = 1;
-        public string Name { get; set; }
-        public string DisplayName { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
         public string Description { get; set; }
-        public string Version { get; set; }
-        public List<ModpkgAuthor> Authors { get; set; }
-        public ModpkgLicense License { get; set; }
-        public DistributorInfo Distributor { get; set; } = new DistributorInfo();
-
-        // Modernized additions
-        public List<string> Tags { get; set; } = new();
-        public List<string> Champions { get; set; } = new();
-        public List<string> Maps { get; set; } = new();
-        public List<ModpkgLayer> Layers { get; set; } = new(); // Serialized into metadata map
-
-        public ModpkgMetadata()
-        {
-            Name = string.Empty;
-            DisplayName = string.Empty;
-            Description = string.Empty;
-            Version = string.Empty;
-            Authors = new List<ModpkgAuthor>();
-            License = new ModpkgLicense(LicenseType.None);
-            Distributor = new DistributorInfo();
-        }
+        public string Version { get; set; } = "1.0.0";
+        public DistributorInfo Distributor { get; set; }
+        public List<ModpkgAuthor> Authors { get; set; } = new();
+        public ModpkgLicense License { get; set; } = new(LicenseType.None);
+        public List<ModpkgLayerMetadata> Layers { get; set; } = new();
     }
 
     public class LayerInfo
@@ -156,7 +159,7 @@ namespace ModPkgLibSpace
         public int Priority { get; set; }
         public string folder_name { get; set; }
         public bool is_active { get; set; } = false;
-        public string Description { get; set; } // Modernized addition
+        public string Description { get; set; }
     }
 
     public class ModpkgInfo
@@ -243,6 +246,36 @@ namespace ModPkgLibSpace
             return HashToUInt64(hash);
         }
 
+        public static (string WadName, string ChunkPath) ParseWadPath(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath)) return (null, string.Empty);
+            var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+
+            int wadClientIdx = normalized.IndexOf(".wad.client", StringComparison.OrdinalIgnoreCase);
+            if (wadClientIdx >= 0)
+            {
+                int endIdx = wadClientIdx + ".wad.client".Length;
+                if (endIdx == normalized.Length) return (normalized, string.Empty);
+                if (normalized[endIdx] == '/')
+                {
+                    return (normalized.Substring(0, endIdx), normalized.Substring(endIdx + 1));
+                }
+            }
+
+            int wadIdx = normalized.IndexOf(".wad", StringComparison.OrdinalIgnoreCase);
+            if (wadIdx >= 0)
+            {
+                int endIdx = wadIdx + ".wad".Length;
+                if (endIdx == normalized.Length) return (normalized, string.Empty);
+                if (normalized[endIdx] == '/')
+                {
+                    return (normalized.Substring(0, endIdx), normalized.Substring(endIdx + 1));
+                }
+            }
+
+            return (null, normalized);
+        }
+
         public static ModpkgInfo GetMetadata(string modpkgPath)
         {
             using var reader = new ModpkgReader(modpkgPath);
@@ -253,21 +286,27 @@ namespace ModPkgLibSpace
             };
 
             var chunksByLayer = reader.Chunks
-                .GroupBy(kvp => kvp.Key.LayerHash)
+                .GroupBy(c => c.LayerHash)
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // Look up detailed configurations mapped in reader layers if populated
             foreach (var layer in reader.Layers.Values.OrderBy(l => l.Priority))
             {
                 var layerHash = HashLayerName(layer.Name);
                 chunksByLayer.TryGetValue(layerHash, out int count);
 
+                var metaLayer = reader.Metadata?.Layers?.FirstOrDefault(l => l.Name.Equals(layer.Name, StringComparison.OrdinalIgnoreCase));
+
+                // Save base layer as "WAD", other layers as "WAD_<LayerName>"
+                string folderName = layer.Name.Equals("base", StringComparison.OrdinalIgnoreCase)
+                    ? "WAD"
+                    : $"WAD_{layer.Name}";
+
                 info.Layers.Add(new LayerInfo
                 {
                     Name = layer.Name,
                     Priority = layer.Priority,
-                    Description = layer.Description,
-                    folder_name = $"WAD_{layer.Name}"
+                    Description = metaLayer?.Description ?? layer.Description ?? string.Empty,
+                    folder_name = folderName
                 });
             }
 
@@ -279,37 +318,72 @@ namespace ModPkgLibSpace
             using var reader = new ModpkgReader(modpkgPath);
             Directory.CreateDirectory(outputDir);
 
+            string metaFolderName = Directory.Exists(Path.Combine(outputDir, "meta")) ? "meta" :
+                                    Directory.Exists(Path.Combine(outputDir, "META")) ? "META" : "meta";
+            string metaDir = Path.Combine(outputDir, metaFolderName);
+
             var chunksByLayer = reader.Chunks
-              .GroupBy(kvp => kvp.Key.LayerHash)
-              .ToDictionary(g => g.Key, g => g.ToList());
+                .GroupBy(c => c.LayerHash)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
             var imageConverter = new ImageConverterMocks.SimpleEncoder();
 
             foreach (var (layerHash, chunks) in chunksByLayer)
             {
-                string layerName = layerHash == Constants.NO_LAYER_HASH ? "WAD_no_layer" :
-                                   reader.Layers.TryGetValue(layerHash, out var l) ? $"WAD_{l.Name}" : $"WAD_{layerHash:X16}";
+                bool isThumbnailLayer = reader.Layers.TryGetValue(layerHash, out var l) &&
+                    (l.Name.Equals("thumbnail", StringComparison.OrdinalIgnoreCase) ||
+                     l.Name.Equals("thumb", StringComparison.OrdinalIgnoreCase));
 
-                foreach (var (key, chunk) in chunks)
+                // Base layer maps directly to "WAD"
+                string layerName;
+                if (layerHash == Constants.NO_LAYER_HASH)
                 {
-                    var chunkPath = reader.ChunkPaths.GetValueOrDefault(chunk.PathHash, $"{chunk.PathHash:X16}");
-                    if (chunkPath.Equals(Constants.METADATA_CHUNK_PATH, StringComparison.OrdinalIgnoreCase)) continue;
+                    layerName = "WAD_no_layer";
+                }
+                else if (l != null)
+                {
+                    layerName = l.Name.Equals("base", StringComparison.OrdinalIgnoreCase) ? "WAD" : $"WAD_{l.Name}";
+                }
+                else
+                {
+                    layerName = $"WAD_{layerHash:X16}";
+                }
+
+                var layerDir = Path.Combine(outputDir, layerName);
+
+                foreach (var chunk in chunks)
+                {
+                    string chunkPath = chunk.PathIndex < reader.ChunkPathList.Count
+                        ? reader.ChunkPathList[(int)chunk.PathIndex]
+                        : reader.ChunkPaths.GetValueOrDefault(chunk.PathHash, $"{chunk.PathHash:X16}");
+
+                    if (chunkPath.Equals(Constants.METADATA_CHUNK_PATH, StringComparison.OrdinalIgnoreCase) ||
+                        chunkPath.Equals(Constants.METADATA_ALT_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
 
                     var data = reader.ExtractChunk(chunk);
                     byte[] finalData = data;
                     string filePath;
                     bool conversionRequired = false;
 
-                    if (chunkPath.Equals(Constants.THUMBNAIL_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
+                    if (isThumbnailLayer || chunkPath.Equals(Constants.THUMBNAIL_CHUNK_PATH, StringComparison.OrdinalIgnoreCase))
                     {
-                        filePath = Path.Combine(outputDir, "META", "image.png");
+                        filePath = Path.Combine(metaDir, "image.png");
                         conversionRequired = true;
                     }
                     else
                     {
-                        var layerDir = Path.Combine(outputDir, layerName);
-                        Directory.CreateDirectory(layerDir);
-                        filePath = Path.Combine(layerDir, chunkPath);
+                        if (chunk.WadIndex != Constants.NO_WAD_INDEX && chunk.WadIndex < reader.WadNames.Count)
+                        {
+                            string wadName = reader.WadNames[(int)chunk.WadIndex];
+                            filePath = Path.Combine(layerDir, wadName, chunkPath);
+                        }
+                        else
+                        {
+                            filePath = Path.Combine(layerDir, chunkPath);
+                        }
                     }
 
                     if (conversionRequired)
@@ -324,6 +398,24 @@ namespace ModPkgLibSpace
                     File.WriteAllBytes(filePath, finalData);
                 }
             }
+
+            var hashesDir = Path.Combine(metaDir, "hashes");
+            Directory.CreateDirectory(hashesDir);
+            var hashesFilePath = Path.Combine(hashesDir, "game.hashes.txt");
+
+            var gamePaths = reader.ChunkPathList
+                .Where(p => !p.StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase) &&
+                            !p.StartsWith("_meta_\\", StringComparison.OrdinalIgnoreCase))
+                .Select(p =>
+                {
+                    var (_, cleanPath) = ParseWadPath(p);
+                    return string.IsNullOrEmpty(cleanPath) ? p : cleanPath;
+                })
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            File.WriteAllLines(hashesFilePath, gamePaths);
         }
 
         private static byte[] LoadThumbnailData(string thumbnailPath)
@@ -346,24 +438,112 @@ namespace ModPkgLibSpace
             catch { return null; }
         }
 
+        private static List<string> DiscoverExistingHashPaths(List<(string FolderPath, string LayerName, int Priority)> layers)
+        {
+            var discovered = new List<string>();
+            var searchDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (folderPath, _, _) in layers)
+            {
+                if (string.IsNullOrWhiteSpace(folderPath)) continue;
+                searchDirs.Add(folderPath);
+
+                var parent = Directory.GetParent(folderPath)?.FullName;
+                if (!string.IsNullOrEmpty(parent))
+                {
+                    searchDirs.Add(parent);
+                    var grandParent = Directory.GetParent(parent)?.FullName;
+                    if (!string.IsNullOrEmpty(grandParent)) searchDirs.Add(grandParent);
+                }
+            }
+
+            string[] candidateSubPaths =
+            {
+                Path.Combine("meta", "hashes", "game.hashes.txt"),
+                Path.Combine("META", "hashes", "game.hashes.txt"),
+                Path.Combine("hashes", "game.hashes.txt"),
+                Path.Combine("meta", "files.txt"),
+                Path.Combine("META", "files.txt"),
+                "files.txt"
+            };
+
+            foreach (var dir in searchDirs)
+            {
+                foreach (var sub in candidateSubPaths)
+                {
+                    var fullPath = Path.Combine(dir, sub);
+                    if (File.Exists(fullPath))
+                    {
+                        foreach (var rawLine in File.ReadAllLines(fullPath))
+                        {
+                            var line = rawLine.Trim();
+                            if (string.IsNullOrEmpty(line) || line.StartsWith("#")) continue;
+
+                            string pathCandidate = line;
+                            var parts = line.Split(new[] { ' ', '\t', ',' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 2 && parts[0].Length == 16 && ulong.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out _))
+                            {
+                                pathCandidate = parts[1].Trim();
+                            }
+
+                            var (_, cleanPath) = ParseWadPath(pathCandidate);
+                            string finalPath = string.IsNullOrEmpty(cleanPath) ? pathCandidate : cleanPath;
+
+                            if (!string.IsNullOrWhiteSpace(finalPath) &&
+                                !finalPath.StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase) &&
+                                !finalPath.StartsWith("_meta_\\", StringComparison.OrdinalIgnoreCase))
+                            {
+                                discovered.Add(finalPath);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return discovered.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
         public static void Pack(List<(string FolderPath, string LayerName, int Priority)> layers,
-            ModpkgMetadata metadata, string outputPath, string thumbnailPath = null, DistributorInfo distributor = null)
+            ModpkgMetadata metadata, string outputPath, string thumbnailPath = null, DistributorInfo distributor = null,
+            IEnumerable<string> extraHeaderPaths = null)
         {
             using var writer = new ModpkgWriter(outputPath);
 
             if (distributor != null) metadata.Distributor = distributor;
 
-            // Align configurations between standard inputs and metadata collections
-            foreach (var (folderPath, layerName, priority) in layers)
+            // 1. Discover extra paths from game.hashes.txt / files.txt
+            var discoveredPaths = DiscoverExistingHashPaths(layers);
+            writer.AddExtraPaths(discoveredPaths);
+
+            if (extraHeaderPaths != null)
             {
-                writer.AddLayer(layerName, priority);
-                if (!metadata.Layers.Any(l => l.Name.Equals(layerName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    metadata.Layers.Add(new ModpkgLayer(layerName, priority));
-                }
+                writer.AddExtraPaths(extraHeaderPaths);
             }
 
-            writer.SetMetadata(metadata);
+            // 2. Resolve thumbnail
+            if (string.IsNullOrEmpty(thumbnailPath))
+            {
+                foreach (var (folderPath, layerName, _) in layers)
+                {
+                    if (layerName.Equals("thumbnail", StringComparison.OrdinalIgnoreCase) ||
+                        layerName.Equals("thumb", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var imgFile = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories)
+                                               .FirstOrDefault(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                                                                    f.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+                                                                    f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase));
+                        if (imgFile != null) { thumbnailPath = imgFile; break; }
+                    }
+
+                    var parent = Directory.GetParent(folderPath)?.FullName;
+                    if (parent != null)
+                    {
+                        var candidate = Path.Combine(parent, "meta", "image.png");
+                        if (!File.Exists(candidate)) candidate = Path.Combine(parent, "META", "image.png");
+                        if (File.Exists(candidate)) { thumbnailPath = candidate; break; }
+                    }
+                }
+            }
 
             if (!string.IsNullOrEmpty(thumbnailPath))
             {
@@ -371,15 +551,50 @@ namespace ModPkgLibSpace
                 if (thumbnailData != null) writer.AddMetaChunkData(Constants.THUMBNAIL_CHUNK_PATH, thumbnailData);
             }
 
-            foreach (var (folderPath, layerName, priority) in layers)
+            // 3. Register layers (Normalizing "WAD" folder input to "base" layer)
+            foreach (var (folderPath, rawLayerName, priority) in layers)
             {
+                if (rawLayerName.Equals("thumbnail", StringComparison.OrdinalIgnoreCase) ||
+                    rawLayerName.Equals("thumb", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string layerName = rawLayerName.Equals("WAD", StringComparison.OrdinalIgnoreCase) ? "base" : rawLayerName;
+
+                writer.AddLayer(layerName, priority);
+                var existingLayer = metadata.Layers.FirstOrDefault(l => l.Name.Equals(layerName, StringComparison.OrdinalIgnoreCase));
+                if (existingLayer != null)
+                {
+                    existingLayer.Priority = priority;
+                }
+                else
+                {
+                    metadata.Layers.Add(new ModpkgLayerMetadata(layerName, priority));
+                }
+            }
+
+            writer.SetMetadata(metadata);
+
+            // 4. Register chunks
+            foreach (var (folderPath, rawLayerName, priority) in layers)
+            {
+                if (rawLayerName.Equals("thumbnail", StringComparison.OrdinalIgnoreCase) ||
+                    rawLayerName.Equals("thumb", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string layerName = rawLayerName.Equals("WAD", StringComparison.OrdinalIgnoreCase) ? "base" : rawLayerName;
+
                 if (!Directory.Exists(folderPath)) throw new DirectoryNotFoundException($"Layer folder not found: {folderPath}");
                 var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
                 foreach (var file in files)
                 {
                     var relativePath = Path.GetRelativePath(folderPath, file);
+                    var (wadName, chunkPath) = ParseWadPath(relativePath);
                     var data = File.ReadAllBytes(file);
-                    writer.AddChunk(relativePath, data, layerName);
+                    writer.AddChunk(chunkPath, data, layerName, wadName);
                 }
             }
 
@@ -390,10 +605,12 @@ namespace ModPkgLibSpace
     internal class ModpkgReader : IDisposable
     {
         private readonly BinaryReader _reader;
-        public Dictionary<(ulong PathHash, ulong LayerHash), ModpkgChunk> Chunks { get; } = new();
+        public List<ModpkgChunk> Chunks { get; } = new();
         public Dictionary<ulong, ModpkgLayer> Layers { get; } = new();
         public Dictionary<ulong, string> ChunkPaths { get; } = new();
+        public List<string> ChunkPathList { get; } = new();
         public Dictionary<ulong, string> Wads { get; } = new();
+        public List<string> WadNames { get; } = new();
         public ModpkgMetadata Metadata { get; private set; }
 
         public ModpkgReader(string filePath)
@@ -432,6 +649,13 @@ namespace ModPkgLibSpace
             return BitConverter.ToUInt32(b, 0);
         }
 
+        private static ulong ReadBigEndianUInt64(MemoryStream stream)
+        {
+            var b = new byte[8]; stream.Read(b, 0, 8);
+            if (BitConverter.IsLittleEndian) Array.Reverse(b);
+            return BitConverter.ToUInt64(b, 0);
+        }
+
         private static ulong ReadMsgpackUInt(MemoryStream stream)
         {
             var header = stream.ReadByte();
@@ -440,13 +664,28 @@ namespace ModPkgLibSpace
             if (header == 0xCC) return (ulong)stream.ReadByte();
             if (header == 0xCD) return ReadBigEndianUInt16(stream);
             if (header == 0xCE) return ReadBigEndianUInt32(stream);
-            if (header == 0xCF)
+            if (header == 0xCF) return ReadBigEndianUInt64(stream);
+            throw new InvalidDataException($"Invalid Msgpack unsigned integer header: 0x{header:X2}");
+        }
+
+        private static long ReadMsgpackInt(MemoryStream stream)
+        {
+            var header = stream.ReadByte();
+            if (header == -1) throw new EndOfStreamException();
+            if ((header & 0x80) == 0x00) return header;
+            if ((header & 0xE0) == 0xE0) return (sbyte)header;
+            return header switch
             {
-                var b = new byte[8]; stream.Read(b, 0, 8);
-                if (BitConverter.IsLittleEndian) Array.Reverse(b);
-                return BitConverter.ToUInt64(b, 0);
-            }
-            throw new InvalidDataException();
+                0xCC => stream.ReadByte(),
+                0xCD => ReadBigEndianUInt16(stream),
+                0xCE => ReadBigEndianUInt32(stream),
+                0xCF => (long)ReadBigEndianUInt64(stream),
+                0xD0 => (sbyte)stream.ReadByte(),
+                0xD1 => (short)ReadBigEndianUInt16(stream),
+                0xD2 => (int)ReadBigEndianUInt32(stream),
+                0xD3 => (long)ReadBigEndianUInt64(stream),
+                _ => throw new InvalidDataException($"Invalid Msgpack integer header: 0x{header:X2}")
+            };
         }
 
         private static uint ReadMsgpackMapHeader(MemoryStream stream)
@@ -481,17 +720,17 @@ namespace ModPkgLibSpace
         {
             var header = stream.ReadByte();
             if (header == -1) return;
-            if ((header & 0x80) == 0x00 || (header & 0xE0) == 0xE0) return; // fixint
-            if ((header & 0xE0) == 0xA0) { stream.Seek(header & 0x1F, SeekOrigin.Current); return; } // fixstr
-            if ((header & 0xF0) == 0x90) { uint len = (uint)(header & 0x0F); for (int i = 0; i < len; i++) SkipMsgpackValue(stream); return; } // fixarray
-            if ((header & 0xF0) == 0x80) { uint len = (uint)(header & 0x0F); for (int i = 0; i < len * 2; i++) SkipMsgpackValue(stream); return; } // fixmap
+            if ((header & 0x80) == 0x00 || (header & 0xE0) == 0xE0) return;
+            if ((header & 0xE0) == 0xA0) { stream.Seek(header & 0x1F, SeekOrigin.Current); return; }
+            if ((header & 0xF0) == 0x90) { uint len = (uint)(header & 0x0F); for (int i = 0; i < len; i++) SkipMsgpackValue(stream); return; }
+            if ((header & 0xF0) == 0x80) { uint len = (uint)(header & 0x0F); for (int i = 0; i < len * 2; i++) SkipMsgpackValue(stream); return; }
             switch (header)
             {
                 case 0xC0: case 0xC2: case 0xC3: return;
-                case 0xCC: stream.Seek(1, SeekOrigin.Current); return;
-                case 0xCD: stream.Seek(2, SeekOrigin.Current); return;
-                case 0xCE: stream.Seek(4, SeekOrigin.Current); return;
-                case 0xCF: stream.Seek(8, SeekOrigin.Current); return;
+                case 0xCC: case 0xD0: stream.Seek(1, SeekOrigin.Current); return;
+                case 0xCD: case 0xD1: stream.Seek(2, SeekOrigin.Current); return;
+                case 0xCE: case 0xD2: stream.Seek(4, SeekOrigin.Current); return;
+                case 0xCF: case 0xD3: stream.Seek(8, SeekOrigin.Current); return;
                 case 0xD9: int len8 = stream.ReadByte(); stream.Seek(len8, SeekOrigin.Current); return;
                 case 0xDA: int len16 = ReadBigEndianUInt16(stream); stream.Seek(len16, SeekOrigin.Current); return;
                 case 0xDB: long len32 = ReadBigEndianUInt32(stream); stream.Seek(len32, SeekOrigin.Current); return;
@@ -532,6 +771,7 @@ namespace ModPkgLibSpace
                 var path = ReadNullTerminatedString();
                 var pathHash = ModPkgLib.HashChunkName(path);
                 ChunkPaths[pathHash] = path;
+                ChunkPathList.Add(path);
             }
 
             var wadCount = _reader.ReadUInt32();
@@ -540,6 +780,7 @@ namespace ModPkgLibSpace
                 var wad = ReadNullTerminatedString();
                 var wadHash = ModPkgLib.HashWadName(wad);
                 Wads[wadHash] = wad;
+                WadNames.Add(wad);
             }
 
             var currentPos = _reader.BaseStream.Position;
@@ -549,8 +790,8 @@ namespace ModPkgLibSpace
             for (int i = 0; i < chunkCount; i++)
             {
                 var chunk = ReadChunk();
-                ulong layerHash = chunk.LayerIndex == Constants.NO_LAYER_INDEX ? Constants.NO_LAYER_HASH : layerHashes[(int)chunk.LayerIndex];
-                Chunks[(chunk.PathHash, layerHash)] = chunk;
+                chunk.LayerHash = chunk.LayerIndex == Constants.NO_LAYER_INDEX ? Constants.NO_LAYER_HASH : layerHashes[(int)chunk.LayerIndex];
+                Chunks.Add(chunk);
             }
 
             Metadata = ReadMetadataChunk();
@@ -560,8 +801,20 @@ namespace ModPkgLibSpace
         {
             var metadata = new ModpkgMetadata();
             var metadataPathHash = ModPkgLib.HashChunkName(Constants.METADATA_CHUNK_PATH);
-            ModpkgChunk chunk = Chunks.Values.FirstOrDefault(c => c.PathHash == metadataPathHash) ??
-                                Chunks.Values.FirstOrDefault(c => c.PathHash == ModPkgLib.HashChunkName(Constants.METADATA_CHUNK_PATH.Replace('/', '\\')));
+            var altPathHash = ModPkgLib.HashChunkName(Constants.METADATA_ALT_CHUNK_PATH);
+
+            ModpkgChunk chunk = Chunks.FirstOrDefault(c => c.PathHash == metadataPathHash)
+                             ?? Chunks.FirstOrDefault(c => c.PathHash == altPathHash)
+                             ?? Chunks.FirstOrDefault(c => c.PathHash == ModPkgLib.HashChunkName(Constants.METADATA_CHUNK_PATH.Replace('/', '\\')))
+                             ?? Chunks.FirstOrDefault(c => c.PathHash == ModPkgLib.HashChunkName(Constants.METADATA_ALT_CHUNK_PATH.Replace('/', '\\')));
+
+            if (chunk == null && Chunks.Count > 0 && ChunkPathList.Count > 0)
+            {
+                if (ChunkPathList[0].StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase))
+                {
+                    chunk = Chunks[0];
+                }
+            }
 
             if (chunk == null) return metadata;
 
@@ -579,16 +832,17 @@ namespace ModPkgLibSpace
                         case "schema_version": metadata.SchemaVersion = (uint)ReadMsgpackUInt(stream); break;
                         case "name": metadata.Name = ReadMsgpackString(stream); break;
                         case "display_name": metadata.DisplayName = ReadMsgpackString(stream); break;
-                        case "description": if (!ReadMsgpackNil(stream)) metadata.Description = ReadMsgpackString(stream); break;
+                        case "description": metadata.Description = ReadMsgpackNil(stream) ? null : ReadMsgpackString(stream); break;
                         case "version": metadata.Version = ReadMsgpackString(stream); break;
-                        case "tags": ReadStringList(stream, metadata.Tags); break; // Modernized
-                        case "champions": ReadStringList(stream, metadata.Champions); break; // Modernized
-                        case "maps": ReadStringList(stream, metadata.Maps); break; // Modernized
-                        case "layers": ReadLayersMetadata(stream, metadata.Layers); break; // Modernized
+                        case "layers": ReadLayersMetadata(stream, metadata.Layers); break;
                         case "distributor":
-                            if (ReadMsgpackNil(stream)) metadata.Distributor = null;
+                            if (ReadMsgpackNil(stream))
+                            {
+                                metadata.Distributor = null;
+                            }
                             else
                             {
+                                metadata.Distributor = new DistributorInfo();
                                 var distMapCount = ReadMsgpackMapHeader(stream);
                                 for (int j = 0; j < distMapCount; j++)
                                 {
@@ -600,7 +854,7 @@ namespace ModPkgLibSpace
                                         case "site_name": metadata.Distributor.SiteName = distValue; break;
                                         case "site_url": metadata.Distributor.SiteUrl = distValue; break;
                                         case "mod_id": metadata.Distributor.ModId = distValue; break;
-                                        case "release_id": metadata.Distributor.ReleaseId = distValue; break;
+                                        default: break;
                                     }
                                 }
                             }
@@ -617,15 +871,15 @@ namespace ModPkgLibSpace
                                     {
                                         var key = ReadMsgpackString(stream);
                                         if (key == "name") name = ReadMsgpackString(stream);
-                                        else if (key == "role" && !ReadMsgpackNil(stream)) role = ReadMsgpackString(stream);
-                                        else if (key != "role") SkipMsgpackValue(stream);
+                                        else if (key == "role") role = ReadMsgpackNil(stream) ? null : ReadMsgpackString(stream);
+                                        else SkipMsgpackValue(stream);
                                     }
                                     metadata.Authors.Add(new ModpkgAuthor(name, role));
                                 }
                             }
                             break;
                         case "license":
-                            if (!ReadMsgpackNil(stream)) metadata.License = ReadLicense(stream);
+                            metadata.License = ReadMsgpackNil(stream) ? new ModpkgLicense(LicenseType.None) : ReadLicense(stream);
                             break;
                         default:
                             SkipMsgpackValue(stream);
@@ -633,27 +887,23 @@ namespace ModPkgLibSpace
                     }
                 }
             }
-            catch (Exception ex) { Console.WriteLine($"Error parsing updated metadata chunks: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error parsing metadata chunk: {ex.Message}");
+            }
             return metadata;
         }
 
-        private static void ReadStringList(MemoryStream stream, List<string> list)
-        {
-            if (ReadMsgpackNil(stream)) return;
-            var count = ReadMsgpackArrayHeader(stream);
-            for (uint i = 0; i < count; i++) list.Add(ReadMsgpackString(stream));
-        }
-
-        private static void ReadLayersMetadata(MemoryStream stream, List<ModpkgLayer> layers)
+        private static void ReadLayersMetadata(MemoryStream stream, List<ModpkgLayerMetadata> layers)
         {
             if (ReadMsgpackNil(stream)) return;
             var count = ReadMsgpackArrayHeader(stream);
             for (uint i = 0; i < count; i++)
             {
                 var fieldCount = ReadMsgpackMapHeader(stream);
-                string name = string.Empty, desc = string.Empty;
+                string name = string.Empty;
+                string desc = null;
                 int priority = 0;
-                var stringOverrides = new Dictionary<string, Dictionary<string, string>>();
 
                 for (uint j = 0; j < fieldCount; j++)
                 {
@@ -661,32 +911,12 @@ namespace ModPkgLibSpace
                     switch (key)
                     {
                         case "name": name = ReadMsgpackString(stream); break;
-                        case "priority": priority = (int)ReadMsgpackUInt(stream); break;
-                        case "description": if (!ReadMsgpackNil(stream)) desc = ReadMsgpackString(stream); break;
-                        case "string_overrides": ReadStringOverridesMap(stream, stringOverrides); break;
+                        case "priority": priority = (int)ReadMsgpackInt(stream); break;
+                        case "description": desc = ReadMsgpackNil(stream) ? null : ReadMsgpackString(stream); break;
                         default: SkipMsgpackValue(stream); break;
                     }
                 }
-                layers.Add(new ModpkgLayer(name, priority, desc, stringOverrides));
-            }
-        }
-
-        private static void ReadStringOverridesMap(MemoryStream stream, Dictionary<string, Dictionary<string, string>> target)
-        {
-            if (ReadMsgpackNil(stream)) return;
-            var outerCount = ReadMsgpackMapHeader(stream);
-            for (uint i = 0; i < outerCount; i++)
-            {
-                var outerKey = ReadMsgpackString(stream);
-                var innerMap = new Dictionary<string, string>();
-                var innerCount = ReadMsgpackMapHeader(stream);
-                for (uint j = 0; j < innerCount; j++)
-                {
-                    var innerKey = ReadMsgpackString(stream);
-                    var innerVal = ReadMsgpackString(stream);
-                    innerMap[innerKey] = innerVal;
-                }
-                target[outerKey] = innerMap;
+                layers.Add(new ModpkgLayerMetadata(name, priority, desc));
             }
         }
 
@@ -709,8 +939,21 @@ namespace ModPkgLibSpace
                 }
             }
 
-            if (typeStr == "spdx") { license.Type = LicenseType.Spdx; license.SpdxId = spdxId; }
-            else if (typeStr == "custom") { license.Type = LicenseType.Custom; license.Name = name; license.Url = url; }
+            if (string.Equals(typeStr, "spdx", StringComparison.OrdinalIgnoreCase))
+            {
+                license.Type = LicenseType.Spdx;
+                license.SpdxId = spdxId;
+            }
+            else if (string.Equals(typeStr, "custom", StringComparison.OrdinalIgnoreCase))
+            {
+                license.Type = LicenseType.Custom;
+                license.Name = name;
+                license.Url = url;
+            }
+            else
+            {
+                license.Type = LicenseType.None;
+            }
             return license;
         }
 
@@ -762,8 +1005,9 @@ namespace ModPkgLibSpace
         private readonly string _outputPath;
         private ModpkgMetadata _metadata;
         private readonly List<ModpkgLayer> _layers = new();
-        private readonly List<(string Path, byte[] Data, string LayerName)> _chunksToProcess = new();
+        private readonly List<(string Path, byte[] Data, string LayerName, string WadName)> _chunksToProcess = new();
         private readonly List<(string Path, byte[] Data)> _otherMetaChunks = new();
+        private readonly List<string> _extraHeaderPaths = new();
         private readonly List<ModpkgChunk> _finalChunks = new();
 
         public ModpkgWriter(string outputPath) => _outputPath = outputPath;
@@ -782,23 +1026,38 @@ namespace ModPkgLibSpace
             if (!_layers.Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) _layers.Add(new ModpkgLayer(name, priority));
         }
 
-        public void AddChunk(string path, byte[] data, string layerName) => _chunksToProcess.Add((path, data, layerName));
+        public void AddChunk(string path, byte[] data, string layerName, string wadName = null)
+        {
+            _chunksToProcess.Add((path, data, layerName, wadName));
+        }
+
+        public void AddExtraPaths(IEnumerable<string> paths)
+        {
+            if (paths == null) return;
+            foreach (var p in paths)
+            {
+                if (!string.IsNullOrWhiteSpace(p) && !_extraHeaderPaths.Contains(p, StringComparer.OrdinalIgnoreCase))
+                {
+                    _extraHeaderPaths.Add(p);
+                }
+            }
+        }
 
         private static void WriteMsgpackString(MemoryStream stream, string value)
         {
             var bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
             var len = bytes.Length;
 
-            if (len < 32) stream.WriteByte((byte)(0xa0 | len));
-            else if (len < 256) { stream.WriteByte(0xd9); stream.WriteByte((byte)len); }
+            if (len < 32) stream.WriteByte((byte)(0xA0 | len));
+            else if (len < 256) { stream.WriteByte(0xD9); stream.WriteByte((byte)len); }
             else if (len < 65536)
             {
-                stream.WriteByte(0xda);
+                stream.WriteByte(0xDA);
                 stream.Write(BitConverter.GetBytes((ushort)len).Reverse().ToArray(), 0, 2);
             }
             else
             {
-                stream.WriteByte(0xdb);
+                stream.WriteByte(0xDB);
                 stream.Write(BitConverter.GetBytes((uint)len).Reverse().ToArray(), 0, 4);
             }
             stream.Write(bytes, 0, len);
@@ -807,107 +1066,162 @@ namespace ModPkgLibSpace
         private static void WriteMsgpackUInt(MemoryStream stream, ulong value)
         {
             if (value <= 127) stream.WriteByte((byte)value);
-            else if (value <= 0xFF) { stream.WriteByte(0xcc); stream.WriteByte((byte)value); }
-            else if (value <= 0xFFFF) { stream.WriteByte(0xcd); stream.Write(BitConverter.GetBytes((ushort)value).Reverse().ToArray(), 0, 2); }
-            else if (value <= 0xFFFFFFFF) { stream.WriteByte(0xce); stream.Write(BitConverter.GetBytes((uint)value).Reverse().ToArray(), 0, 4); }
-            else { stream.WriteByte(0xcf); stream.Write(BitConverter.GetBytes(value).Reverse().ToArray(), 0, 8); }
+            else if (value <= 0xFF) { stream.WriteByte(0xCC); stream.WriteByte((byte)value); }
+            else if (value <= 0xFFFF) { stream.WriteByte(0xCD); stream.Write(BitConverter.GetBytes((ushort)value).Reverse().ToArray(), 0, 2); }
+            else if (value <= 0xFFFFFFFF) { stream.WriteByte(0xCE); stream.Write(BitConverter.GetBytes((uint)value).Reverse().ToArray(), 0, 4); }
+            else { stream.WriteByte(0xCF); stream.Write(BitConverter.GetBytes(value).Reverse().ToArray(), 0, 8); }
+        }
+
+        private static void WriteMsgpackInt(MemoryStream stream, long value)
+        {
+            if (value >= 0)
+            {
+                WriteMsgpackUInt(stream, (ulong)value);
+                return;
+            }
+
+            if (value >= -32)
+            {
+                stream.WriteByte((byte)(0xE0 | (value & 0x1F)));
+            }
+            else if (value >= sbyte.MinValue)
+            {
+                stream.WriteByte(0xD0);
+                stream.WriteByte((byte)(sbyte)value);
+            }
+            else if (value >= short.MinValue)
+            {
+                stream.WriteByte(0xD1);
+                var b = BitConverter.GetBytes((short)value);
+                if (BitConverter.IsLittleEndian) Array.Reverse(b);
+                stream.Write(b, 0, 2);
+            }
+            else if (value >= int.MinValue)
+            {
+                stream.WriteByte(0xD2);
+                var b = BitConverter.GetBytes((int)value);
+                if (BitConverter.IsLittleEndian) Array.Reverse(b);
+                stream.Write(b, 0, 4);
+            }
+            else
+            {
+                stream.WriteByte(0xD3);
+                var b = BitConverter.GetBytes(value);
+                if (BitConverter.IsLittleEndian) Array.Reverse(b);
+                stream.Write(b, 0, 8);
+            }
         }
 
         private static void WriteMsgpackMapHeader(MemoryStream stream, uint count)
         {
             if (count <= 15) stream.WriteByte((byte)(0x80 | count));
-            else if (count <= 0xFFFF) { stream.WriteByte(0xde); stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2); }
-            else { stream.WriteByte(0xdf); stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4); }
+            else if (count <= 0xFFFF) { stream.WriteByte(0xDE); stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2); }
+            else { stream.WriteByte(0xDF); stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4); }
         }
 
         private static void WriteMsgpackArrayHeader(MemoryStream stream, uint count)
         {
             if (count <= 15) stream.WriteByte((byte)(0x90 | count));
-            else if (count <= 0xFFFF) { stream.WriteByte(0xdc); stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2); }
-            else { stream.WriteByte(0xdd); stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4); }
+            else if (count <= 0xFFFF) { stream.WriteByte(0xDC); stream.Write(BitConverter.GetBytes((ushort)count).Reverse().ToArray(), 0, 2); }
+            else { stream.WriteByte(0xDD); stream.Write(BitConverter.GetBytes((uint)count).Reverse().ToArray(), 0, 4); }
         }
 
-        private static void WriteMsgpackNil(MemoryStream stream) => stream.WriteByte(0xc0);
+        private static void WriteMsgpackNil(MemoryStream stream) => stream.WriteByte(0xC0);
 
         private byte[] SerializeMetadataMsgpack(ModpkgMetadata metadata)
         {
             using var stream = new MemoryStream();
 
-            // Total fields expanded to include tags, champions, maps, layers collections
-            WriteMsgpackMapHeader(stream, 13);
+            WriteMsgpackMapHeader(stream, 9);
 
-            WriteMsgpackString(stream, "schema_version"); WriteMsgpackUInt(stream, metadata.SchemaVersion);
-            WriteMsgpackString(stream, "name"); WriteMsgpackString(stream, metadata.Name);
-            WriteMsgpackString(stream, "display_name"); WriteMsgpackString(stream, metadata.DisplayName);
+            WriteMsgpackString(stream, "schema_version");
+            WriteMsgpackUInt(stream, metadata.SchemaVersion);
+
+            WriteMsgpackString(stream, "name");
+            WriteMsgpackString(stream, metadata.Name);
+
+            WriteMsgpackString(stream, "display_name");
+            WriteMsgpackString(stream, metadata.DisplayName);
 
             WriteMsgpackString(stream, "description");
-            if (string.IsNullOrEmpty(metadata.Description)) WriteMsgpackNil(stream);
+            if (metadata.Description == null) WriteMsgpackNil(stream);
             else WriteMsgpackString(stream, metadata.Description);
 
-            WriteMsgpackString(stream, "version"); WriteMsgpackString(stream, metadata.Version);
-
-            // Modern Serialization Additions
-            WriteMsgpackString(stream, "tags");
-            WriteMsgpackArrayHeader(stream, (uint)metadata.Tags.Count);
-            foreach (var tag2 in metadata.Tags) WriteMsgpackString(stream, tag2);
-
-            WriteMsgpackString(stream, "champions");
-            WriteMsgpackArrayHeader(stream, (uint)metadata.Champions.Count);
-            foreach (var champ in metadata.Champions) WriteMsgpackString(stream, champ);
-
-            WriteMsgpackString(stream, "maps");
-            WriteMsgpackArrayHeader(stream, (uint)metadata.Maps.Count);
-            foreach (var map in metadata.Maps) WriteMsgpackString(stream, map);
-
-            WriteMsgpackString(stream, "layers");
-            WriteMsgpackArrayHeader(stream, (uint)metadata.Layers.Count);
-            foreach (var layer in metadata.Layers)
-            {
-                WriteMsgpackMapHeader(stream, 4);
-                WriteMsgpackString(stream, "name"); WriteMsgpackString(stream, layer.Name);
-                WriteMsgpackString(stream, "priority"); WriteMsgpackUInt(stream, (ulong)layer.Priority);
-                WriteMsgpackString(stream, "description"); WriteMsgpackString(stream, layer.Description);
-
-                WriteMsgpackString(stream, "string_overrides");
-                WriteMsgpackMapHeader(stream, (uint)layer.StringOverrides.Count);
-                foreach (var outer in layer.StringOverrides)
-                {
-                    WriteMsgpackString(stream, outer.Key);
-                    WriteMsgpackMapHeader(stream, (uint)outer.Value.Count);
-                    foreach (var inner in outer.Value)
-                    {
-                        WriteMsgpackString(stream, inner.Key);
-                        WriteMsgpackString(stream, inner.Value);
-                    }
-                }
-            }
+            WriteMsgpackString(stream, "version");
+            WriteMsgpackString(stream, string.IsNullOrEmpty(metadata.Version) ? "1.0.0" : metadata.Version);
 
             WriteMsgpackString(stream, "distributor");
-            var distributor = metadata.Distributor ?? new DistributorInfo();
-            WriteMsgpackMapHeader(stream, 5);
-            WriteMsgpackString(stream, "site_id"); WriteMsgpackString(stream, distributor.SiteId);
-            WriteMsgpackString(stream, "site_name"); WriteMsgpackString(stream, distributor.SiteName);
-            WriteMsgpackString(stream, "site_url"); WriteMsgpackString(stream, distributor.SiteUrl);
-            WriteMsgpackString(stream, "mod_id"); WriteMsgpackString(stream, distributor.ModId);
-            WriteMsgpackString(stream, "release_id"); WriteMsgpackString(stream, distributor.ReleaseId);
+            if (metadata.Distributor == null)
+            {
+                WriteMsgpackNil(stream);
+            }
+            else
+            {
+                WriteMsgpackMapHeader(stream, 4);
+                WriteMsgpackString(stream, "site_id");
+                WriteMsgpackString(stream, metadata.Distributor.SiteId ?? string.Empty);
+                WriteMsgpackString(stream, "site_name");
+                WriteMsgpackString(stream, metadata.Distributor.SiteName ?? string.Empty);
+                WriteMsgpackString(stream, "site_url");
+                WriteMsgpackString(stream, metadata.Distributor.SiteUrl ?? string.Empty);
+                WriteMsgpackString(stream, "mod_id");
+                WriteMsgpackString(stream, metadata.Distributor.ModId ?? string.Empty);
+            }
 
             WriteMsgpackString(stream, "authors");
-            WriteMsgpackArrayHeader(stream, (uint)metadata.Authors.Count);
-            foreach (var author in metadata.Authors)
+            var authors = metadata.Authors ?? new List<ModpkgAuthor>();
+            WriteMsgpackArrayHeader(stream, (uint)authors.Count);
+            foreach (var author in authors)
             {
                 WriteMsgpackMapHeader(stream, 2);
-                WriteMsgpackString(stream, "name"); WriteMsgpackString(stream, author.Name);
-                WriteMsgpackString(stream, "role"); if (string.IsNullOrEmpty(author.Role)) WriteMsgpackNil(stream); else WriteMsgpackString(stream, author.Role);
+                WriteMsgpackString(stream, "name");
+                WriteMsgpackString(stream, author.Name ?? string.Empty);
+                WriteMsgpackString(stream, "role");
+                if (string.IsNullOrEmpty(author.Role)) WriteMsgpackNil(stream);
+                else WriteMsgpackString(stream, author.Role);
             }
 
             WriteMsgpackString(stream, "license");
-            string tag = metadata.License.Type == LicenseType.Spdx ? "spdx" : metadata.License.Type == LicenseType.Custom ? "custom" : "none";
-            uint mapSize = metadata.License.Type == LicenseType.Spdx ? 2U : metadata.License.Type == LicenseType.Custom ? 3U : 1U;
+            var license = metadata.License ?? new ModpkgLicense(LicenseType.None);
+            if (license.Type == LicenseType.Spdx)
+            {
+                WriteMsgpackMapHeader(stream, 2);
+                WriteMsgpackString(stream, "type");
+                WriteMsgpackString(stream, "spdx");
+                WriteMsgpackString(stream, "spdx_id");
+                WriteMsgpackString(stream, license.SpdxId ?? string.Empty);
+            }
+            else if (license.Type == LicenseType.Custom)
+            {
+                WriteMsgpackMapHeader(stream, 3);
+                WriteMsgpackString(stream, "type");
+                WriteMsgpackString(stream, "custom");
+                WriteMsgpackString(stream, "name");
+                WriteMsgpackString(stream, license.Name ?? string.Empty);
+                WriteMsgpackString(stream, "url");
+                WriteMsgpackString(stream, license.Url ?? string.Empty);
+            }
+            else
+            {
+                WriteMsgpackMapHeader(stream, 1);
+                WriteMsgpackString(stream, "type");
+                WriteMsgpackString(stream, "none");
+            }
 
-            WriteMsgpackMapHeader(stream, mapSize);
-            WriteMsgpackString(stream, "type"); WriteMsgpackString(stream, tag);
-            if (metadata.License.Type == LicenseType.Spdx) { WriteMsgpackString(stream, "spdx_id"); WriteMsgpackString(stream, metadata.License.SpdxId); }
-            else if (metadata.License.Type == LicenseType.Custom) { WriteMsgpackString(stream, "name"); WriteMsgpackString(stream, metadata.License.Name); WriteMsgpackString(stream, "url"); WriteMsgpackString(stream, metadata.License.Url ?? ""); }
+            WriteMsgpackString(stream, "layers");
+            var layers = metadata.Layers ?? new List<ModpkgLayerMetadata>();
+            WriteMsgpackArrayHeader(stream, (uint)layers.Count);
+            foreach (var layer in layers)
+            {
+                WriteMsgpackMapHeader(stream, 3);
+                WriteMsgpackString(stream, "name");
+                WriteMsgpackString(stream, layer.Name ?? string.Empty);
+                WriteMsgpackString(stream, "priority");
+                WriteMsgpackInt(stream, layer.Priority);
+                WriteMsgpackString(stream, "description");
+                if (layer.Description == null) WriteMsgpackNil(stream);
+                else WriteMsgpackString(stream, layer.Description);
+            }
 
             return stream.ToArray();
         }
@@ -919,31 +1233,72 @@ namespace ModPkgLibSpace
             using var fileStream = File.Create(_outputPath);
             using var writer = new BinaryWriter(fileStream);
 
-            var chunkPaths = _chunksToProcess.Select(c => c.Path)
-                                      .Concat(new[] { Constants.METADATA_CHUNK_PATH })
-                                      .Concat(_otherMetaChunks.Select(c => c.Path))
-                                      .Distinct()
-                                      .ToList();
-            var pathToIndex = chunkPaths.Select((p, i) => (p, i)).ToDictionary(x => x.p, x => (uint)x.i);
-            var totalChunks = _chunksToProcess.Count + 1 + _otherMetaChunks.Count;
+            var chunkPaths = new List<string> { Constants.METADATA_CHUNK_PATH };
+            foreach (var (p, _) in _otherMetaChunks)
+            {
+                if (!chunkPaths.Contains(p, StringComparer.OrdinalIgnoreCase))
+                {
+                    chunkPaths.Add(p);
+                }
+            }
+
+            foreach (var (p, _, _, _) in _chunksToProcess)
+            {
+                if (!chunkPaths.Contains(p, StringComparer.OrdinalIgnoreCase))
+                {
+                    chunkPaths.Add(p);
+                }
+            }
+
+            foreach (var p in _extraHeaderPaths)
+            {
+                if (!chunkPaths.Contains(p, StringComparer.OrdinalIgnoreCase))
+                {
+                    chunkPaths.Add(p);
+                }
+            }
+
+            var pathToIndex = chunkPaths.Select((p, i) => (p, i)).ToDictionary(x => x.p, x => (uint)x.i, StringComparer.OrdinalIgnoreCase);
+
+            var wads = _chunksToProcess.Select(c => c.WadName)
+                                       .Where(w => !string.IsNullOrEmpty(w))
+                                       .Distinct(StringComparer.OrdinalIgnoreCase)
+                                       .ToList();
+            var wadToIndex = wads.Select((w, i) => (w, i)).ToDictionary(x => x.w, x => (uint)x.i, StringComparer.OrdinalIgnoreCase);
+
+            var totalChunks = 1 + _otherMetaChunks.Count + _chunksToProcess.Count;
 
             writer.Write(Constants.MAGIC);
             writer.Write(Constants.VERSION);
-            writer.Write(0U); // signature size placeholder
+            writer.Write(0U);
             writer.Write((uint)totalChunks);
-            writer.Write(Array.Empty<byte>()); // empty signature
+            writer.Write(Array.Empty<byte>());
 
+            // 1. Layers Table
             writer.Write((uint)_layers.Count);
             foreach (var layer in _layers)
             {
                 var nameBytes = Encoding.UTF8.GetBytes(layer.Name);
-                writer.Write((uint)nameBytes.Length); writer.Write(nameBytes); writer.Write(layer.Priority);
+                writer.Write((uint)nameBytes.Length);
+                writer.Write(nameBytes);
+                writer.Write(layer.Priority);
             }
 
+            // 2. Paths Table
             writer.Write((uint)chunkPaths.Count);
-            foreach (var path in chunkPaths) { writer.Write(Encoding.UTF8.GetBytes(path)); writer.Write((byte)0); }
+            foreach (var path in chunkPaths)
+            {
+                writer.Write(Encoding.UTF8.GetBytes(path));
+                writer.Write((byte)0);
+            }
 
-            writer.Write(0U); // wad count
+            // 3. WADs Table
+            writer.Write((uint)wads.Count);
+            foreach (var wad in wads)
+            {
+                writer.Write(Encoding.UTF8.GetBytes(wad));
+                writer.Write((byte)0);
+            }
 
             var currentPos = writer.BaseStream.Position;
             var padding = (8 - (currentPos % 8)) % 8;
@@ -952,31 +1307,42 @@ namespace ModPkgLibSpace
             var chunksHeaderPos = writer.BaseStream.Position;
             writer.BaseStream.Seek(totalChunks * ModpkgChunk.ChunkHeaderSize, SeekOrigin.Current);
 
+            // 4. Chunk Payloads
             var metadataBytes = SerializeMetadataMsgpack(_metadata);
-            ProcessAndWriteChunk(writer, Constants.METADATA_CHUNK_PATH, metadataBytes, null, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_LAYER_HASH, true);
+            ProcessAndWriteChunk(writer, Constants.METADATA_CHUNK_PATH, metadataBytes, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_WAD_INDEX, true);
 
-            foreach (var (path, data) in _otherMetaChunks) ProcessAndWriteChunk(writer, path, data, null, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_LAYER_HASH, true);
-
-            foreach (var (path, data, layerName) in _chunksToProcess)
+            foreach (var (path, data) in _otherMetaChunks)
             {
-                var layerIndex = string.IsNullOrEmpty(layerName) ? Constants.NO_LAYER_INDEX : (uint)_layers.FindIndex(l => l.Name == layerName);
-                var layerHash = string.IsNullOrEmpty(layerName) ? Constants.NO_LAYER_HASH : ModPkgLib.HashLayerName(layerName);
-                ProcessAndWriteChunk(writer, path, data, layerName, pathToIndex, layerIndex, layerHash, false);
+                ProcessAndWriteChunk(writer, path, data, pathToIndex, Constants.NO_LAYER_INDEX, Constants.NO_WAD_INDEX, true);
             }
 
+            foreach (var (path, data, layerName, wadName) in _chunksToProcess)
+            {
+                var layerIndex = string.IsNullOrEmpty(layerName) ? Constants.NO_LAYER_INDEX : (uint)_layers.FindIndex(l => l.Name == layerName);
+                var wadIndex = string.IsNullOrEmpty(wadName) ? Constants.NO_WAD_INDEX : wadToIndex[wadName];
+                ProcessAndWriteChunk(writer, path, data, pathToIndex, layerIndex, wadIndex, false);
+            }
+
+            // 5. Chunk Descriptors Table
             writer.BaseStream.Seek(chunksHeaderPos, SeekOrigin.Begin);
             foreach (var chunk in _finalChunks)
             {
-                writer.Write(chunk.PathHash); writer.Write(chunk.DataOffset); writer.Write((byte)chunk.Compression);
-                writer.Write(chunk.CompressedSize); writer.Write(chunk.UncompressedSize);
-                writer.Write(chunk.CompressedChecksum); writer.Write(chunk.UncompressedChecksum);
-                writer.Write(chunk.PathIndex); writer.Write(chunk.LayerIndex); writer.Write(chunk.WadIndex);
+                writer.Write(chunk.PathHash);
+                writer.Write(chunk.DataOffset);
+                writer.Write((byte)chunk.Compression);
+                writer.Write(chunk.CompressedSize);
+                writer.Write(chunk.UncompressedSize);
+                writer.Write(chunk.CompressedChecksum);
+                writer.Write(chunk.UncompressedChecksum);
+                writer.Write(chunk.PathIndex);
+                writer.Write(chunk.LayerIndex);
+                writer.Write(chunk.WadIndex);
             }
             writer.Flush();
         }
 
-        private void ProcessAndWriteChunk(BinaryWriter writer, string path, byte[] data, string layerName,
-          Dictionary<string, uint> pathToIndex, uint layerIndex, ulong layerHash, bool isMetaChunk)
+        private void ProcessAndWriteChunk(BinaryWriter writer, string path, byte[] data,
+          Dictionary<string, uint> pathToIndex, uint layerIndex, uint wadIndex, bool isMetaChunk)
         {
             var dataOffset = (ulong)writer.BaseStream.Position;
             byte[] compressedData = data;
@@ -986,7 +1352,11 @@ namespace ModPkgLibSpace
             {
                 using var compressor = new ZstdSharp.Compressor();
                 byte[] compressed = compressor.Wrap(data).ToArray();
-                if (compressed.Length < data.Length) { compressedData = compressed; compression = CompressionType.Zstd; }
+                if (compressed.Length < data.Length)
+                {
+                    compressedData = compressed;
+                    compression = CompressionType.Zstd;
+                }
             }
 
             writer.Write(compressedData);
@@ -1002,7 +1372,7 @@ namespace ModPkgLibSpace
                 UncompressedChecksum = ModPkgLib.XXH3_64(data),
                 PathIndex = pathToIndex[path],
                 LayerIndex = layerIndex,
-                WadIndex = Constants.NO_WAD_INDEX
+                WadIndex = wadIndex
             });
         }
 
