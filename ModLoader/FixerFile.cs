@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Documents;
+using System.Windows.Shapes;
 using ZstdSharp;
 using static ModManager.Repatheruwu;
 using static ModManager.Repatheruwu.WadExtractor;
@@ -109,6 +110,7 @@ namespace ModManager
         public string manifest_145 { get; set; } = "https://lol.secure.dyn.riotcdn.net/channels/public/releases/998BEDBD1E22BD5E.manifest";
         public List<ShaderEntry> shaders { get; set; } = null;
         public string ManfiestDL { get; set; } = Path.Combine("cslol-tools", "ManifestDownloader.exe");
+        public List<string> hash_table { get; set; } = new List<string>();
     }
     public class ShaderEntry
     {
@@ -613,6 +615,7 @@ namespace ModManager
                 }
 
             }
+            _wadExtractor.ExtractAndLoadTemporaryHashes(Settings.base_wad_path);
             if (Settings.AllAviable)
             {
                 List<int> Skins = _wadExtractor.GetAvailableSkinNumbers(Settings.base_wad_path, Settings.Character);
@@ -747,7 +750,10 @@ namespace ModManager
                 }
 
             }
-
+            if (Settings.hash_table.Count > 0)
+            {
+                File.WriteAllLines($"{Settings.outputDir}/hashes.game.txt", Settings.hash_table);
+            }
             if (!Settings.folder)
             {
                 x.LowerLog("[PACK] Packing WAD", CLR_ACT);
@@ -1546,6 +1552,73 @@ namespace ModManager
             }
             var mainEntry = (BinEmbed)SkinDataEntries.Values.First().Value;
 
+
+            if (GetField(mainEntry, 0x45ff5904) is BinEmbed skinMeshProps)
+            {
+                var submeshKey = new FNV1a(0xaad7612c, "Submesh");
+                var textureKey = new FNV1a(0x3c6468f4, "texture");
+
+                var materialOverrideVal = GetField(skinMeshProps, 0x24725910);
+
+                if (materialOverrideVal is BinList or BinList2)
+                {
+                    var items = materialOverrideVal is BinList bList ? bList.Items : ((BinList2)materialOverrideVal).Items;
+
+                    foreach (var item in items)
+                    {
+                        List<BinField>? fields = item switch
+                        {
+                            BinEmbed embed => embed.Items,
+                            BinPointer ptr => ptr.Items,
+                            _ => null
+                        };
+
+                        if (fields == null) continue;
+
+                        for (int i = 0; i < fields.Count; i++)
+                        {
+                            var field = fields[i];
+
+                            switch (field.Value)
+                            {
+                                case BinString strVal:
+                                    string raw = strVal.Value;
+                                    bool isTexturePath = raw.Contains('/');
+                                    if (isTexturePath)
+                                    {
+                                        field.Key = textureKey;
+
+                                        ulong pathHash = HashMaster.HashPath(raw);
+                                        HashMaster.AddTemporaryHashesAsync([raw]);
+                                        Settings.hash_table.Add(raw);
+
+                                        field.Value = new BinFile(new XXH64(pathHash, raw));
+                                    }
+                                    else
+                                    {
+                                        field.Key = submeshKey;
+                                    }
+                                    break;
+
+                                case BinHash hashVal:
+                                    // Convert existing 32-bit hash into 64-bit BinFile
+                                    field.Key = textureKey;
+                                    field.Value = new BinFile(new XXH64((ulong)hashVal.Value.Hash, hashVal.Value.String));
+                                    break;
+
+                                case BinFile:
+                                    // Already a file, ensure correct key
+                                    field.Key = textureKey;
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+
+
+
+
             BinValue? GetField(BinEmbed embed, uint hash)
                 => embed.Items.FirstOrDefault(f => f.Key.Hash == hash)?.Value;
 
@@ -1729,18 +1802,47 @@ namespace ModManager
 
                         if (itemsToProcess != null)
                         {
+                            FNV1a textureKey = new FNV1a(0xf0a363e3, "TexturePath");
+                            FNV1a submeshKey = new FNV1a(0xb311d4ef, "TextureName");
                             foreach (var listItem in itemsToProcess)
                             {
                                 if (listItem is BinEmbed innerEmbed)
                                 {
                                     foreach (var field in innerEmbed.Items)
                                     {
-                                        if (field.Value is BinString strVal)
+                                        switch (field.Value)
                                         {
-                                            // Logic: Set key based on whether string contains a dot
-                                            field.Key = strVal.Value.Contains(".")
-                                                ? new FNV1a(0xf0a363e3)
-                                                : new FNV1a(0xb311d4ef);
+                                            // Case 1: String value
+                                            case BinString strVal:
+                                                if (strVal.Value.Contains("/"))
+                                                {
+                                                    // Texture path -> Convert to BinFile using XXH64 hash
+                                                    field.Key = textureKey;
+
+                                                    // Replace with your actual HashMaster call/signature (returns ulong or XXH64)
+                                                    ulong pathHash = HashMaster.HashPath(strVal.Value);
+                                                    field.Value = new BinFile(new XXH64(pathHash));
+                                                    HashMaster.AddTemporaryHashesAsync([strVal.Value]);
+                                                    Settings.hash_table.Add(strVal.Value);
+                                                }
+                                                else
+                                                {
+                                                    // Non-path string -> Submesh name
+                                                    field.Key = submeshKey;
+                                                }
+                                                break;
+
+                                            // Case 2: Already a File (XXH64)
+                                            case BinFile fileVal:
+                                                field.Key = textureKey;
+                                                break;
+
+                                            // Case 3: In case it was parsed as a 32-bit BinHash previously
+                                            case BinHash hashVal:
+                                                field.Key = textureKey;
+                                                // If your file expects BinFile instead of BinHash, convert it:
+                                                field.Value = new BinFile(new XXH64((ulong)hashVal.Value.Hash, hashVal.Value.String));
+                                                break;
                                         }
                                     }
                                 }
@@ -2286,9 +2388,9 @@ namespace ModManager
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
                     if (found != null)
                     {
-                        x.UpperLog($"{found.BinFileRef.Count}");
-                        x.UpperLog($"{file.BinFileRef.Count}");
-                        x.UpperLog($"---");
+                        // x.UpperLog($"{found.BinFileRef.Count}");
+                        // x.UpperLog($"{file.BinFileRef.Count}");
+                        // x.UpperLog($"---");
                         found.BinFileRef.AddRange(file.BinFileRef);
                     }
                     else
@@ -2699,6 +2801,149 @@ namespace ModManager
                             while ((bytesRead = inputFile.Read(copyBuffer, 0, copyBuffer.Length)) > 0)
                             {
                                 bw.Write(copyBuffer, 0, bytesRead);
+                            }
+                        }
+                    }
+                }
+            }
+
+            public void ExtractAndLoadTemporaryHashes(List<string> wadPaths)
+            {
+                if (wadPaths == null || wadPaths.Count == 0) return;
+
+                var targetFileNames = new List<string> { "hashes.game.txt" };
+
+                var targetHashes = new HashSet<ulong>();
+                foreach (var target in targetFileNames)
+                {
+                    targetHashes.Add(HashMaster.HashPath(target));
+                }
+
+                byte[] entryBuffer = new byte[32];
+
+                foreach (var wadPath in wadPaths)
+                {
+                    // 1. Directory scan for loose files
+                    if (Directory.Exists(wadPath))
+                    {
+                        foreach (var targetName in targetFileNames)
+                        {
+                            string loosePath = Path.Combine(wadPath, targetName);
+                            if (File.Exists(loosePath))
+                            {
+                                HashMaster.AddTemporaryHashesFromFileAsync(loosePath).GetAwaiter().GetResult();
+                            }
+                        }
+                        continue;
+                    }
+
+                    // 2. WAD archive scan
+                    if (!File.Exists(wadPath)) continue;
+
+                    using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var br = new BinaryReader(fs))
+                    {
+                        if (fs.Length < 272) continue;
+
+                        fs.Seek(268, SeekOrigin.Begin);
+                        uint fileCount = br.ReadUInt32();
+
+                        for (int i = 0; i < fileCount; i++)
+                        {
+                            if (fs.Read(entryBuffer, 0, 32) != 32) break;
+
+                            ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
+
+                            if (targetHashes.Contains(pathHash))
+                            {
+                                uint offset = BitConverter.ToUInt32(entryBuffer, 8);
+                                uint compressedSize = BitConverter.ToUInt32(entryBuffer, 12);
+                                byte type = (byte)(entryBuffer[20] & 0x0F);
+
+                                long savedTocPosition = fs.Position;
+
+                                fs.Seek(offset, SeekOrigin.Begin);
+                                byte[] fileData = new byte[compressedSize];
+                                if (fs.Read(fileData, 0, (int)compressedSize) != compressedSize)
+                                {
+                                    fs.Seek(savedTocPosition, SeekOrigin.Begin);
+                                    continue;
+                                }
+
+                                // Decompress payload (Span works normally in non-async methods)
+                                byte[] rawData;
+                                var rawSpan = new ReadOnlySpan<byte>(fileData);
+
+                                if (IsZstd(rawSpan) || type == 3)
+                                {
+                                    try { rawData = DecompressZstd(fileData, fileData.Length); }
+                                    catch { rawData = fileData; }
+                                }
+                                else if (IsGzip(rawSpan) || type == 1)
+                                {
+                                    try { rawData = DecompressGzip(fileData, fileData.Length); }
+                                    catch { rawData = fileData; }
+                                }
+                                else
+                                {
+                                    rawData = fileData;
+                                }
+
+                                try
+                                {
+                                    using var stream = new MemoryStream(rawData);
+                                    using var reader = new StreamReader(stream, Encoding.UTF8);
+
+                                    // 1. Read first line for scheme check
+                                    string? firstLine = reader.ReadLine();
+                                    string? firstToken = firstLine?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+
+                                    bool scheme = ulong.TryParse(
+     firstToken?.Replace("0x", "", StringComparison.OrdinalIgnoreCase).Trim(),
+     NumberStyles.HexNumber,
+     CultureInfo.InvariantCulture,
+     out _);
+                                    if (scheme)
+                                    {
+                                        string[] parts = firstLine.Split(' ', 2);
+                                        string remaining = parts.Length > 1 ? parts[1] : string.Empty;
+                                        _settings.hash_table.Add(remaining);
+                                    }
+                                    else
+                                    {
+                                        _settings.hash_table.Add(firstLine);
+                                    }
+
+                                    // 3. Iterate over remaining lines
+                                    string? line;
+                                    if (scheme)
+                                    {
+                                        while ((line = reader.ReadLine()) != null)
+                                        {
+                                            if (string.IsNullOrWhiteSpace(line)) continue;
+
+                                            string[] parts = line.Split(' ', 2);
+                                            string remaining = parts.Length > 1 ? parts[1] : string.Empty;
+                                            _settings.hash_table.Add(remaining);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        while ((line = reader.ReadLine()) != null)
+                                        {
+                                            if (string.IsNullOrWhiteSpace(line)) continue;
+
+                                            _settings.hash_table.Add(line);
+                                        }
+                                    }
+                                }
+                                finally
+                                {
+                                    HashMaster.AddTemporaryHashesAsync(_settings.hash_table).GetAwaiter().GetResult();
+                                }
+
+                                // Restore position in TOC table
+                                fs.Seek(savedTocPosition, SeekOrigin.Begin);
                             }
                         }
                     }
