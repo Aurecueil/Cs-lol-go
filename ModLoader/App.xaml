@@ -86,29 +86,29 @@
         <Style x:Key="roundHighlight" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="8" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid>
-                            <Border x:Name="BackgroundBorder"
-                    Background="Transparent"
-                    CornerRadius="50"
-                    SnapsToDevicePixels="True" />
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
+                        <Border x:Name="BackgroundBorder"
+                        Background="Transparent"
+                        CornerRadius="17"
+                        SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                      VerticalAlignment="Center" />
+                        </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="BackgroundBorder" Property="Background" Value="#99000000" />
-                                <!-- 0.6 opacity black: #99000000 -->
+                                <Setter TargetName="BackgroundBorder" Property="Background" Value="#29FFFFFF" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="BackgroundBorder" Property="Background" Value="#CC000000" />
-                                <!-- Slightly darker when pressed -->
+                                <Setter TargetName="BackgroundBorder" Property="Background" Value="#4DFFFFFF" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5" />
+                                <Setter Property="Opacity" Value="0.35" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

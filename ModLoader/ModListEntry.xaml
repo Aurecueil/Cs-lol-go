@@ -5,61 +5,21 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              Height="{DynamicResource ModListEntryHeight}" 
-             MinWidth="600">
+             MinWidth="200" d:DesignWidth="620"
+             SizeChanged="UserControl_SizeChanged">
 
     <Border x:Name="EntryBorder" CornerRadius="6" Margin="{DynamicResource ModListEntryMargin}">
         <Grid>
             <Border x:Name="BGBorder" Background="#FF2A2A2A" CornerRadius="6" />
             <Border x:Name="BackgroundBorder" CornerRadius="6" ClipToBounds="True"/>
 
+            <!-- Main row layout -->
             <DockPanel x:Name="det_grid" 
                        Panel.ZIndex="10" 
-                       Margin="5,0"
+                       Margin="3,0"
                        LastChildFill="True">
 
-                <StackPanel x:Name="elements2" 
-                            DockPanel.Dock="Right"
-                            Orientation="Horizontal" 
-                            VerticalAlignment="Bottom" 
-                            Margin="5,0,0,0">
-
-                    <ComboBox x:Name="ImportOverrideComboBox"
-                              Panel.ZIndex="10" Width="120"
-                              Style="{StaticResource StyledComboBox}"
-                              SelectedIndex="0" Visibility="Collapsed" 
-                              SelectionChanged="ShowSelectedLayerSetting"
-                              Margin="0,0,5,0"/>
-
-                    <Button x:Name="FixingIcon" Style="{StaticResource roundHighlight}"
-                            ToolTip="Fixing" Cursor="Hand" Click="Fixer_settings_panel_open"
-                            BorderThickness="0" Background="Transparent" Visibility="Collapsed">
-                        <TextBlock Text="🔧" Style="{StaticResource IconTextBlockStyle}" 
-                                   Foreground="White" FontSize="15" Padding="8" />
-                    </Button>
-
-                    <Button x:Name="ExportIcon" Style="{StaticResource roundHighlight}"
-                            ToolTip="Export" Cursor="Hand" Click="Export_Item"
-                            BorderThickness="0" Background="Transparent" Visibility="Collapsed">
-                        <TextBlock Text="📄" Style="{StaticResource IconTextBlockStyle}" 
-                                   Foreground="White" FontSize="15" Padding="8" />
-                    </Button>
-
-                    <Button x:Name="ModHandlingIcon" Style="{StaticResource roundHighlight}"
-                            ToolTip="Mod Handling" Cursor="Hand" Click="Open_details_page"
-                            BorderThickness="0" Background="Transparent">
-                        <TextBlock Text="✏️" Style="{StaticResource IconTextBlockStyle}" 
-                                   Foreground="White" FontSize="15" Padding="8" />
-                    </Button>
-
-                    <Button x:Name="DeleteIcon" Style="{StaticResource roundHighlight}"
-                            ToolTip="Delete" Margin="0,0,0,0"
-                            Cursor="Hand" Click="Delete_click_clicked"
-                            BorderThickness="0" Background="Transparent">
-                        <TextBlock Text="❌" Style="{StaticResource IconTextBlockStyle}" 
-                                   Foreground="White" FontSize="15" Padding="8" />
-                    </Button>
-                </StackPanel>
-
+                <!-- Left-side checkbox & title -->
                 <DockPanel x:Name="elements1" 
                            DockPanel.Dock="Left"
                            LastChildFill="True" 
@@ -77,71 +37,179 @@
                     <TextBlock x:Name="EntryName"
                                Foreground="White"
                                FontWeight="SemiBold"
-                               FontSize="14"
+                               FontSize="14" Margin="-10,0,0,0"
                                HorizontalAlignment="Left"
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                MaxWidth="250" 
-                               Text="{Binding Name}"/>
+                               Text="{Binding Name}" d:Text="Lorem Ipsum"/>
                 </DockPanel>
 
-                
-
             </DockPanel>
+
+            <!-- Center details: forcibly hidden when width < 500 -->
             <StackPanel x:Name="elements3"
-            VerticalAlignment="Center"
-            HorizontalAlignment="Center"
-            IsHitTestVisible="False">
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        IsHitTestVisible="False">
                 <TextBlock x:Name="DetailsText"
-               Foreground="#CCCCCC"
-               FontSize="12"
-               TextAlignment="Center"
-               TextWrapping="NoWrap"
-               TextTrimming="CharacterEllipsis"
-               Visibility="Visible"
-               Text="Description text goes here"/>
+                           Foreground="#CCCCCC"
+                           FontSize="12"
+                           TextAlignment="Center"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           Visibility="Visible"
+                           Text="Description text goes here"/>
             </StackPanel>
+
+            <!-- Action buttons container: 34x34 circle with white outline when collapsed -->
+            <!-- Container grid: Holds both the border frame and the buttons -->
+            <Grid x:Name="ActionsOverlayBorder"
+      Panel.ZIndex="25"
+      HorizontalAlignment="Right"
+      VerticalAlignment="Center"
+      Height="34"
+      Margin="0,0,5,0"
+      ClipToBounds="False"
+      Focusable="True"
+      IsKeyboardFocusWithinChanged="ActionsOverlayBorder_IsKeyboardFocusWithinChanged"
+      LostFocus="ActionsOverlayBorder_LostFocus"
+      PreviewKeyDown="ActionsOverlayBorder_PreviewKeyDown">
+
+                <!-- 1. Background Pill: Sits BEHIND the buttons so glow can overlap the border -->
+                <Border x:Name="ActionsOverlayFrame"
+            Background="#FF2A2A2A"
+            BorderBrush="Gray"
+            BorderThickness="2"
+            CornerRadius="17"
+            IsHitTestVisible="False"/>
+
+                <!-- 2. Interactive layer: Strictly unclipped -->
+                <Grid ClipToBounds="False">
+                    <!-- 3-dot Button -->
+                    <Button x:Name="MoreActionsButton"
+                Style="{StaticResource roundHighlight}"
+                ToolTip="More actions"
+                Cursor="Hand"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed"
+                Click="MoreActionsButton_Click">
+                        <TextBlock Text="•••" 
+                       Style="{StaticResource IconTextBlockStyle}"
+                       Foreground="White" 
+                       FontSize="11" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Margin="0,0,0,2"/>
+                    </Button>
+
+                    <!-- Action Buttons: Shifted 1px left -->
+                    <!-- Action Buttons: Shifted 1px left, 2px up, 0 right margin -->
+                    <StackPanel x:Name="elements2" 
+            Orientation="Horizontal" 
+            VerticalAlignment="Center" 
+            ClipToBounds="False"
+            Margin="-1,-2,0,0">
+
+                        <ComboBox x:Name="ImportOverrideComboBox"
+              Panel.ZIndex="10" Width="120"
+              Style="{StaticResource StyledComboBox}"
+              SelectedIndex="0" Visibility="Collapsed" 
+              SelectionChanged="ShowSelectedLayerSetting"
+              VerticalAlignment="Center"
+              Margin="0"/>
+
+                        <Button x:Name="FixingIcon" Style="{StaticResource roundHighlight}"
+            ToolTip="Fixing" Cursor="Hand" Click="Fixer_settings_panel_open"
+            Visibility="Collapsed"
+            Height="30" Width="30" Padding="0"
+            HorizontalContentAlignment="Center" Margin="0,0,-2,0"
+            VerticalAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="🔧" Style="{StaticResource IconTextBlockStyle}" 
+                   Foreground="White"
+                   FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="3,0,0,1"
+                            />
+                        </Button>
+
+                        <Button x:Name="ExportIcon" Style="{StaticResource roundHighlight}"
+            ToolTip="Export" Cursor="Hand" Click="Export_Item"
+            Visibility="Collapsed"
+            Height="30" Width="30" Padding="0"
+            HorizontalContentAlignment="Center" Margin="0,0,-2,0"
+            VerticalAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="📄" Style="{StaticResource IconTextBlockStyle}" 
+                   Foreground="White"
+                   FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"  Margin="0,0,0,1"
+                            />
+                        </Button>
+
+                        <Button x:Name="ModHandlingIcon" Style="{StaticResource roundHighlight}"
+            ToolTip="Mod Handling" Cursor="Hand" Click="Open_details_page"
+            Height="30" Width="30" Padding="0"
+            HorizontalContentAlignment="Center" Margin="0,0,-2,0"
+            VerticalAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="✏️" Style="{StaticResource IconTextBlockStyle}" 
+                   Foreground="White"
+                   FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"  Margin="0,0,0,1"
+                            />
+                        </Button>
+
+                        <Button x:Name="DeleteIcon" Style="{StaticResource roundHighlight}"
+            ToolTip="Delete" Cursor="Hand" Click="Delete_click_clicked"
+            Height="30" Width="30" Padding="0" Margin="0,0,-2,0"
+            HorizontalContentAlignment="Center"
+            VerticalAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="❌" Style="{StaticResource IconTextBlockStyle}" 
+                   Foreground="White"
+                   FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1"
+                             />
+                        </Button>
+                    </StackPanel>
+                    
+                </Grid>
+            </Grid>
+
+
+            <!-- Status and fixer overlays -->
             <Border x:Name="StatusBorder" Panel.ZIndex="15" Background="Transparent" CornerRadius="6" Opacity="0.15" IsHitTestVisible="False"/>
             <Border x:Name="StatusBorderBorder" Panel.ZIndex="15" BorderBrush="Transparent" BorderThickness="2" CornerRadius="3" Opacity="0.8" IsHitTestVisible="False"/>
 
             <Border x:Name="FixerOverlay"
-        Visibility="Collapsed"
-        Panel.ZIndex="20"
-        Background="#AA000000"
-        CornerRadius="6">
+                    Visibility="Collapsed"
+                    Panel.ZIndex="30"
+                    Background="#AA000000"
+                    CornerRadius="6">
 
                 <StackPanel Orientation="Horizontal"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
 
                     <TextBlock x:Name="block"
-                   Text="Fixer Running..."
-                   Foreground="White"
-                   FontWeight="Bold"
-                   FontSize="12"
-                   VerticalAlignment="Center"
-                   Margin="8,5,4,5"/>
+                               Text="Fixer Running..."
+                               Foreground="White"
+                               FontWeight="Bold"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="8,5,4,5"/>
 
                     <Button Style="{StaticResource roundHighlight}"
-                ToolTip="Fixing"
-                Cursor="Hand"
-                Click="Fixer_settings_panel_open"
-                BorderThickness="0"
-                Background="Transparent"
-                Visibility="Visible"
-                VerticalAlignment="Center">
+                            ToolTip="Fixing"
+                            Cursor="Hand"
+                            Click="Fixer_settings_panel_open"
+                            Visibility="Visible"
+                            VerticalAlignment="Center">
 
                         <TextBlock Text="🔧" x:Name="whenrun" Visibility="Collapsed"
-                       Style="{StaticResource IconTextBlockStyle}"
-                       Foreground="White"
-                       FontSize="15"
-                       Padding="8"/>
+                                   Style="{StaticResource IconTextBlockStyle}"
+                                   Foreground="White"
+                                   FontSize="15"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
                     </Button>
-
                 </StackPanel>
             </Border>
-
-            
 
         </Grid>
     </Border>

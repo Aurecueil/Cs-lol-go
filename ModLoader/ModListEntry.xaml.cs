@@ -4,7 +4,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace ModManager
 {
@@ -107,6 +109,8 @@ namespace ModManager
             ExportIcon.Visibility = Visibility.Collapsed;
             ModHandlingIcon.Visibility = Visibility.Collapsed;
             DeleteIcon.Visibility = Visibility.Collapsed;
+            ActionsOverlayFrame.Visibility = Visibility.Collapsed;
+            ActionsOverlayBorder.Visibility = Visibility.Collapsed;
 
             ApplyAlignmentSettings(); // Apply alignment settings for parent folder
             UpdateSelectionVisual();
@@ -303,7 +307,7 @@ namespace ModManager
                         meow.Add(entry);
                     }
                 }
-                foreach(var entry in meow)
+                foreach (var entry in meow)
                 {
                     entry.set_export(true);
                 }
@@ -368,9 +372,11 @@ namespace ModManager
                         Main.OverlayHost.Children.Add(Fixer);
                 }
             }
-            catch (Exception ex) { 
+            catch (Exception ex)
+            {
                 MessageBox.Show(ex.ToString());
-                Logger.LogError("Failed to handle Runeforge protocol", ex); }
+                Logger.LogError("Failed to handle Runeforge protocol", ex);
+            }
         }
         public void null_fixer()
         {
@@ -535,21 +541,21 @@ namespace ModManager
                 case 0: // Top
                     elements1.VerticalAlignment = VerticalAlignment.Top;
                     elements2.VerticalAlignment = VerticalAlignment.Top;
-                    elements2.Margin = new Thickness(6);
+                    elements2.Margin = new Thickness(6, 6, 11, 6); // +5px right
                     elements3.VerticalAlignment = VerticalAlignment.Top;
-                    elements3.Margin = new Thickness(0,18,0,0);
+                    elements3.Margin = new Thickness(0, 18, 0, 0);
                     break;
                 case 1: // Center
                     elements1.VerticalAlignment = VerticalAlignment.Center;
                     elements2.VerticalAlignment = VerticalAlignment.Center;
-                    elements2.Margin = new Thickness(8, 0, 0, 0);
+                    elements2.Margin = new Thickness(8, 0, 5, 0);  // +5px right
                     DetailsText.VerticalAlignment = VerticalAlignment.Center;
                     DetailsText.Margin = new Thickness(8, 0, 8, 0);
                     break;
                 case 2: // Bottom
                     elements1.VerticalAlignment = VerticalAlignment.Bottom;
                     elements2.VerticalAlignment = VerticalAlignment.Bottom;
-                    elements2.Margin = new Thickness(6);
+                    elements2.Margin = new Thickness(6, 6, 11, 6); // +5px right
                     elements3.VerticalAlignment = VerticalAlignment.Bottom;
                     elements3.Margin = new Thickness(0, 0, 0, 18);
                     break;
@@ -557,7 +563,7 @@ namespace ModManager
                     break;
             }
         }
-        
+
 
         private async void UpdateBackgroundUI()
         {
@@ -968,6 +974,170 @@ namespace ModManager
             {
                 UpdateUIForFolder(info, basee, first);
             }
+        }
+        private const double CircleSize = 34.0;
+        private const double CapsuleRadius = 17.0;
+        private bool _isExpanded = false;
+
+        private void UserControl_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (IsParentFolder)
+            {
+                return;
+            }
+            // 1. Hide description when narrow
+            elements3.Visibility = (e.NewSize.Width < 450 && !IsParentFolder) ? Visibility.Collapsed : Visibility.Visible;
+
+            // 2. Responsive actions (< 400)
+            bool isCompact = e.NewSize.Width < 400;
+
+            if (isCompact)
+            {
+                ActionsOverlayFrame.Background = new SolidColorBrush(Color.FromArgb(0xFF, 0x2A, 0x2A, 0x2A));
+                ActionsOverlayFrame.BorderBrush = Brushes.Gray;
+                ActionsOverlayFrame.BorderThickness = new Thickness(2);
+                ActionsOverlayFrame.CornerRadius = new CornerRadius(CapsuleRadius);
+
+                ActionsOverlayBorder.Height = CircleSize;
+                ActionsOverlayBorder.Margin = new Thickness(0, 0, 8, 0);
+
+                elements2.Margin = new Thickness(-1, 0, 1, 0);
+
+                if (e.PreviousSize.Width >= 400 || e.PreviousSize.Width == 0)
+                {
+                    CollapseActions(animate: false);
+                }
+            }
+            else
+            {
+                _isExpanded = false;
+                ActionsOverlayBorder.BeginAnimation(WidthProperty, null);
+                ActionsOverlayBorder.Width = double.NaN;
+                ActionsOverlayBorder.Height = double.NaN;
+                ActionsOverlayBorder.Margin = new Thickness(0, 0, 6, 0);
+
+                ActionsOverlayFrame.Background = Brushes.Transparent;
+                ActionsOverlayFrame.BorderBrush = Brushes.Transparent;
+                ActionsOverlayFrame.BorderThickness = new Thickness(0);
+
+                elements2.Margin = new Thickness(4, 0, 0, 0);
+                MoreActionsButton.Visibility = Visibility.Collapsed;
+                elements2.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ExpandActions()
+        {
+            if (_isExpanded || ActualWidth >= 400) return;
+            _isExpanded = true;
+
+            MoreActionsButton.Visibility = Visibility.Collapsed;
+            elements2.Visibility = Visibility.Visible;
+            elements2.Margin = new Thickness(-1, 0, 1, 0);
+
+            elements2.Measure(new Size(double.PositiveInfinity, CircleSize));
+            double targetWidth = Math.Max(elements2.DesiredSize.Width + 2, CircleSize);
+
+            if (ActualWidth > 0)
+            {
+                targetWidth = Math.Min(targetWidth, ActualWidth - 14);
+            }
+
+            DoubleAnimation expandAnim = new DoubleAnimation
+            {
+                From = CircleSize,
+                To = targetWidth,
+                Duration = TimeSpan.FromMilliseconds(200),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            expandAnim.Completed += (s, e) =>
+            {
+                if (_isExpanded)
+                {
+                    ActionsOverlayBorder.BeginAnimation(WidthProperty, null);
+                    ActionsOverlayBorder.Width = targetWidth;
+                    ActionsOverlayBorder.Focus();
+                }
+            };
+
+            ActionsOverlayBorder.BeginAnimation(WidthProperty, expandAnim);
+        }
+
+        private void CollapseActions(bool animate = true)
+        {
+            if (!_isExpanded && MoreActionsButton.Visibility == Visibility.Visible) return;
+            _isExpanded = false;
+
+            if (ActualWidth >= 400) return;
+
+            if (!animate)
+            {
+                ActionsOverlayBorder.BeginAnimation(WidthProperty, null);
+                elements2.Visibility = Visibility.Collapsed;
+                MoreActionsButton.Visibility = Visibility.Visible;
+                ActionsOverlayBorder.Width = CircleSize;
+                return;
+            }
+
+            double startWidth = ActionsOverlayBorder.ActualWidth > 0 ? ActionsOverlayBorder.ActualWidth : CircleSize;
+
+            DoubleAnimation collapseAnim = new DoubleAnimation
+            {
+                From = startWidth,
+                To = CircleSize,
+                Duration = TimeSpan.FromMilliseconds(160),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+
+            collapseAnim.Completed += (s, e) =>
+            {
+                if (!_isExpanded)
+                {
+                    elements2.Visibility = Visibility.Collapsed;
+                    MoreActionsButton.Visibility = Visibility.Visible;
+                    ActionsOverlayBorder.BeginAnimation(WidthProperty, null);
+                    ActionsOverlayBorder.Width = CircleSize;
+                }
+            };
+
+            ActionsOverlayBorder.BeginAnimation(WidthProperty, collapseAnim);
+        }
+        private void MoreActionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            ExpandActions();
+        }
+
+
+        private void ActionsOverlayBorder_IsKeyboardFocusWithinChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            CollapseIfFocusLost();
+        }
+
+        private void ActionsOverlayBorder_LostFocus(object sender, RoutedEventArgs e)
+        {
+            CollapseIfFocusLost();
+        }
+
+        private void ActionsOverlayBorder_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && ActualWidth < 400)
+            {
+                CollapseActions(animate: true);
+                MoreActionsButton.Focus();
+                e.Handled = true;
+            }
+        }
+
+        private void CollapseIfFocusLost()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ActualWidth < 400 && !ActionsOverlayBorder.IsKeyboardFocusWithin)
+                {
+                    CollapseActions(animate: true);
+                }
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
     }

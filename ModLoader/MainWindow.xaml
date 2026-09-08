@@ -10,7 +10,7 @@
         Title="{Binding DisplayVersion, RelativeSource={RelativeSource Self}, StringFormat='cslol-go    -    {0}'}"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
-        MinWidth="700"
+        MinWidth="650"
         MinHeight="400"
     WindowStartupLocation="CenterScreen">
 

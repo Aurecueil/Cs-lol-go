@@ -1735,6 +1735,7 @@ try
                 await Task.Run(() => LoadFolders());
                 SetLoading("Mods", 1, 0);
                 await Task.Run(() => LoadMods());
+                AdjustModListLayout();
                 details_colums_change(settings.detials_column_active);
                 if (settings.tft_mode)
                 {
@@ -1798,6 +1799,8 @@ try
                     Fixed .modpkg Implementation
                     Further fixer minor optimizations and improvments
                     Fixed import issue occuring with older (2y+) mods
+                    Change Min Width for mod elements to 220
+                    Low Width will now use expandable ... for action buttons
                     """;
                 CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
@@ -2252,7 +2255,16 @@ try
         void AdjustModListLayout()
         {
             if (ModListPanel == null) return;
-
+            if (this.ActualHeight < 770)
+            {
+                Rf_Button.Visibility = Visibility.Collapsed;
+                DS_Button.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                Rf_Button.Visibility = Visibility.Visible;
+                DS_Button.Visibility = Visibility.Visible;
+            }
             double panelWidth = ModListPanel.ActualWidth;
 
             int columns = Math.Max(1, (int)(panelWidth / MinColumnWidth));

@@ -313,8 +313,8 @@ namespace ModLoader
         {
             if (int.TryParse(TilesWidths.Text, out int value))
             {
-                if (value < 350)
-                    value = 350;
+                if (value < 220)
+                    value = 220;
                 else if (value > 2500)
                     value = 2500;
 
