@@ -330,26 +330,20 @@ namespace ModPkgLibSpace
 
             foreach (var (layerHash, chunks) in chunksByLayer)
             {
+                bool isNoLayer = layerHash == Constants.NO_LAYER_HASH;
                 bool isThumbnailLayer = reader.Layers.TryGetValue(layerHash, out var l) &&
                     (l.Name.Equals("thumbnail", StringComparison.OrdinalIgnoreCase) ||
                      l.Name.Equals("thumb", StringComparison.OrdinalIgnoreCase));
 
-                // Base layer maps directly to "WAD"
-                string layerName;
-                if (layerHash == Constants.NO_LAYER_HASH)
+                string layerDir = null;
+                if (!isNoLayer)
                 {
-                    layerName = "WAD_no_layer";
-                }
-                else if (l != null)
-                {
-                    layerName = l.Name.Equals("base", StringComparison.OrdinalIgnoreCase) ? "WAD" : $"WAD_{l.Name}";
-                }
-                else
-                {
-                    layerName = $"WAD_{layerHash:X16}";
-                }
+                    string layerName = l != null
+                        ? (l.Name.Equals("base", StringComparison.OrdinalIgnoreCase) ? "WAD" : $"WAD_{l.Name}")
+                        : $"WAD_{layerHash:X16}";
 
-                var layerDir = Path.Combine(outputDir, layerName);
+                    layerDir = Path.Combine(outputDir, layerName);
+                }
 
                 foreach (var chunk in chunks)
                 {
@@ -372,6 +366,18 @@ namespace ModPkgLibSpace
                     {
                         filePath = Path.Combine(metaDir, "image.png");
                         conversionRequired = true;
+                    }
+                    else if (isNoLayer)
+                    {
+                        // Strip redundant "_meta_/" prefix if present so everything lands directly under /meta/
+                        string cleanChunkPath = chunkPath;
+                        if (cleanChunkPath.StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase) ||
+                            cleanChunkPath.StartsWith("_meta_\\", StringComparison.OrdinalIgnoreCase))
+                        {
+                            cleanChunkPath = cleanChunkPath.Substring(7);
+                        }
+
+                        filePath = Path.Combine(metaDir, cleanChunkPath);
                     }
                     else
                     {
@@ -403,9 +409,16 @@ namespace ModPkgLibSpace
             Directory.CreateDirectory(hashesDir);
             var hashesFilePath = Path.Combine(hashesDir, "game.hashes.txt");
 
+            // Exclude any chunk assigned to NO_LAYER_HASH from the game asset hash list
+            var noLayerPathIndices = reader.Chunks
+                .Where(c => c.LayerHash == Constants.NO_LAYER_HASH)
+                .Select(c => c.PathIndex)
+                .ToHashSet();
+
             var gamePaths = reader.ChunkPathList
-                .Where(p => !p.StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase) &&
-                            !p.StartsWith("_meta_\\", StringComparison.OrdinalIgnoreCase))
+                .Where((p, idx) => !noLayerPathIndices.Contains((uint)idx) &&
+                                   !p.StartsWith("_meta_/", StringComparison.OrdinalIgnoreCase) &&
+                                   !p.StartsWith("_meta_\\", StringComparison.OrdinalIgnoreCase))
                 .Select(p =>
                 {
                     var (_, cleanPath) = ParseWadPath(p);
@@ -417,7 +430,6 @@ namespace ModPkgLibSpace
 
             File.WriteAllLines(hashesFilePath, gamePaths);
         }
-
         private static byte[] LoadThumbnailData(string thumbnailPath)
         {
             if (string.IsNullOrEmpty(thumbnailPath) || !File.Exists(thumbnailPath)) return null;

@@ -4873,7 +4873,7 @@ try
             string modFolderName = Path.GetFileName(modFolderPath);
             string metaPath = Path.Combine(modFolderPath, "META");
             string infoPath = Path.Combine(metaPath, "info.json");
-            string hashesPath = Path.Combine(metaPath, "files.txt");
+            string hashesPath = Path.Combine(metaPath, "hashes");
             string detailsPath = Path.Combine(metaPath, "details.json");
             string wadPath = Path.Combine(modFolderPath, "WAD");
 
@@ -4946,54 +4946,9 @@ try
                 string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
-
-            if (File.Exists(hashesPath))
-            {
-                var settings = new FixerSettings();
-                var extractor = new WadExtractor(settings);
-                var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
-                var processor = new WadBatchProcessor(extractor, converter);
-
-                Dispatcher.Invoke(() => SetLoading($"Additional Fix: {modFolderName}", 1, 2137));
-
-                processor.RunRecoveryPipelineAsync(wadPath);
-
-                File.Delete(hashesPath);
-                modDetails.check_up = 2;
-                string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
-                if (File.Exists(game_hash_path))
-                {
-                    modInfo.Hashtables.Add(new Hashtables
-                    {
-                        Path = "META/hashes/game.hashes.txt",
-                        Category = "game",
-                        Algorithm = "xxh64",
-                        Bits = 64
-                    });
-                }
-                string binentries_hash_path = Path.Combine(metaPath, "hashes", "binentries.hashes.txt");
-                if (File.Exists(binentries_hash_path))
-                {
-                    modInfo.Hashtables.Add(new Hashtables
-                    {
-                        Path = "META/hashes/binentries.hashes.txt",
-                        Category = "binentries",
-                        Algorithm = "fnv1a_32",
-                        Bits = 32
-                    });
-                }
-                File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
-            }
+            if (Directory.Exists(hashesPath)) { modDetails.check_up = 2; }
             if (modDetails.check_up < 2)
             {
-                Dispatcher.Invoke(() => SetLoading($"Backing-up: {modFolderName}", 1, 2137));
-
-                string backupDir = Path.Combine("backup", modFolderName);
-                if (Directory.Exists(modFolderPath) && !Directory.Exists(backupDir))
-                {
-                    CopyDirectory(modFolderPath, backupDir);
-                }
-
                 // 1. Set up dependencies
                 var settings = new FixerSettings();
                 var extractor = new WadExtractor(settings);

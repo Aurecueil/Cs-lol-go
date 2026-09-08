@@ -14,6 +14,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Controls.Primitives;
 using ZstdSharp;
 using static ModManager.Repatheruwu;
 using Path = System.IO.Path;
@@ -139,6 +140,16 @@ namespace ModManager
                     if (kvp.Value is BinEmbed patchEmbed)
                         TransformEmbed(patchEmbed, tracker);
                 }
+            }
+        }
+
+        public void ConvertBinMap(BinMap bin, ConvertedStringsTracker? tracker) => ConvertBinInternalMap(bin, tracker);
+        private void ConvertBinInternalMap(BinMap bin, ConvertedStringsTracker? tracker)
+        {
+            foreach (var kvp in bin.Items)
+            {
+                if (kvp.Value is BinEmbed entryEmbed)
+                    TransformEmbed(entryEmbed, tracker);
             }
         }
 
@@ -1155,7 +1166,6 @@ namespace ModManager
             public uint UncompressedSize;
             public byte Type;
         }
-
         private static bool IsZstd(byte[] data, int length) =>
             length >= 4 &&
             data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD;
@@ -1164,33 +1174,104 @@ namespace ModManager
             length >= 2 &&
             data[0] == 0x1F && data[1] == 0x8B;
 
-        private static byte[] DecompressGzip(byte[] data, int length)
+        private static byte[] DecompressDeflateOrZlib(byte[] data, int length)
         {
-            using var ms = new MemoryStream(data, 0, length);
-            using var gs = new GZipStream(ms, CompressionMode.Decompress);
-            using var outMs = new MemoryStream();
-            gs.CopyTo(outMs);
-            return outMs.ToArray();
+            // 1. Standard Gzip wrapper
+            if (IsGzip(data, length))
+            {
+                try
+                {
+                    using var ms = new MemoryStream(data, 0, length);
+                    using var gs = new GZipStream(ms, CompressionMode.Decompress);
+                    using var outMs = new MemoryStream();
+                    gs.CopyTo(outMs);
+                    return outMs.ToArray();
+                }
+                catch { }
+            }
+
+            // 2. Zlib wrapper (RFC 1950)
+            try
+            {
+                using var ms = new MemoryStream(data, 0, length);
+                using var zs = new ZLibStream(ms, CompressionMode.Decompress);
+                using var outMs = new MemoryStream();
+                zs.CopyTo(outMs);
+                return outMs.ToArray();
+            }
+            catch { }
+
+            // 3. Raw Deflate fallback (RFC 1951)
+            try
+            {
+                using var ms = new MemoryStream(data, 0, length);
+                using var ds = new DeflateStream(ms, CompressionMode.Decompress);
+                using var outMs = new MemoryStream();
+                ds.CopyTo(outMs);
+                return outMs.ToArray();
+            }
+            catch { }
+
+            // 4. Raw Deflate stripping 2-byte zlib header (0x78 ...)
+            if (length > 2 && data[0] == 0x78)
+            {
+                try
+                {
+                    using var ms = new MemoryStream(data, 2, length - 2);
+                    using var ds = new DeflateStream(ms, CompressionMode.Decompress);
+                    using var outMs = new MemoryStream();
+                    ds.CopyTo(outMs);
+                    return outMs.ToArray();
+                }
+                catch { }
+            }
+
+            byte[] fallback = new byte[length];
+            Array.Copy(data, fallback, length);
+            return fallback;
         }
 
         private static byte[] DecompressZstd(byte[] data, int length, uint uncompressedSize)
         {
-            using var decompressor = new Decompressor();
+            // Fast unwrap for single-frame Zstd
             if (uncompressedSize > 0)
             {
-                byte[] outBuffer = new byte[uncompressedSize];
-                int written = decompressor.Unwrap(data.AsSpan(0, length), outBuffer.AsSpan());
-                if (written == uncompressedSize) return outBuffer;
-                return outBuffer.AsSpan(0, written).ToArray();
+                try
+                {
+                    using var decompressor = new Decompressor();
+                    byte[] outBuffer = new byte[uncompressedSize];
+                    int written = decompressor.Unwrap(data.AsSpan(0, length), outBuffer.AsSpan());
+                    if (written == (int)uncompressedSize)
+                        return outBuffer;
+                }
+                catch
+                {
+                    // Fall back to stream decompression for multi-frame / chunked frames
+                }
             }
-            return decompressor.Unwrap(data.AsSpan(0, length)).ToArray();
+
+            // DecompressionStream decodes multi-frame and ZstdChunked completely without truncation
+            using var inMs = new MemoryStream(data, 0, length);
+            using var zs = new ZstdSharp.DecompressionStream(inMs);
+            using var outMs = uncompressedSize > 0 ? new MemoryStream((int)uncompressedSize) : new MemoryStream();
+            zs.CopyTo(outMs);
+            return outMs.ToArray();
         }
 
         private static byte[] DecompressEntry(byte[] compBuffer, int bytesRead, RawWadEntry entry)
         {
-            if (IsZstd(compBuffer, bytesRead) || entry.Type == 3)
+            if (bytesRead == 0 || entry.CompressedSize == 0)
+                return Array.Empty<byte>();
+
+            byte compType = (byte)(entry.Type & 0x0F);
+
+            // Type 3: Zstd, Type 4: ZstdChunked, or data starting with Zstd magic header
+            if (compType == 3 || compType == 4 || IsZstd(compBuffer, bytesRead))
             {
-                try { return DecompressZstd(compBuffer, bytesRead, entry.UncompressedSize); }
+                try
+                {
+                    return DecompressZstd(compBuffer, bytesRead, entry.UncompressedSize);
+                }
                 catch
                 {
                     byte[] fallback = new byte[bytesRead];
@@ -1198,9 +1279,13 @@ namespace ModManager
                     return fallback;
                 }
             }
-            else if (IsGzip(compBuffer, bytesRead) || entry.Type == 1)
+            // Type 1: GZip / Zlib / Deflate
+            else if (compType == 1 || IsGzip(compBuffer, bytesRead) || (bytesRead >= 2 && compBuffer[0] == 0x78))
             {
-                try { return DecompressGzip(compBuffer, bytesRead); }
+                try
+                {
+                    return DecompressDeflateOrZlib(compBuffer, bytesRead);
+                }
                 catch
                 {
                     byte[] fallback = new byte[bytesRead];
@@ -1210,6 +1295,7 @@ namespace ModManager
             }
             else
             {
+                // Type 0: Uncompressed data
                 byte[] raw = new byte[bytesRead];
                 Array.Copy(compBuffer, raw, bytesRead);
                 return raw;
@@ -1219,12 +1305,11 @@ namespace ModManager
         private async Task ExtractWadFileAsync(string wadFilePath, string outputDir, CancellationToken ct)
         {
             var entries = new List<RawWadEntry>();
-            byte[] entryBuffer = new byte[32];
 
             using (var fs = new FileStream(wadFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var br = new BinaryReader(fs))
             {
-                if (fs.Length < 272) return;
+                if (fs.Length < 4) return;
 
                 byte[] magic = br.ReadBytes(2);
                 if (magic.Length < 2 || magic[0] != 'R' || magic[1] != 'W') return;
@@ -1232,20 +1317,58 @@ namespace ModManager
                 byte major = br.ReadByte();
                 byte minor = br.ReadByte();
 
-                fs.Seek(268, SeekOrigin.Begin);
-                uint fileCount = br.ReadUInt32();
+                uint fileCount = 0;
+                int entrySize = 32;
+
+                if (major == 3)
+                {
+                    if (fs.Length < 272) return;
+                    fs.Seek(268, SeekOrigin.Begin);
+                    fileCount = br.ReadUInt32();
+                    entrySize = 32; // Both 3.0-3.3 and 3.4+ TOC entries are 32 bytes
+                }
+                else if (major == 2)
+                {
+                    if (fs.Length < 103) return;
+                    fs.Seek(95, SeekOrigin.Begin);
+                    ushort tocStartOffset = br.ReadUInt16();
+                    entrySize = br.ReadUInt16();
+                    fileCount = br.ReadUInt32();
+                    fs.Seek(tocStartOffset, SeekOrigin.Begin);
+                }
+                else if (major == 1)
+                {
+                    if (fs.Length < 12) return;
+                    fs.Seek(4, SeekOrigin.Begin);
+                    ushort tocStartOffset = br.ReadUInt16();
+                    entrySize = br.ReadUInt16();
+                    fileCount = br.ReadUInt32();
+                    fs.Seek(tocStartOffset, SeekOrigin.Begin);
+                }
+                else
+                {
+                    return;
+                }
+
+                byte[] entryBuffer = new byte[entrySize];
 
                 for (int i = 0; i < fileCount; i++)
                 {
-                    if (fs.Read(entryBuffer, 0, 32) != 32) break;
+                    if (fs.Read(entryBuffer, 0, entrySize) != entrySize) break;
+
+                    ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
+                    uint offset = BitConverter.ToUInt32(entryBuffer, 8);
+                    uint compSize = BitConverter.ToUInt32(entryBuffer, 12);
+                    uint uncompSize = BitConverter.ToUInt32(entryBuffer, 16);
+                    byte compType = (byte)(entryBuffer[20] & 0x0F);
 
                     entries.Add(new RawWadEntry
                     {
-                        PathHash = BitConverter.ToUInt64(entryBuffer, 0),
-                        Offset = BitConverter.ToUInt32(entryBuffer, 8),
-                        CompressedSize = BitConverter.ToUInt32(entryBuffer, 12),
-                        UncompressedSize = BitConverter.ToUInt32(entryBuffer, 16),
-                        Type = entryBuffer[20]
+                        PathHash = pathHash,
+                        Offset = offset,
+                        CompressedSize = compSize,
+                        UncompressedSize = uncompSize,
+                        Type = compType
                     });
                 }
             }
@@ -1261,46 +1384,88 @@ namespace ModManager
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    fs.Seek(entry.Offset, SeekOrigin.Begin);
-                    byte[] compBuffer = ArrayPool<byte>.Shared.Rent((int)entry.CompressedSize);
-
                     try
                     {
-                        int bytesRead = fs.Read(compBuffer, 0, (int)entry.CompressedSize);
-                        byte[] decompressed = DecompressEntry(compBuffer, bytesRead, entry);
-
-                        string relativePath;
-                        if (unhashedMap.TryGetValue(entry.PathHash, out string? resolvedPath) && !string.IsNullOrEmpty(resolvedPath))
+                        if (entry.CompressedSize == 0)
                         {
-                            relativePath = resolvedPath;
-                        }
-                        else
-                        {
-                            string ext = GuessExtension(decompressed);
-                            relativePath = $"{entry.PathHash:x16}{ext}";
+                            string emptyPath = ResolveDestinationPath(outputDir, entry, unhashedMap, Array.Empty<byte>());
+                            EnsureDirectoryExists(emptyPath);
+                            File.WriteAllBytes(emptyPath, Array.Empty<byte>());
+                            continue;
                         }
 
-                        relativePath = relativePath.Replace('/', Path.DirectorySeparatorChar)
-                                                   .Replace('\\', Path.DirectorySeparatorChar)
-                                                   .TrimStart(Path.DirectorySeparatorChar);
-
-                        string fullOutPath = Path.Combine(outputDir, relativePath);
-                        string? dir = Path.GetDirectoryName(fullOutPath);
-                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                        if ((ulong)entry.Offset + entry.CompressedSize > (ulong)fs.Length)
                         {
-                            Directory.CreateDirectory(dir);
+                            Debug.WriteLine($"[WadExtract] Chunk {entry.PathHash:x16} bounds exceed file length. Skipped.");
+                            continue;
                         }
 
-                        File.WriteAllBytes(fullOutPath, decompressed);
+                        fs.Seek(entry.Offset, SeekOrigin.Begin);
+                        byte[] compBuffer = ArrayPool<byte>.Shared.Rent((int)entry.CompressedSize);
+
+                        try
+                        {
+                            int bytesRead = fs.Read(compBuffer, 0, (int)entry.CompressedSize);
+                            byte[] decompressed = DecompressEntry(compBuffer, bytesRead, entry);
+
+                            string fullOutPath = ResolveDestinationPath(outputDir, entry, unhashedMap, decompressed);
+                            EnsureDirectoryExists(fullOutPath);
+
+                            File.WriteAllBytes(fullOutPath, decompressed);
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(compBuffer);
+                        }
                     }
-                    finally
+                    catch (Exception ex)
                     {
-                        ArrayPool<byte>.Shared.Return(compBuffer);
+                        Debug.WriteLine($"[WadExtract] Skipped entry {entry.PathHash:x16}: {ex.Message}");
                     }
                 }
             }
         }
 
+        private static string ResolveDestinationPath(string outputDir, RawWadEntry entry, IReadOnlyDictionary<ulong, string> unhashedMap, byte[] decompressed)
+        {
+            string relativePath;
+            if (unhashedMap.TryGetValue(entry.PathHash, out string? resolved) && !string.IsNullOrWhiteSpace(resolved))
+            {
+                relativePath = resolved;
+            }
+            else
+            {
+                string ext = GuessExtension(decompressed);
+                relativePath = $"{entry.PathHash:x16}{ext}";
+            }
+
+            relativePath = relativePath.Replace('/', Path.DirectorySeparatorChar)
+                                       .Replace('\\', Path.DirectorySeparatorChar)
+                                       .TrimStart(Path.DirectorySeparatorChar);
+
+            // Sanitize illegal path chars
+            char[] invalidChars = Path.GetInvalidPathChars();
+            if (relativePath.IndexOfAny(invalidChars) >= 0)
+            {
+                var sb = new StringBuilder(relativePath.Length);
+                foreach (char c in relativePath)
+                {
+                    sb.Append(invalidChars.Contains(c) || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|' ? '_' : c);
+                }
+                relativePath = sb.ToString();
+            }
+
+            return Path.Combine(outputDir, relativePath);
+        }
+
+        private static void EnsureDirectoryExists(string filePath)
+        {
+            string? dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+        }
         private static bool IsBinFile(string filePath)
         {
             try

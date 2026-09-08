@@ -71,7 +71,7 @@ namespace ModManager
         // NO LONGER STATIC
         public string Character { get; set; } = "";
         public int skinNo { get; set; } = 0;
-
+        public bool apply1617binconvertion { get; set; } = true;
         public int HealthbarStyle { get; set; } = 12;
         public bool verifyHpBar { get; set; } = true;
         public string inputDir { get; set; } = "TEMP";
@@ -198,6 +198,7 @@ namespace ModManager
         private WadExtractor _wadExtractor;
         private PathFixer _pathFixer;
         private IFixerLogger x;
+        private BinFieldConverter binconverter = new BinFieldConverter();
 
         // Constants for Logging Colors
         private const string CLR_ACT = "#2a84d2";   // Blue
@@ -599,6 +600,10 @@ namespace ModManager
             _wadExtractor.x = this.x;
             string tmp = Path.Combine(Path.GetTempPath(), "cslolgo_fixer_" + Guid.NewGuid().ToString());
 
+            if (Settings.apply1617binconvertion) { 
+                string rules = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cslol-tools", "binfile_migration_16.17.8087655.jsonl");
+                binconverter.LoadRulesFromFile(rules);
+            }
             Directory.CreateDirectory(tmp);
             Settings.inputDir = tmp;
 
@@ -610,13 +615,7 @@ namespace ModManager
 
                 if (Directory.Exists(currentPath))
                 {
-                    string randomchar = Path.GetRandomFileName().Replace(".", "").Substring(0, 8);
-                    string outputWadPath = Path.Combine(Settings.inputDir, $"{randomchar}.wad.client");
-
-                    // Use instance method
-                    _wadExtractor.PackDirectoryToWad(currentPath, outputWadPath);
-
-                    Settings.base_wad_path[i] = outputWadPath;
+                    _wadExtractor.CreateTopazMap(currentPath);
                 }
 
             }
@@ -665,6 +664,14 @@ namespace ModManager
                 {
                     x.LowerLog($"[SKIP] Coudnt Find SkinCharacterProperties, Skipping {Settings.Character} skin {Settings.skinNo}", CLR_WARN);
                     continue;
+                }
+                if (Settings.apply1617binconvertion)
+                {
+                    ConvertedStringsTracker tracker = new ConvertedStringsTracker();
+                    binconverter.ConvertBinMap(binentries, tracker);
+                    binconverter.ConvertBinMap(concat, tracker);
+                    binconverter.ConvertBinMap(staticMat, tracker);
+                    Settings.hash_table.AddRange(tracker.GameFiles);
                 }
                 if (HpBar)
                 {
@@ -770,12 +777,12 @@ namespace ModManager
             {
                 File.WriteAllLines($"{Settings.outputDir}/hashes.game.txt", Settings.hash_table);
             }
-            if (!Settings.folder)
-            {
-                x.LowerLog("[PACK] Packing WAD", CLR_ACT);
-                _wadExtractor.PackDirectoryToWadCompressed(Settings.outputDir, $"{Settings.outputDir}.client");
-                Directory.Delete(Settings.outputDir, true);
-            }
+            // if (!Settings.folder)
+            // {
+            //     x.LowerLog("[PACK] Packing WAD", CLR_ACT);
+            //     _wadExtractor.PackDirectoryToWadCompressed(Settings.outputDir, $"{Settings.outputDir}.client");
+            //     Directory.Delete(Settings.outputDir, true);
+            // }
 
 
             if (Directory.Exists(Settings.inputDir)) Directory.Delete(Settings.inputDir, true);
@@ -814,13 +821,6 @@ namespace ModManager
             // ==================== DETAILED REPORT (UPPER LOG) ====================
             // Order mirrors LowerLog evaluation: Definitions -> Animations -> Meshes -> Textures -> Audio -> Bins/Other
 
-            if (uniqueMissingBins.Count > 0)
-            {
-                foreach (var bin in uniqueMissingBins)
-                {
-                    x.UpperLog(bin.StartsWith("[") ? bin : $"[MISS] {bin}", CLR_ERR);
-                }
-            }
             if (hasMissingAnm)
             {
                 foreach (var anm in missingAnmFiles)
@@ -1599,7 +1599,7 @@ namespace ModManager
                     {
                         foreach (string left in notfound)
                         {
-                            x.LowerLog($"[FAIL] Missing: {left}", CLR_ERR);
+                            // x.LowerLog($"[FAIL] Missing: {left}", CLR_ERR);
                             linkedListtoReturn.Items.Add(new BinString(left));
                         }
                     }
@@ -2848,17 +2848,130 @@ namespace ModManager
                 public byte CompressionType;
             }
 
-            public void PackDirectoryToWad(string sourceDirectory, string outputWadPath)
+            // public void PackDirectoryToWad(string sourceDirectory, string outputWadPath)
+            // {
+            //     if (!Directory.Exists(sourceDirectory))
+            //         throw new DirectoryNotFoundException($"Source directory not found: {sourceDirectory}");
+            // 
+            //     string outputDir = Path.GetDirectoryName(outputWadPath);
+            //     if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+            // 
+            //     var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+            //     var entries = new WadEntryInfo[files.Length];
+            // 
+            //     var tempPaths = new ConcurrentBag<string>();
+            // 
+            //     Parallel.For(0, files.Length, i =>
+            //     {
+            //         string file = files[i];
+            //         string relativePath = Path.GetRelativePath(sourceDirectory, file);
+            //         string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
+            //         tempPaths.Add(wadPath);
+            //         byte[] fileBytes = File.ReadAllBytes(file);
+            // 
+            //         // --- Start of Modified Logic ---
+            //         ulong pathHash;
+            // 
+            //         // Check if the file is directly in the root (no directory separators in the relative path)
+            //         bool isRootFile = !relativePath.Contains(Path.DirectorySeparatorChar)
+            //                           && !relativePath.Contains(Path.AltDirectorySeparatorChar);
+            // 
+            //         if (isRootFile)
+            //         {
+            //             // Try to parse the filename (without extension) as a hex string
+            //             string filenameNoExt = Path.GetFileNameWithoutExtension(file);
+            // 
+            //             // Allow HexNumber format. "a5ed..." needs to be parsed as ulong.
+            //             if (ulong.TryParse(filenameNoExt, System.Globalization.NumberStyles.HexNumber, null, out ulong manualHash))
+            //             {
+            //                 pathHash = manualHash;
+            //             }
+            //             else
+            //             {
+            //                 // Root file, but not a valid hash name -> Hash the path normally
+            //                 pathHash = HashMaster.HashPath(wadPath);
+            //                 HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
+            //             }
+            //         }
+            //         else
+            //         {
+            //             // File is in a subdirectory -> Hash the path normally
+            //             pathHash = HashMaster.HashPath(wadPath);
+            //             HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
+            //         }
+            //         // --- End of Modified Logic ---
+            // 
+            //         entries[i] = new WadEntryInfo
+            //         {
+            //             FilePath = file,
+            //             PathHash = pathHash,
+            //             DataChecksum = BitConverter.ToUInt64(XxHash64.Hash(fileBytes)),
+            //             Size = (uint)fileBytes.Length
+            //         };
+            //     });
+            // 
+            //     // Assuming bonusPaths is defined in the class scope as per your original snippet
+            //     bonusPaths.AddRange(tempPaths);
+            // 
+            //     Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
+            //     ulong tocChecksum = 0;
+            //     foreach (var e in entries) tocChecksum ^= e.DataChecksum;
+            // 
+            //     using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
+            //     using (var bw = new BinaryWriter(fs))
+            //     {
+            //         bw.Write(new char[] { 'R', 'W' });
+            //         bw.Write((byte)3);
+            //         bw.Write((byte)4);
+            //         bw.Write(new byte[256]);
+            //         bw.Write(tocChecksum);
+            //         bw.Write((uint)entries.Length);
+            // 
+            //         uint dataStartOffset = 272 + ((uint)entries.Length * 32);
+            //         uint absoluteOffset = dataStartOffset;
+            // 
+            //         foreach (var entry in entries)
+            //         {
+            //             bw.Write(entry.PathHash);
+            //             bw.Write(absoluteOffset);
+            //             bw.Write(entry.Size);
+            //             bw.Write(entry.Size);
+            //             bw.Write((byte)0);
+            //             bw.Write((byte)0);
+            //             bw.Write((ushort)0);
+            //             bw.Write(entry.DataChecksum);
+            // 
+            //             absoluteOffset += entry.Size;
+            //         }
+            // 
+            //         byte[] copyBuffer = new byte[81920];
+            //         foreach (var entry in entries)
+            //         {
+            //             using (var inputFile = new FileStream(entry.FilePath, FileMode.Open, FileAccess.Read))
+            //             {
+            //                 int bytesRead;
+            //                 while ((bytesRead = inputFile.Read(copyBuffer, 0, copyBuffer.Length)) > 0)
+            //                 {
+            //                     bw.Write(copyBuffer, 0, bytesRead);
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
+
+            public void CreateTopazMap(string sourceDirectory)
             {
                 if (!Directory.Exists(sourceDirectory))
                     throw new DirectoryNotFoundException($"Source directory not found: {sourceDirectory}");
 
-                string outputDir = Path.GetDirectoryName(outputWadPath);
-                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+                string mapFilePath = Path.Combine(sourceDirectory, "topaz.map");
 
-                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
-                var entries = new WadEntryInfo[files.Length];
+                // Exclude any existing topaz.map from indexing
+                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories)
+                                     .Where(f => !Path.GetFileName(f).Equals("topaz.map", StringComparison.OrdinalIgnoreCase))
+                                     .ToArray();
 
+                var entries = new (ulong Hash, string Path)[files.Length];
                 var tempPaths = new ConcurrentBag<string>();
 
                 Parallel.For(0, files.Length, i =>
@@ -2867,95 +2980,75 @@ namespace ModManager
                     string relativePath = Path.GetRelativePath(sourceDirectory, file);
                     string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
                     tempPaths.Add(wadPath);
-                    byte[] fileBytes = File.ReadAllBytes(file);
 
-                    // --- Start of Modified Logic ---
                     ulong pathHash;
-
-                    // Check if the file is directly in the root (no directory separators in the relative path)
                     bool isRootFile = !relativePath.Contains(Path.DirectorySeparatorChar)
                                       && !relativePath.Contains(Path.AltDirectorySeparatorChar);
 
                     if (isRootFile)
                     {
-                        // Try to parse the filename (without extension) as a hex string
                         string filenameNoExt = Path.GetFileNameWithoutExtension(file);
 
-                        // Allow HexNumber format. "a5ed..." needs to be parsed as ulong.
                         if (ulong.TryParse(filenameNoExt, System.Globalization.NumberStyles.HexNumber, null, out ulong manualHash))
                         {
                             pathHash = manualHash;
                         }
                         else
                         {
-                            // Root file, but not a valid hash name -> Hash the path normally
                             pathHash = HashMaster.HashPath(wadPath);
                             HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
                         }
                     }
                     else
                     {
-                        // File is in a subdirectory -> Hash the path normally
                         pathHash = HashMaster.HashPath(wadPath);
                         HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
                     }
-                    // --- End of Modified Logic ---
 
-                    entries[i] = new WadEntryInfo
-                    {
-                        FilePath = file,
-                        PathHash = pathHash,
-                        DataChecksum = BitConverter.ToUInt64(XxHash64.Hash(fileBytes)),
-                        Size = (uint)fileBytes.Length
-                    };
+                    entries[i] = (pathHash, wadPath);
                 });
 
-                // Assuming bonusPaths is defined in the class scope as per your original snippet
                 bonusPaths.AddRange(tempPaths);
 
-                Array.Sort(entries, (a, b) => a.PathHash.CompareTo(b.PathHash));
-                ulong tocChecksum = 0;
-                foreach (var e in entries) tocChecksum ^= e.DataChecksum;
+                // Sort ascending by hash to enable O(log N) binary searching
+                Array.Sort(entries, (a, b) => a.Hash.CompareTo(b.Hash));
 
-                using (var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write))
+                using (var fs = new FileStream(mapFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
                 using (var bw = new BinaryWriter(fs))
                 {
-                    bw.Write(new char[] { 'R', 'W' });
-                    bw.Write((byte)3);
-                    bw.Write((byte)4);
-                    bw.Write(new byte[256]);
-                    bw.Write(tocChecksum);
-                    bw.Write((uint)entries.Length);
+                    bw.Write(new char[] { 'T', 'P', 'Z', 'M' }); // 4-byte magic
+                    bw.Write((uint)entries.Length);              // 4-byte entry count
 
-                    uint dataStartOffset = 272 + ((uint)entries.Length * 32);
-                    uint absoluteOffset = dataStartOffset;
+                    long stringTableOffsetPos = fs.Position;
+                    bw.Write((ulong)0); // Placeholder for string pool byte offset
 
-                    foreach (var entry in entries)
+                    byte[][] utf8Paths = new byte[entries.Length][];
+                    uint runningStringOffset = 0;
+
+                    // Fixed 16-byte records: [Hash: 8B][StringOffset: 4B][Length: 2B][Reserved: 2B]
+                    for (int i = 0; i < entries.Length; i++)
                     {
-                        bw.Write(entry.PathHash);
-                        bw.Write(absoluteOffset);
-                        bw.Write(entry.Size);
-                        bw.Write(entry.Size);
-                        bw.Write((byte)0);
-                        bw.Write((byte)0);
-                        bw.Write((ushort)0);
-                        bw.Write(entry.DataChecksum);
+                        byte[] encoded = Encoding.UTF8.GetBytes(entries[i].Path);
+                        utf8Paths[i] = encoded;
 
-                        absoluteOffset += entry.Size;
+                        bw.Write(entries[i].Hash);
+                        bw.Write(runningStringOffset);
+                        bw.Write((ushort)encoded.Length);
+                        bw.Write((ushort)0); // Alignment padding
+
+                        runningStringOffset += (uint)encoded.Length;
                     }
 
-                    byte[] copyBuffer = new byte[81920];
-                    foreach (var entry in entries)
+                    long stringTableOffset = fs.Position;
+
+                    for (int i = 0; i < entries.Length; i++)
                     {
-                        using (var inputFile = new FileStream(entry.FilePath, FileMode.Open, FileAccess.Read))
-                        {
-                            int bytesRead;
-                            while ((bytesRead = inputFile.Read(copyBuffer, 0, copyBuffer.Length)) > 0)
-                            {
-                                bw.Write(copyBuffer, 0, bytesRead);
-                            }
-                        }
+                        bw.Write(utf8Paths[i]);
                     }
+
+                    // Backfill string pool start offset
+                    fs.Seek(stringTableOffsetPos, SeekOrigin.Begin);
+                    bw.Write((ulong)stringTableOffset);
                 }
             }
 
@@ -2975,21 +3068,44 @@ namespace ModManager
 
                 foreach (var wadPath in wadPaths)
                 {
-                    // 1. Directory scan for loose files
+                    // 1. Directory scan / topaz.map handler
                     if (Directory.Exists(wadPath))
                     {
-                        foreach (var targetName in targetFileNames)
+                        string mapFilePath = Path.Combine(wadPath, "topaz.map");
+
+                        if (File.Exists(mapFilePath))
                         {
-                            string loosePath = Path.Combine(wadPath, targetName);
-                            if (File.Exists(loosePath))
+                            // Find and load target files directly from disk via topaz.map lookup
+                            foreach (ulong targetHash in targetHashes)
                             {
-                                HashMaster.AddTemporaryHashesFromFileAsync(loosePath).GetAwaiter().GetResult();
+                                string? relativePath = FindPathInTopazMap(mapFilePath, targetHash);
+                                if (string.IsNullOrEmpty(relativePath)) continue;
+
+                                // Support cross-platform path separators
+                                string physicalPath = Path.Combine(wadPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+                                if (File.Exists(physicalPath))
+                                {
+                                    HashMaster.AddTemporaryHashesFromFileAsync(physicalPath).GetAwaiter().GetResult();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Fallback: Check for loose target files directly in root
+                            foreach (var targetName in targetFileNames)
+                            {
+                                string loosePath = Path.Combine(wadPath, targetName);
+                                if (File.Exists(loosePath))
+                                {
+                                    HashMaster.AddTemporaryHashesFromFileAsync(loosePath).GetAwaiter().GetResult();
+                                }
                             }
                         }
                         continue;
                     }
 
-                    // 2. WAD archive scan
+                    // 2. WAD archive scan (original logic)
                     if (!File.Exists(wadPath)) continue;
 
                     using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -3022,7 +3138,7 @@ namespace ModManager
                                     continue;
                                 }
 
-                                // Decompress payload (Span works normally in non-async methods)
+                                // Decompress payload
                                 byte[] rawData;
                                 var rawSpan = new ReadOnlySpan<byte>(fileData);
 
@@ -3046,15 +3162,15 @@ namespace ModManager
                                     using var stream = new MemoryStream(rawData);
                                     using var reader = new StreamReader(stream, Encoding.UTF8);
 
-                                    // 1. Read first line for scheme check
                                     string? firstLine = reader.ReadLine();
                                     string? firstToken = firstLine?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
 
                                     bool scheme = ulong.TryParse(
-     firstToken?.Replace("0x", "", StringComparison.OrdinalIgnoreCase).Trim(),
-     NumberStyles.HexNumber,
-     CultureInfo.InvariantCulture,
-     out _);
+                                        firstToken?.Replace("0x", "", StringComparison.OrdinalIgnoreCase).Trim(),
+                                        NumberStyles.HexNumber,
+                                        CultureInfo.InvariantCulture,
+                                        out _);
+
                                     if (scheme)
                                     {
                                         string[] parts = firstLine.Split(' ', 2);
@@ -3066,14 +3182,12 @@ namespace ModManager
                                         _settings.hash_table.Add(firstLine);
                                     }
 
-                                    // 3. Iterate over remaining lines
                                     string? line;
                                     if (scheme)
                                     {
                                         while ((line = reader.ReadLine()) != null)
                                         {
                                             if (string.IsNullOrWhiteSpace(line)) continue;
-
                                             string[] parts = line.Split(' ', 2);
                                             string remaining = parts.Length > 1 ? parts[1] : string.Empty;
                                             _settings.hash_table.Add(remaining);
@@ -3084,7 +3198,6 @@ namespace ModManager
                                         while ((line = reader.ReadLine()) != null)
                                         {
                                             if (string.IsNullOrWhiteSpace(line)) continue;
-
                                             _settings.hash_table.Add(line);
                                         }
                                     }
@@ -3100,6 +3213,51 @@ namespace ModManager
                         }
                     }
                 }
+            }
+
+            private static string? FindPathInTopazMap(string mapFilePath, ulong targetHash)
+            {
+                using var fs = new FileStream(mapFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var br = new BinaryReader(fs);
+
+                if (fs.Length < 16) return null;
+
+                char[] magic = br.ReadChars(4);
+                if (new string(magic) != "TPZM") return null;
+
+                uint count = br.ReadUInt32();
+                long stringTableOffset = (long)br.ReadUInt64();
+
+                long low = 0;
+                long high = count - 1;
+
+                const int headerSize = 16;
+                const int recordSize = 16;
+
+                while (low <= high)
+                {
+                    long mid = low + ((high - low) / 2);
+                    fs.Seek(headerSize + (mid * recordSize), SeekOrigin.Begin);
+
+                    ulong currentHash = br.ReadUInt64();
+
+                    if (currentHash == targetHash)
+                    {
+                        uint stringOffset = br.ReadUInt32();
+                        ushort stringLength = br.ReadUInt16();
+
+                        fs.Seek(stringTableOffset + stringOffset, SeekOrigin.Begin);
+                        byte[] stringBytes = br.ReadBytes(stringLength);
+                        return Encoding.UTF8.GetString(stringBytes);
+                    }
+
+                    if (currentHash < targetHash)
+                        low = mid + 1;
+                    else
+                        high = mid - 1;
+                }
+
+                return null;
             }
             public (uint version, uint id) CheckLanguageID(List<string> wadPaths, string target)
             {
@@ -3228,10 +3386,159 @@ namespace ModManager
                 var createdDirectories = new HashSet<string>();
                 byte[] entryBuffer = new byte[32];
 
+                // --- Local helper to handle the common write, conversion, and ref-swapping logic ---
+                void ProcessTargetData(Target target, string extension, byte[] finalData)
+                {
+                    string final_out = target.OutputString;
+                    if (!_settings.binless)
+                    {
+                        final_out = string.IsNullOrEmpty(extension)
+                            ? target.OutputString
+                            : Path.ChangeExtension(target.OutputString, extension);
+                    }
+                    if (string.IsNullOrEmpty(Path.GetFileNameWithoutExtension(final_out)))
+                        final_out = Path.Combine(Path.GetDirectoryName(final_out) ?? "", $"dot_{Guid.NewGuid().ToString().Substring(0, 4)}{extension}");
+
+                    if (!string.IsNullOrEmpty(target.OutputPath))
+                    {
+                        string outPath = Path.Combine(target.OutputPath, final_out);
+                        string dir = Path.GetDirectoryName(outPath);
+
+                        if (!createdDirectories.Contains(dir, StringComparer.OrdinalIgnoreCase))
+                        {
+                            Directory.CreateDirectory(dir);
+                            createdDirectories.Add(dir);
+                        }
+                        if (extension == ".sco" || extension == ".scb")
+                        {
+                            if (finalData.Length > 0 && finalData[0] == 0x72) // 'r' for r3d2Mesh
+                            {
+                                File.WriteAllBytes(outPath, finalData);
+                            }
+                            else // Defaults to SCO parser if it starts with '[' or text
+                            {
+                                var sco = new SceneObject();
+                                sco.ReadSCO(finalData);
+                                sco.WriteSCB(outPath);
+                            }
+                        }
+                        else
+                        {
+                            File.WriteAllBytes(outPath, finalData);
+                        }
+                    }
+
+                    string right = final_out.Length > 55
+                        ? $"{final_out[..26]}...{final_out[^26..]}"
+                        : final_out;
+
+                    string ext = Path.GetExtension(target.OriginalPath);
+                    if (ext.ToLower() != ".bin")
+                    {
+                        string left = target.OriginalPath.Length > 55
+                            ? $"{target.OriginalPath[..26]}...{target.OriginalPath[^26..]}"
+                            : target.OriginalPath;
+
+                        bool extChanged = !string.Equals(ext, Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
+                        string logTag = extChanged ? "[FIXD]" : "[GOOD]";
+                        string log_c = extChanged ? alt_Mod : logColor;
+                        x.UpperLog($"{logTag} {left,-55} --> {right,-55}", log_c);
+                    }
+
+                    if (target.BinStringRef != null)
+                    {
+                        foreach (BinString s in target.BinStringRef)
+                        {
+                            s.Value = final_out;
+                        }
+                    }
+
+                    if (target.BinFileRef != null)
+                    {
+                        foreach (BinFile s in target.BinFileRef)
+                        {
+                            s.Value = new XXH64 { Hash = HashMaster.HashPath(final_out) };
+                        }
+                    }
+
+                    targets.Remove(target);
+                }
+                // -----------------------------------------------------------------------------------
+
                 foreach (var wadPath in wadPaths)
                 {
-                    // x.UpperLog(wadPath, "#ff0000");
                     if (lookup.Count == 0) break;
+
+                    // 1. Directory handler using topaz.map
+                    if (Directory.Exists(wadPath))
+                    {
+                        string mapFilePath = Path.Combine(wadPath, "topaz.map");
+                        var bestDirCandidates = new Dictionary<Target, (string PhysicalPath, string Extension, int Priority)>();
+
+                        if (File.Exists(mapFilePath))
+                        {
+                            foreach (var kvp in lookup)
+                            {
+                                ulong hash = kvp.Key;
+                                var entry = kvp.Value;
+
+                                // Assuming FindPathInTopazMap exists in your class scope from the previous step
+                                string relativePath = FindPathInTopazMap(mapFilePath, hash);
+                                if (!string.IsNullOrEmpty(relativePath))
+                                {
+                                    string physicalPath = Path.Combine(wadPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+                                    if (File.Exists(physicalPath))
+                                    {
+                                        if (!bestDirCandidates.ContainsKey(entry.target) || entry.priority < bestDirCandidates[entry.target].Priority)
+                                        {
+                                            bestDirCandidates[entry.target] = (physicalPath, entry.ext == ".sco" ? ".scb" : entry.ext, entry.priority);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Fallback if no topaz.map exists: check for files matching the raw string path
+                            foreach (var kvp in lookup)
+                            {
+                                var entry = kvp.Value;
+                                string originalString = entry.target.Hashes[entry.priority];
+                                string physicalPath = Path.Combine(wadPath, originalString.Replace('/', Path.DirectorySeparatorChar));
+
+                                if (File.Exists(physicalPath))
+                                {
+                                    if (!bestDirCandidates.ContainsKey(entry.target) || entry.priority < bestDirCandidates[entry.target].Priority)
+                                    {
+                                        bestDirCandidates[entry.target] = (physicalPath, entry.ext == ".sco" ? ".scb" : entry.ext, entry.priority);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (bestDirCandidates.Count > 0)
+                        {
+                            foreach (var kvp in bestDirCandidates)
+                            {
+                                var target = kvp.Key;
+                                var jobInfo = kvp.Value;
+
+                                // Clean up lookup to prevent re-processing in subsequent WADs
+                                foreach (var h in target.Hashes)
+                                {
+                                    lookup.Remove(HashMaster.HashPath(h));
+                                }
+
+                                // Just read the loose file and process it
+                                byte[] fileData = File.ReadAllBytes(jobInfo.PhysicalPath);
+                                ProcessTargetData(target, jobInfo.Extension, fileData);
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    // 2. WAD archive handler (original behavior)
                     if (!File.Exists(wadPath)) continue;
 
                     using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -3241,7 +3548,7 @@ namespace ModManager
 
                         fs.Seek(268, SeekOrigin.Begin);
                         uint fileCount = br.ReadUInt32();
-                        // x.UpperLog(fileCount.ToString(), "#ff0000");
+
                         var bestCandidates = new Dictionary<Target, (ExtractionJob job, int priority)>();
 
                         for (int i = 0; i < fileCount; i++)
@@ -3307,76 +3614,9 @@ namespace ModManager
                                 {
                                     finalData = rawSpan.ToArray();
                                 }
-                                string final_out = job.Target.OutputString;
-                                if (!_settings.binless)
-                                {
-                                    final_out = string.IsNullOrEmpty(job.Extension)
-                                        ? job.Target.OutputString
-                                        : Path.ChangeExtension(job.Target.OutputString, job.Extension);
-                                }
-                                if (string.IsNullOrEmpty(Path.GetFileNameWithoutExtension(final_out))) final_out = Path.Combine(Path.GetDirectoryName(final_out) ?? "", $"dot_{Guid.NewGuid().ToString().Substring(0, 4)}{job.Extension}");
-                                if (!string.IsNullOrEmpty(job.Target.OutputPath))
-                                {
-                                    string outPath = Path.Combine(job.Target.OutputPath, final_out);
-                                    string dir = Path.GetDirectoryName(outPath);
 
-                                    if (!createdDirectories.Contains(dir, StringComparer.OrdinalIgnoreCase))
-                                    {
-                                        Directory.CreateDirectory(dir);
-                                        createdDirectories.Add(dir);
-                                    }
-                                    if (job.Extension == ".sco" || job.Extension == ".scb")
-                                    {
-                                        if (finalData.Length > 0 && finalData[0] == 0x72) // 'r' for r3d2Mesh
-                                        {
-                                            File.WriteAllBytes(outPath, finalData);
-                                        }
-                                        else // Defaults to SCO parser if it starts with '[' or text
-                                        {
-                                            var sco = new SceneObject();
-                                            sco.ReadSCO(finalData);
-                                            sco.WriteSCB(outPath);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        File.WriteAllBytes(outPath, finalData);
-                                    }
-                                }
-                                string right = final_out.Length > 55
-                                    ? $"{final_out[..26]}...{final_out[^26..]}"
-                                    : final_out;
-
-                                string ext = Path.GetExtension(job.Target.OriginalPath);
-                                if (ext.ToLower() != ".bin")
-                                {
-                                    string left = job.Target.OriginalPath.Length > 55
-        ? $"{job.Target.OriginalPath[..26]}...{job.Target.OriginalPath[^26..]}"
-        : job.Target.OriginalPath;
-
-                                    bool extChanged = !string.Equals(ext, Path.GetExtension(final_out), StringComparison.OrdinalIgnoreCase);
-                                    string logTag = extChanged ? "[FIXD]" : "[GOOD]";
-                                    string log_c = extChanged ? alt_Mod : logColor;
-                                    x.UpperLog($"{logTag} {left,-55} --> {right,-55}", log_c);
-                                }
-                                if (job.Target.BinStringRef != null)
-                                {
-                                    foreach (BinString s in job.Target.BinStringRef)
-                                    {
-                                        s.Value = final_out;
-                                    }
-                                }
-                                if (job.Target.BinFileRef != null)
-                                {
-                                    foreach (BinFile s in job.Target.BinFileRef)
-                                    {
-                                        // ulong pre = s.Value.Hash;
-                                        // ulong post = HashMaster.HashPath(final_out);
-                                        s.Value = new XXH64 { Hash = HashMaster.HashPath(final_out) };
-                                        // x.LowerLog($"{pre:x16} -> {post:x16}  ({final_out})");
-                                    }
-                                }
-                                targets.Remove(job.Target);
+                                // Route to the shared logic block
+                                ProcessTargetData(job.Target, job.Extension, finalData);
                             }
                             finally
                             {
@@ -3386,10 +3626,8 @@ namespace ModManager
                     }
                 }
 
-
                 return targets;
             }
-
             public List<Target> FindAndSwapReferences(List<string> wadPaths, List<Target> targets)
             {
                 if (targets == null || targets.Count == 0) return targets;
@@ -3421,10 +3659,112 @@ namespace ModManager
                 // Buffer to read directory entries (32 bytes per file entry)
                 byte[] entryBuffer = new byte[32];
 
+                // Helper to resolve candidates and swap references cleanly
+                void ApplyCandidateMatches(Dictionary<Target, int> bestCandidates)
+                {
+                    if (bestCandidates.Count == 0) return;
+
+                    foreach (var candidate in bestCandidates)
+                    {
+                        Target t = candidate.Key;
+                        int hashIndex = candidate.Value;
+
+                        // Retrieve the actual string that exists in the WAD or folder
+                        string foundString = t.Hashes[hashIndex];
+
+                        // Remove all hashes for this target from lookup so we don't process it again in other WADs/folders
+                        foreach (var h in t.Hashes)
+                        {
+                            lookup.Remove(HashMaster.HashPath(h));
+                        }
+
+                        if (t.BinStringRef != null)
+                        {
+                            foreach (BinString s in t.BinStringRef)
+                            {
+                                s.Value = foundString;
+                            }
+                        }
+
+                        if (t.BinFileRef != null)
+                        {
+                            foreach (BinFile f in t.BinFileRef)
+                            {
+                                f.Value = new XXH64 { Hash = HashMaster.HashPath(foundString) };
+                            }
+                        }
+
+                        // --- Logging ---
+                        string left = t.OriginalPath.Length > 55
+                            ? $"{t.OriginalPath[..26]}...{t.OriginalPath[^26..]}"
+                            : t.OriginalPath;
+
+                        string right = foundString.Length > 55
+                            ? $"{foundString[..26]}...{foundString[^26..]}"
+                            : foundString;
+
+                        bool pathChanged = !string.Equals(t.OriginalPath, foundString, StringComparison.OrdinalIgnoreCase);
+                        x.UpperLog($"[UPDT] {left,-55} --> {right,-55}", pathChanged ? CLR_MOD : CLR_GOOD);
+
+                        targets.Remove(t);
+                    }
+                }
+
                 foreach (var wadPath in wadPaths)
                 {
-                    // If we have found everything, stop looking
                     if (lookup.Count == 0) break;
+
+                    // 1. Directory scan / topaz.map handler
+                    if (Directory.Exists(wadPath))
+                    {
+                        string mapFilePath = Path.Combine(wadPath, "topaz.map");
+                        var bestCandidates = new Dictionary<Target, int>();
+
+                        if (File.Exists(mapFilePath))
+                        {
+                            foreach (var kvp in lookup)
+                            {
+                                ulong hash = kvp.Key;
+                                var entry = kvp.Value;
+
+                                string? relativePath = FindPathInTopazMap(mapFilePath, hash);
+                                if (!string.IsNullOrEmpty(relativePath))
+                                {
+                                    string physicalPath = Path.Combine(wadPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+                                    if (File.Exists(physicalPath))
+                                    {
+                                        if (!bestCandidates.ContainsKey(entry.target) || entry.index < bestCandidates[entry.target])
+                                        {
+                                            bestCandidates[entry.target] = entry.index;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Fallback if no topaz.map exists: check for files matching the raw string path
+                            foreach (var kvp in lookup)
+                            {
+                                var entry = kvp.Value;
+                                string candidatePath = entry.target.Hashes[entry.index];
+                                string physicalPath = Path.Combine(wadPath, candidatePath.Replace('/', Path.DirectorySeparatorChar));
+
+                                if (File.Exists(physicalPath))
+                                {
+                                    if (!bestCandidates.ContainsKey(entry.target) || entry.index < bestCandidates[entry.target])
+                                    {
+                                        bestCandidates[entry.target] = entry.index;
+                                    }
+                                }
+                            }
+                        }
+
+                        ApplyCandidateMatches(bestCandidates);
+                        continue;
+                    }
+
+                    // 2. WAD archive handler
                     if (!File.Exists(wadPath)) continue;
 
                     using (var fs = new FileStream(wadPath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -3436,21 +3776,16 @@ namespace ModManager
                         fs.Seek(268, SeekOrigin.Begin);
                         uint fileCount = br.ReadUInt32();
 
-                        // Store the best match found in this specific WAD
-                        // Key: Target, Value: Index in the Hashes list (lower is better priority)
                         var bestCandidates = new Dictionary<Target, int>();
 
                         for (int i = 0; i < fileCount; i++)
                         {
-                            // Read the 32-byte entry
                             if (fs.Read(entryBuffer, 0, 32) != 32) break;
 
-                            // The first 8 bytes are the Path Hash
                             ulong pathHash = BitConverter.ToUInt64(entryBuffer, 0);
 
                             if (lookup.TryGetValue(pathHash, out var entry))
                             {
-                                // If this target isn't in candidates yet, OR this new match has a higher priority (lower index)
                                 if (!bestCandidates.ContainsKey(entry.target) || entry.index < bestCandidates[entry.target])
                                 {
                                     bestCandidates[entry.target] = entry.index;
@@ -3458,63 +3793,12 @@ namespace ModManager
                             }
                         }
 
-                        if (bestCandidates.Count == 0) continue;
-
-                        // Process the matches found in this WAD
-                        foreach (var candidate in bestCandidates)
-                        {
-                            Target t = candidate.Key;
-                            int hashIndex = candidate.Value;
-
-                            // Retrieve the actual string that exists in the WAD
-                            string foundString = t.Hashes[hashIndex];
-
-                            // Remove all hashes for this target from lookup so we don't process it again in other WADs
-                            foreach (var h in t.Hashes)
-                            {
-                                lookup.Remove(HashMaster.HashPath(h));
-                            }
-
-                            if (t.BinStringRef != null)
-                            {
-                                // Update the references to the string we actually found
-                                foreach (BinString s in t.BinStringRef)
-                                {
-                                    s.Value = foundString;
-                                }
-                                foreach (BinFile f in t.BinFileRef)
-                                {
-                                    // ulong pre = f.Value.Hash;
-                                    // ulong post = HashMaster.HashPath(foundString);
-                                    f.Value = new XXH64 { Hash = HashMaster.HashPath(foundString) };
-                                    // x.LowerLog($"{pre:x16} -> {post:x16}  ({foundString})");
-                                }
-
-                                // --- Logging (Reusing your style) ---
-                                string left = t.OriginalPath.Length > 55
-                                    ? $"{t.OriginalPath[..26]}...{t.OriginalPath[^26..]}"
-                                    : t.OriginalPath;
-
-                                string right = foundString.Length > 55
-                                    ? $"{foundString[..26]}...{foundString[^26..]}"
-                                    : foundString;
-
-                                // Determine if the path changed (e.g. extension fix or hash fallback)
-                                bool pathChanged = !string.Equals(t.OriginalPath, foundString, StringComparison.OrdinalIgnoreCase);
-
-                                // Assuming 'x' is your logger instance from the original scope
-                                x.UpperLog($"[UPDT] {left,-55} --> {right,-55}", pathChanged ? CLR_MOD : CLR_GOOD);
-                            }
-
-                            // Finally, remove the processed target from the list
-                            targets.Remove(t);
-                        }
+                        ApplyCandidateMatches(bestCandidates);
                     }
                 }
 
                 return targets;
             }
-
             private static bool IsZstd(ReadOnlySpan<byte> data) =>
         data.Length >= 4 &&
         data[0] == 0x28 && data[1] == 0xB5 && data[2] == 0x2F && data[3] == 0xFD;
@@ -3544,143 +3828,143 @@ namespace ModManager
                 public byte[] Data;
             }
 
-            public void PackDirectoryToWadCompressed(string sourceDirectory, string outputWadPath)
-            {
-                if (!Directory.Exists(sourceDirectory))
-                    throw new DirectoryNotFoundException(sourceDirectory);
-
-                string outputDir = Path.GetDirectoryName(outputWadPath);
-                if (!string.IsNullOrEmpty(outputDir)) Directory.CreateDirectory(outputDir);
-
-                var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
-
-                // FIX: Use an array of objects instead of a Dictionary to avoid threading crashes
-                var processedEntries = new ProcessedEntry[files.Length];
-
-                // -------------------------------
-                // 1. Compress + hash (parallel)
-                // -------------------------------
-                Parallel.For(0, files.Length, i =>
-                {
-                    string file = files[i];
-                    string relativePath = Path.GetRelativePath(sourceDirectory, file)
-                        .Replace('\\', '/')
-                        .ToLowerInvariant();
-
-                    // cslol-tools uses XXH64 for path hashing
-                    ulong pathHash = HashMaster.HashPath(relativePath);
-                    byte[] originalBytes = File.ReadAllBytes(file);
-
-                    // Logic matches cslol-tools (Magic bytes are safer, but extension works for basic mods)
-                    bool rawOnly = relativePath.EndsWith(".bnk") || relativePath.EndsWith(".wpk");
-
-                    byte[] finalData;
-                    byte compressionType;
-
-                    if (rawOnly)
-                    {
-                        finalData = originalBytes;
-                        compressionType = 0; // Raw
-                    }
-                    else
-                    {
-                        // Zstd Level 0 in C++ maps to default level 3
-                        using var compressor = new Compressor(3);
-                        finalData = compressor.Wrap(originalBytes).ToArray();
-                        compressionType = 3; // Zstd
-                    }
-
-                    // XXH3 Checksum of the FINAL (compressed) data
-                    ulong checksum = XxHash3.HashToUInt64(finalData);
-
-                    // Store directly in array slot 'i' (Thread-Safe)
-                    processedEntries[i] = new ProcessedEntry
-                    {
-                        Info = new WadEntryInfo
-                        {
-                            FilePath = file,
-                            PathHash = pathHash,
-                            Size = (uint)finalData.Length,
-                            UncompressedSize = (uint)originalBytes.Length,
-                            CompressionType = compressionType,
-                            DataChecksum = checksum
-                        },
-                        Data = finalData
-                    };
-                });
-
-                // -------------------------------
-                // 2. Sort by hash (WAD standard)
-                // -------------------------------
-                // We sort the combined array so Data stays with Info
-                Array.Sort(processedEntries, (a, b) => a.Info.PathHash.CompareTo(b.Info.PathHash));
-
-                // -------------------------------
-                // 3.4 Requirement: TOC Checksum
-                // -------------------------------
-                byte[] headerChecksum = CalculateTocChecksum(processedEntries);
-
-                // -------------------------------
-                // 3. Write WAD (Version 3.4)
-                // -------------------------------
-                using var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write);
-                using var bw = new BinaryWriter(fs);
-
-                // ---- Header (v3.4) ----
-                bw.Write(new[] { 'R', 'W' });
-                bw.Write((byte)3); // Major
-                bw.Write((byte)4); // Minor (Updated to 4)
-                bw.Write(headerChecksum); // 3.4 Required Checksum
-                bw.Write(new byte[248]); // ECDSA Signature (Empty)
-                bw.Write((uint)processedEntries.Length);
-
-                // Calculate Data Start Offset
-                // Header (272) + Entries (Count * 32 bytes)
-                uint currentOffset = 272 + (uint)(processedEntries.Length * 32);
-
-                // Deduplication Map: Maps DataChecksum -> FileOffset
-                var writtenOffsets = new Dictionary<ulong, uint>();
-
-                // ---- TOC ----
-                foreach (var entry in processedEntries)
-                {
-                    // Deduplication: If we already wrote this data, point to it
-                    if (!writtenOffsets.TryGetValue(entry.Info.DataChecksum, out uint entryOffset))
-                    {
-                        entryOffset = currentOffset;
-                        writtenOffsets[entry.Info.DataChecksum] = currentOffset;
-                        currentOffset += entry.Info.Size;
-                    }
-
-                    bw.Write(entry.Info.PathHash);
-                    bw.Write(entryOffset);
-                    bw.Write(entry.Info.Size);
-                    bw.Write(entry.Info.UncompressedSize);
-
-                    // v3.4 Entry: Type (4 bits) | SubChunkCount (4 bits)
-                    // Usually count is 0.
-                    bw.Write((byte)(entry.Info.CompressionType & 0xF));
-
-                    // v3.4 Entry: SubChunkIndex (3 bytes / 24-bit)
-                    // Writing 3 zeros
-                    bw.Write((byte)0);
-                    bw.Write((byte)0);
-                    bw.Write((byte)0);
-
-                    bw.Write(entry.Info.DataChecksum);
-                }
-
-                // ---- Data ----
-                // Write distinct data chunks
-                var writtenChecksums = new HashSet<ulong>();
-                foreach (var entry in processedEntries)
-                {
-                    if (writtenChecksums.Add(entry.Info.DataChecksum))
-                    {
-                        bw.Write(entry.Data);
-                    }
-                }
-            }
+            // public void PackDirectoryToWadCompressed(string sourceDirectory, string outputWadPath)
+            // {
+            //     if (!Directory.Exists(sourceDirectory))
+            //         throw new DirectoryNotFoundException(sourceDirectory);
+            // 
+            //     string outputDir = Path.GetDirectoryName(outputWadPath);
+            //     if (!string.IsNullOrEmpty(outputDir)) Directory.CreateDirectory(outputDir);
+            // 
+            //     var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+            // 
+            //     // FIX: Use an array of objects instead of a Dictionary to avoid threading crashes
+            //     var processedEntries = new ProcessedEntry[files.Length];
+            // 
+            //     // -------------------------------
+            //     // 1. Compress + hash (parallel)
+            //     // -------------------------------
+            //     Parallel.For(0, files.Length, i =>
+            //     {
+            //         string file = files[i];
+            //         string relativePath = Path.GetRelativePath(sourceDirectory, file)
+            //             .Replace('\\', '/')
+            //             .ToLowerInvariant();
+            // 
+            //         // cslol-tools uses XXH64 for path hashing
+            //         ulong pathHash = HashMaster.HashPath(relativePath);
+            //         byte[] originalBytes = File.ReadAllBytes(file);
+            // 
+            //         // Logic matches cslol-tools (Magic bytes are safer, but extension works for basic mods)
+            //         bool rawOnly = relativePath.EndsWith(".bnk") || relativePath.EndsWith(".wpk");
+            // 
+            //         byte[] finalData;
+            //         byte compressionType;
+            // 
+            //         if (rawOnly)
+            //         {
+            //             finalData = originalBytes;
+            //             compressionType = 0; // Raw
+            //         }
+            //         else
+            //         {
+            //             // Zstd Level 0 in C++ maps to default level 3
+            //             using var compressor = new Compressor(3);
+            //             finalData = compressor.Wrap(originalBytes).ToArray();
+            //             compressionType = 3; // Zstd
+            //         }
+            // 
+            //         // XXH3 Checksum of the FINAL (compressed) data
+            //         ulong checksum = XxHash3.HashToUInt64(finalData);
+            // 
+            //         // Store directly in array slot 'i' (Thread-Safe)
+            //         processedEntries[i] = new ProcessedEntry
+            //         {
+            //             Info = new WadEntryInfo
+            //             {
+            //                 FilePath = file,
+            //                 PathHash = pathHash,
+            //                 Size = (uint)finalData.Length,
+            //                 UncompressedSize = (uint)originalBytes.Length,
+            //                 CompressionType = compressionType,
+            //                 DataChecksum = checksum
+            //             },
+            //             Data = finalData
+            //         };
+            //     });
+            // 
+            //     // -------------------------------
+            //     // 2. Sort by hash (WAD standard)
+            //     // -------------------------------
+            //     // We sort the combined array so Data stays with Info
+            //     Array.Sort(processedEntries, (a, b) => a.Info.PathHash.CompareTo(b.Info.PathHash));
+            // 
+            //     // -------------------------------
+            //     // 3.4 Requirement: TOC Checksum
+            //     // -------------------------------
+            //     byte[] headerChecksum = CalculateTocChecksum(processedEntries);
+            // 
+            //     // -------------------------------
+            //     // 3. Write WAD (Version 3.4)
+            //     // -------------------------------
+            //     using var fs = new FileStream(outputWadPath, FileMode.Create, FileAccess.Write);
+            //     using var bw = new BinaryWriter(fs);
+            // 
+            //     // ---- Header (v3.4) ----
+            //     bw.Write(new[] { 'R', 'W' });
+            //     bw.Write((byte)3); // Major
+            //     bw.Write((byte)4); // Minor (Updated to 4)
+            //     bw.Write(headerChecksum); // 3.4 Required Checksum
+            //     bw.Write(new byte[248]); // ECDSA Signature (Empty)
+            //     bw.Write((uint)processedEntries.Length);
+            // 
+            //     // Calculate Data Start Offset
+            //     // Header (272) + Entries (Count * 32 bytes)
+            //     uint currentOffset = 272 + (uint)(processedEntries.Length * 32);
+            // 
+            //     // Deduplication Map: Maps DataChecksum -> FileOffset
+            //     var writtenOffsets = new Dictionary<ulong, uint>();
+            // 
+            //     // ---- TOC ----
+            //     foreach (var entry in processedEntries)
+            //     {
+            //         // Deduplication: If we already wrote this data, point to it
+            //         if (!writtenOffsets.TryGetValue(entry.Info.DataChecksum, out uint entryOffset))
+            //         {
+            //             entryOffset = currentOffset;
+            //             writtenOffsets[entry.Info.DataChecksum] = currentOffset;
+            //             currentOffset += entry.Info.Size;
+            //         }
+            // 
+            //         bw.Write(entry.Info.PathHash);
+            //         bw.Write(entryOffset);
+            //         bw.Write(entry.Info.Size);
+            //         bw.Write(entry.Info.UncompressedSize);
+            // 
+            //         // v3.4 Entry: Type (4 bits) | SubChunkCount (4 bits)
+            //         // Usually count is 0.
+            //         bw.Write((byte)(entry.Info.CompressionType & 0xF));
+            // 
+            //         // v3.4 Entry: SubChunkIndex (3 bytes / 24-bit)
+            //         // Writing 3 zeros
+            //         bw.Write((byte)0);
+            //         bw.Write((byte)0);
+            //         bw.Write((byte)0);
+            // 
+            //         bw.Write(entry.Info.DataChecksum);
+            //     }
+            // 
+            //     // ---- Data ----
+            //     // Write distinct data chunks
+            //     var writtenChecksums = new HashSet<ulong>();
+            //     foreach (var entry in processedEntries)
+            //     {
+            //         if (writtenChecksums.Add(entry.Info.DataChecksum))
+            //         {
+            //             bw.Write(entry.Data);
+            //         }
+            //     }
+            // }
 
             // -------------------------------
             // Helper for WAD 3.4 Checksum

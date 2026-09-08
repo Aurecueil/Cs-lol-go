@@ -526,9 +526,9 @@ Text="-"/>
 
             <Grid Grid.Row="1" Margin="15" x:Name="OutputView" Visibility="Collapsed" Panel.ZIndex="10" Background="#FF252525">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="2*"/>
+                    <RowDefinition Height="3*"/>
                     <RowDefinition Height="5"/>
-                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="2*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
