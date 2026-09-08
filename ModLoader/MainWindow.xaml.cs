@@ -2254,8 +2254,7 @@ try
         }
         void AdjustModListLayout()
         {
-            if (ModListPanel == null) return;
-            if (this.ActualHeight < 770)
+            if (this.ActualWidth < 770)
             {
                 Rf_Button.Visibility = Visibility.Collapsed;
                 DS_Button.Visibility = Visibility.Collapsed;
@@ -2265,6 +2264,7 @@ try
                 Rf_Button.Visibility = Visibility.Visible;
                 DS_Button.Visibility = Visibility.Visible;
             }
+            if (ModListPanel == null) return;
             double panelWidth = ModListPanel.ActualWidth;
 
             int columns = Math.Max(1, (int)(panelWidth / MinColumnWidth));
