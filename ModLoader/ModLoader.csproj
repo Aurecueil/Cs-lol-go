@@ -10,6 +10,8 @@
     <StartupObject>ModManager.App</StartupObject>
     <UseWindowsForms>False</UseWindowsForms>
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <FileVersion>2.15.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

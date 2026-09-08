@@ -1,7 +1,9 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.IO.Pipes;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,6 +14,13 @@ using Cursors = System.Windows.Input.Cursors;
 
 namespace ModManager
 {
+    public class AppInfo
+    {
+        // Reads the Win32 File Version directly from the running .exe header
+        public static string Version =>
+            FileVersionInfo.GetVersionInfo(Environment.ProcessPath ?? Assembly.GetEntryAssembly().Location).FileVersion
+            ?? "1.0.0.0";
+    }
     public static class Logger
     {
         private static readonly string logFilePath = "Simple_logs.txt";

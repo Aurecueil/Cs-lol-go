@@ -264,7 +264,7 @@ namespace ModManager
         public string Global_searchText = "";
         private static readonly string ProfilesFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "profiles");
         public static Dictionary<string, int> ProfileEntries = new();
-
+        public string DisplayVersion => AppInfo.Version;
         void AddChild(int parentId, string childName, bool isMod)
         {
             if (hierarchyById.TryGetValue(parentId, out var parent))
@@ -1790,18 +1790,14 @@ try
             Globals.IsMainLoaded = true;
             TriggerQueueProcessing();
 
-            if (settings.ver != "2.14.0")
+            if (settings.ver != DisplayVersion)
             {
-                settings.ver = "2.14.0";
+                settings.ver = DisplayVersion;
                 save_settings();
                 string whats_new = """
-                    .modpkg now imports and exports sucesfully
-                    .modpkg is now default export (.fantome is still aviable)
-                    Fixed issue with Topaz fixer that caused incorrect textures on the model (forgot about mets on 16.17 fixer update)
-                    Fixer now allows to set custom repath affix (related settings are persistent)
-                    Fixer wad packing option is no longer aviable
-                    Bin fallback is no longer modifiable
-                    Fixer now provides short summary in lower log
+                    Fixed .modpkg Implementation
+                    Further fixer minor optimizations and improvments
+                    Fixed import issue occuring with older (2y+) mods
                     """;
                 CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
@@ -4023,7 +4019,7 @@ try
             string baseDir = AppContext.BaseDirectory;
             string versionFile = Path.Combine(baseDir, "version.txt");
 
-            string localVersion = "2.14.0";
+            string localVersion = AppInfo.Version;
             if (File.Exists(versionFile))
             {
                 localVersion = File.ReadAllText(versionFile).Trim();
@@ -4045,7 +4041,6 @@ try
                 .GetProperty("tag_name")
                 .GetString()!
                 .TrimStart('v');
-
 
             if (!Version.TryParse(remoteVersion, out var r) ||
                 !Version.TryParse(localVersion, out var l) ||

@@ -7,7 +7,7 @@
         xmlns:local="using:PrimitivesExperiment.Samples"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-        Title="cslol-go    -    2.14.0"
+        Title="{Binding DisplayVersion, RelativeSource={RelativeSource Self}, StringFormat='cslol-go    -    {0}'}"
         Height="700" Width="1000"
         Background="#FF1E1E1E"
         MinWidth="700"
@@ -90,7 +90,7 @@ Click="YasuoButtons_click">
             </Button>
 
             <ToggleButton DragEnter="OnDragEnterMode"
-        DragOver="OnDragOverMode" AllowDrop="True"
+        DragOver="OnDragOverMode" AllowDrop="True" Visibility="Collapsed"
         Drop="OnDropMode" Style="{StaticResource BigToggleSlider}" DockPanel.Dock="Right" x:Name="tftModButton"
             Margin="0,1,0,0"/>
 
