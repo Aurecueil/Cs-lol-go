@@ -4073,10 +4073,7 @@ try
             {
                 releaseNotes = $"""
                     Update Found!
-                    
                     {releaseNotes}
-
-
                     Do you want to auto-update the app?
                     """;
             }else

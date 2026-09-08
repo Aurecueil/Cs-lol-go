@@ -533,37 +533,59 @@ namespace ModManager
             }
         }
 
-        // NEW HELPER METHOD FOR ALIGNMENT
         private void ApplyAlignmentSettings()
         {
+            bool isCompact = ActualWidth > 0 ? ActualWidth < 400 : false;
+
+            // Keep internal action elements centered within the pill container at all times
+            elements2.VerticalAlignment = VerticalAlignment.Center;
+            elements2.Margin = isCompact ? new Thickness(-1, 0, 1, 0) : new Thickness(8, 0, 5, 0);
+
+            // Padding values for top/bottom margins
+            const double verticalSpacing = 10.0; // Increased spacing from card edges
+
             switch (Main.settings.Ailgment)
             {
                 case 0: // Top
                     elements1.VerticalAlignment = VerticalAlignment.Top;
-                    elements2.VerticalAlignment = VerticalAlignment.Top;
-                    elements2.Margin = new Thickness(6, 6, 11, 6); // +5px right
                     elements3.VerticalAlignment = VerticalAlignment.Top;
                     elements3.Margin = new Thickness(0, 18, 0, 0);
+
+                    // Move container to the top with larger top margin
+                    ActionsOverlayBorder.VerticalAlignment = VerticalAlignment.Top;
+                    ActionsOverlayBorder.Margin = isCompact
+                        ? new Thickness(0, verticalSpacing, 8, 0)
+                        : new Thickness(0, verticalSpacing, 6, 0);
                     break;
+
                 case 1: // Center
                     elements1.VerticalAlignment = VerticalAlignment.Center;
-                    elements2.VerticalAlignment = VerticalAlignment.Center;
-                    elements2.Margin = new Thickness(8, 0, 5, 0);  // +5px right
                     DetailsText.VerticalAlignment = VerticalAlignment.Center;
                     DetailsText.Margin = new Thickness(8, 0, 8, 0);
+
+                    // Centered (no top/bottom offset needed)
+                    ActionsOverlayBorder.VerticalAlignment = VerticalAlignment.Center;
+                    ActionsOverlayBorder.Margin = isCompact
+                        ? new Thickness(0, 0, 8, 0)
+                        : new Thickness(0, 0, 6, 0);
                     break;
+
                 case 2: // Bottom
                     elements1.VerticalAlignment = VerticalAlignment.Bottom;
-                    elements2.VerticalAlignment = VerticalAlignment.Bottom;
-                    elements2.Margin = new Thickness(6, 6, 11, 6); // +5px right
                     elements3.VerticalAlignment = VerticalAlignment.Bottom;
                     elements3.Margin = new Thickness(0, 0, 0, 18);
+
+                    // Move container to the bottom with larger bottom margin
+                    ActionsOverlayBorder.VerticalAlignment = VerticalAlignment.Bottom;
+                    ActionsOverlayBorder.Margin = isCompact
+                        ? new Thickness(0, 0, 8, verticalSpacing)
+                        : new Thickness(0, 0, 6, verticalSpacing);
                     break;
+
                 default:
                     break;
             }
         }
-
 
         private async void UpdateBackgroundUI()
         {
@@ -985,6 +1007,7 @@ namespace ModManager
             {
                 return;
             }
+
             // 1. Hide description when narrow
             elements3.Visibility = (e.NewSize.Width < 450 && !IsParentFolder) ? Visibility.Collapsed : Visibility.Visible;
 
@@ -999,9 +1022,6 @@ namespace ModManager
                 ActionsOverlayFrame.CornerRadius = new CornerRadius(CapsuleRadius);
 
                 ActionsOverlayBorder.Height = CircleSize;
-                ActionsOverlayBorder.Margin = new Thickness(0, 0, 8, 0);
-
-                elements2.Margin = new Thickness(-1, 0, 1, 0);
 
                 if (e.PreviousSize.Width >= 400 || e.PreviousSize.Width == 0)
                 {
@@ -1014,18 +1034,18 @@ namespace ModManager
                 ActionsOverlayBorder.BeginAnimation(WidthProperty, null);
                 ActionsOverlayBorder.Width = double.NaN;
                 ActionsOverlayBorder.Height = double.NaN;
-                ActionsOverlayBorder.Margin = new Thickness(0, 0, 6, 0);
 
                 ActionsOverlayFrame.Background = Brushes.Transparent;
                 ActionsOverlayFrame.BorderBrush = Brushes.Transparent;
                 ActionsOverlayFrame.BorderThickness = new Thickness(0);
 
-                elements2.Margin = new Thickness(4, 0, 0, 0);
                 MoreActionsButton.Visibility = Visibility.Collapsed;
                 elements2.Visibility = Visibility.Visible;
             }
-        }
 
+            // Reapply alignment to ensure margins and vertical alignments match the current width mode
+            ApplyAlignmentSettings();
+        }
         private void ExpandActions()
         {
             if (_isExpanded || ActualWidth >= 400) return;
@@ -1033,7 +1053,7 @@ namespace ModManager
 
             MoreActionsButton.Visibility = Visibility.Collapsed;
             elements2.Visibility = Visibility.Visible;
-            elements2.Margin = new Thickness(-1, 0, 1, 0);
+            elements2.Margin = new Thickness(-1, -1, 1, 0);
 
             elements2.Measure(new Size(double.PositiveInfinity, CircleSize));
             double targetWidth = Math.Max(elements2.DesiredSize.Width + 2, CircleSize);
