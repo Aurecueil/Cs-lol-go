@@ -321,7 +321,11 @@ Unchecked="Stop_loader" Style="{StaticResource ButtonTemple}"
             <TextBlock Margin="5,0,0,2" x:Name="Feed2" Text="Feed2" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         </Grid>
 
-        <Grid x:Name="ToggleOverlayRow3" Visibility="Collapsed" Background="{DynamicResource  AccentBrush}" Grid.Row="4" Grid.ColumnSpan="3" Margin="0,0,0,0">
+        <Grid x:Name="ToggleOverlayRow3" Visibility="Collapsed" Grid.Row="4" Grid.ColumnSpan="3" Margin="0,0,0,0">
+            <Rectangle Fill="Gray" />
+
+            <!-- Progress Layer (filled part) -->
+            <Rectangle x:Name="ProgressBarFill3" Fill="{DynamicResource AccentBrush}" HorizontalAlignment="Left" />
             <TextBlock Margin="5,0,0,2" x:Name="Feed3" Text="Feed3" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left"/>
         </Grid>
 

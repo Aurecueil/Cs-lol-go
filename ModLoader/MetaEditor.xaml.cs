@@ -281,7 +281,7 @@ namespace ModManager
                     start_name = true_folder_name;
                     valid_Folder = false;
                     Update_folder_name.IsEnabled = false;
-                    ModElement = Main.CreateModFromFolder(Path.Combine(installedPath, true_folder_name));
+                    ModElement = Main.CreateModFromFoldersync(Path.Combine(installedPath, true_folder_name));
                     ModElement.Info.Author = txtAuthor.Text;
                     ModElement.Info.Description = txtDescription.Text;
                     ModElement.Info.Version = txtVersion.Text;

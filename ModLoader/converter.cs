@@ -553,20 +553,32 @@ namespace ModManager
     {
         private readonly WadExtractor _extractor;
         private readonly BinFieldConverter _converter;
+        private MainWindow _main;
 
-        public WadBatchProcessor(WadExtractor extractor, BinFieldConverter converter)
+        public WadBatchProcessor(WadExtractor extractor, BinFieldConverter converter, MainWindow? main = null)
         {
             _extractor = extractor ?? throw new ArgumentNullException(nameof(extractor));
             _converter = converter ?? throw new ArgumentNullException(nameof(converter));
+                _main = main;
         }
+        private void ReportProgress(double progress)
+        {
+            if (_main == null) return;
 
+            double clamped = Math.Clamp(progress, 0.0, 1.0);
+
+            if (_main.Dispatcher.CheckAccess())
+                _main.SetProgress3(clamped);
+            else
+                _main.Dispatcher.InvokeAsync(() => _main.SetProgress3(clamped));
+        }
         public async Task ProcessFolderAsync(string targetDirectory, CancellationToken ct = default)
         {
             if (!Directory.Exists(targetDirectory))
                 throw new DirectoryNotFoundException($"Target directory not found: {targetDirectory}");
-
+            ReportProgress(0.0);
             await PreseedCommonSkinHashesAsync(targetDirectory, ct);
-
+            ReportProgress(0.02);
             var extractedWadFolders = await ProcessAllWadsInDirectoryAsync(targetDirectory, ct);
 
             var tracker = new ConvertedStringsTracker();
@@ -602,6 +614,7 @@ namespace ModManager
                 }
             }
 
+            ReportProgress(1);
             // Save strictly converted strings to files
             SaveTrackedStrings(targetDirectory, tracker);
         }
@@ -1126,9 +1139,11 @@ namespace ModManager
                 .ToList();
 
             var extractedFolders = new List<string>();
-
+            int section = 0;
+            int sections = wadFiles.Count();
             foreach (var wadPath in wadFiles)
             {
+                double progress = 0.02 + (0.93 / sections * section);
                 ct.ThrowIfCancellationRequested();
 
                 string? wadDir = Path.GetDirectoryName(wadPath);
@@ -1143,7 +1158,7 @@ namespace ModManager
                     if (!Directory.Exists(outputExtractFolder))
                         Directory.CreateDirectory(outputExtractFolder);
 
-                    await ExtractWadFileAsync(tempWadPath, outputExtractFolder, ct);
+                    await ExtractWadFileAsync(tempWadPath, outputExtractFolder, ct, progress , 0.93 / sections);
                     extractedFolders.Add(outputExtractFolder);
                 }
                 finally
@@ -1153,6 +1168,7 @@ namespace ModManager
                         File.Delete(tempWadPath);
                     }
                 }
+                section += 1;
             }
 
             return extractedFolders;
@@ -1302,7 +1318,7 @@ namespace ModManager
             }
         }
 
-        private async Task ExtractWadFileAsync(string wadFilePath, string outputDir, CancellationToken ct)
+        private async Task ExtractWadFileAsync(string wadFilePath, string outputDir, CancellationToken ct, double current, double max)
         {
             var entries = new List<RawWadEntry>();
 
@@ -1380,6 +1396,8 @@ namespace ModManager
 
             using (var fs = new FileStream(wadFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
+                int entryIndex = 1;
+                int entryIndexMax = entries.Count();
                 foreach (var entry in entries)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -1415,7 +1433,9 @@ namespace ModManager
                         }
                         finally
                         {
+                            ReportProgress(current + (max / entryIndexMax * entryIndex));
                             ArrayPool<byte>.Shared.Return(compBuffer);
+                            entryIndex += 1;
                         }
                     }
                     catch (Exception ex)

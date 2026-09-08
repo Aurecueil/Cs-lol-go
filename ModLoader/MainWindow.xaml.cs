@@ -1728,7 +1728,7 @@ try
                         await Task.Delay(500);
                     }
                 }
-
+                SetProgress3(1);
                 SetLoading("WAD Index", 1, 0);
                 await Task.Run(() => LoadWadFiles());
                 SetLoading("Folder `", 1, 0);
@@ -1849,6 +1849,11 @@ try
         {
             double totalWidth = ToggleOverlayRow.ActualWidth;
             ProgressBarFill.Width = totalWidth * currentProgress;
+        }
+        public void SetProgress3(double progress)
+        {
+            double totalWidth = ToggleOverlayRow3.ActualWidth;
+            ProgressBarFill3.Width = totalWidth * progress;
         }
 
 
@@ -4723,7 +4728,7 @@ try
         }
 
 
-        public void LoadMods()
+        public async Task LoadMods()
         {
 
             if (!Directory.Exists(installedPath))
@@ -4745,7 +4750,6 @@ try
                 {
                     Dispatcher.Invoke(() => SetLoading($"Loading: {modFolderName}", 1, j/total));
                     CreateModFromFolder(modFolderPath);
-
                 }
                 catch (Exception ex)
                 {
@@ -4867,8 +4871,8 @@ try
                 MessageBox.Show($"Error removing element from folders.json: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-        public Mod CreateModFromFolder(string modFolderPath, bool override_inner_path = false)
+        public Mod CreateModFromFoldersync(string modFolderPath, bool override_inner_path = false) => CreateModFromFolder(modFolderPath, override_inner_path).GetAwaiter().GetResult();
+        public async Task<Mod> CreateModFromFolder(string modFolderPath, bool override_inner_path = false)
         {
             string modFolderName = Path.GetFileName(modFolderPath);
             string metaPath = Path.Combine(modFolderPath, "META");
@@ -4954,10 +4958,10 @@ try
                 var extractor = new WadExtractor(settings);
                 var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
 
-                var processor = new WadBatchProcessor(extractor, converter);
-                Dispatcher.Invoke(() => SetLoading($"Converting: {modFolderName}", 1, 2137));
+                var processor = new WadBatchProcessor(extractor, converter, this);
+                Dispatcher.Invoke(() => SetLoading($"Applying Fixes: {modInfo.Name}", 1, 2137));
 
-                processor.ProcessFolderAsync(wadPath);
+                await processor.ProcessFolderAsync(wadPath);
                 string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
                 if (File.Exists(game_hash_path))
                 {
@@ -5250,7 +5254,7 @@ try
                         }
                     }
                     string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                    Mod new_mod = CreateModFromFolder(extractTargetDir, true);
+                    Mod new_mod = await CreateModFromFolder(extractTargetDir, true);
                     if (new_mod == null) {
                         Application.Current.Dispatcher.Invoke(() =>
                    CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
@@ -5592,7 +5596,7 @@ try
                             }
 
                             string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
-                            Mod newmod = CreateModFromFolder(extractTargetDir, true);
+                            Mod newmod = await CreateModFromFolder(extractTargetDir, true);
 
                             if (newmod == null)
                             {
@@ -5648,7 +5652,7 @@ try
         RegexOptions.Compiled | RegexOptions.IgnoreCase
     );
 
-        private void install_modpkg(string path, bool override_ = false)
+        private async Task install_modpkg(string path, bool override_ = false)
         {
             var info = ModPkgLib.GetMetadata(path);
 
@@ -5742,7 +5746,7 @@ try
             File.WriteAllText(Path.Combine(metaPath, "details.json"), json2);
 
             string folderName = Path.GetFileName(installPath.TrimEnd(Path.DirectorySeparatorChar));
-            Mod moddi = CreateModFromFolder(installPath, true);
+            Mod moddi = await CreateModFromFolder(installPath, true);
             if(moddi == null)
                             {
                 Application.Current.Dispatcher.Invoke(() =>
