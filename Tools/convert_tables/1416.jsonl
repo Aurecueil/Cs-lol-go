@@ -1,0 +1,2 @@
+{"class": "ChampionAugmentTagList", "field": "ChampionTags", "from": {"type": "List", "value": "Embed"}, "to": {"type": "List2", "value": "Embed"}}
+{"class": "LoLModesRoundsListData", "field": "Rounds", "from": {"type": "List", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}

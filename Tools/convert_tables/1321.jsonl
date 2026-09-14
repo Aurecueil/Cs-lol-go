@@ -1,0 +1,3 @@
+{"class": "0x288b8edc", "field": "SpellObjects", "from": {"type": "List", "key": "0x4", "value": "Hash"}, "to": {"type": "List", "key": "0x4", "value": "Link"}}
+{"class": "HomeViewPromoBanner", "field": "Elements", "from": {"type": "List2", "value": "Embed"}, "to": {"type": "List2", "value": "Pointer"}}
+{"class": "TftTraitTrackerTraitDataTemplate", "field": "IconBackgrounds", "from": {"type": "List", "key": "0x6", "value": "Embed"}, "to": {"type": "List", "key": "0x7", "value": "Embed"}}

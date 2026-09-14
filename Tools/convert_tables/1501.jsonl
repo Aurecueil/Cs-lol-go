@@ -1,0 +1,4 @@
+{"class": "0x114c210c", "field": "0xfd73ebe0", "from": {"type": "Map", "key": "U32", "value": "Hash"}, "to": {"type": "Map", "key": "U32", "value": "Embed"}}
+{"class": "FeatsViewController", "field": "0x9051620d", "from": {"type": "Map", "key": "U32", "value": "Embed"}, "to": {"type": "Map", "key": "U32", "value": "Embed"}}
+{"class": "GameEntityIconTexture", "field": "ColorblindTexturePath", "from": {"type": "Option", "value": "String"}, "to": {"type": "String"}}
+{"class": "PlayAnimation", "field": "AnimationName", "from": {"type": "String"}, "to": {"type": "Hash"}}

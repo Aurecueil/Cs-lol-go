@@ -1,0 +1,3 @@
+{"class": "0x68067fa5", "field": "0x5ff6cd50", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
+{"class": "0x707d57b1", "field": "0x5ff6cd50", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
+{"class": "CharacterMeshEntityTemplate", "field": "Character", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}

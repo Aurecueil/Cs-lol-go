@@ -1,0 +1,4 @@
+{"class": "0x4e7f16fe", "field": "SpellDataTemplate", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
+{"class": "EntityGroupGet", "field": "value", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "GameEntityDefinition", "field": "tags", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}
+{"class": "MapActionGroupAnimation", "field": "Group", "from": {"type": "Link"}, "to": {"type": "Link"}}

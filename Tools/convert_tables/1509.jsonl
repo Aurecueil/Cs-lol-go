@@ -1,0 +1,6 @@
+{"class": "0x92309121", "field": "0x20fc97e7", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "HeroFloatingInfoCharacterStateIndicatorList", "field": "StateIndicatorList", "from": {"type": "List", "value": "Hash"}, "to": {"type": "List2", "value": "Embed"}}
+{"class": "LightRegionRenderData", "field": "CharacterSunLightColor", "from": {"type": "Vec4"}, "to": {"type": "Vec3"}}
+{"class": "LightRegionRenderData", "field": "SunLightColor", "from": {"type": "Vec4"}, "to": {"type": "Vec3"}}
+{"class": "MonarchInteractRequirement", "field": "Requirements", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
+{"class": "SpellDataResource", "field": "0xabe507b9", "from": {"type": "Link"}, "to": {"type": "Hash"}}

@@ -1,0 +1,4 @@
+{"class": "0x21a128f8", "field": "0x47da838e", "from": {"type": "Map", "key": "U32", "value": "Bool"}, "to": {"type": "Map", "key": "U32", "value": "U8"}}
+{"class": "MonarchEncounterDef", "field": "UniqueId", "from": {"type": "Hash"}, "to": {"type": "String"}}
+{"class": "0x21a128f8", "field": "0x47da838e", "from": {"type": "Map", "key": "U32", "value": "Bool"}, "to": {"type": "Map", "key": "U32", "value": "U8"}}
+{"class": "MonarchEncounterDef", "field": "UniqueId", "from": {"type": "Hash"}, "to": {"type": "String"}}

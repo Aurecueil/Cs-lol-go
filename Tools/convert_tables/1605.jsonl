@@ -1,0 +1,5 @@
+{"class": "0x19ff61ac", "field": "0x4dfeefaf", "from": {"type": "List", "key": "0x6", "value": "Bool"}, "to": {"type": "List", "key": "0x4", "value": "Bool"}}
+{"class": "0x791eb92e", "field": "0xb136a8a8", "from": {"type": "List2", "value": "Embed"}, "to": {"type": "List2", "value": "Hash"}}
+{"class": "AugmentSlotData", "field": "0x791eb92e", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}
+{"class": "MatchmakingQueue", "field": "GameTypeConfigId", "from": {"type": "U8"}, "to": {"type": "U32"}}
+{"class": "MatchmakingQueue", "field": "MapId", "from": {"type": "U8"}, "to": {"type": "U32"}}

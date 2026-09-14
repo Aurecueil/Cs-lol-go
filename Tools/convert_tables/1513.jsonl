@@ -1,0 +1,5 @@
+{"class": "AreaTriggerDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
+{"class": "BarracksDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
+{"class": "NeutralCampDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
+{"class": "SkinCharacterDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
+{"class": "VfxComponents", "field": "components", "from": {"type": "List2", "value": "Embed"}, "to": {"type": "List2", "value": "Pointer"}}

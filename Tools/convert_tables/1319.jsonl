@@ -1,0 +1,2 @@
+{"class": "AddLevelTimer", "field": "callback", "from": {"type": "Link"}, "to": {"type": "Embed"}}
+{"class": "CustomNeutralCampSpawnBehavior", "field": "callback", "from": {"type": "Link"}, "to": {"type": "Embed"}}

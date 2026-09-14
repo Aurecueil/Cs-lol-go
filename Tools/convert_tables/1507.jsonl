@@ -1,0 +1,3 @@
+{"class": "0x17d73579", "field": "Character", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "0x82e8ec62", "field": "RequiredCount", "from": {"type": "I8"}, "to": {"type": "I32"}}
+{"class": "0xbb04e22d", "field": "RequiredLevel", "from": {"type": "I8"}, "to": {"type": "I32"}}

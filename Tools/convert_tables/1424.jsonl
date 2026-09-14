@@ -1,0 +1,5 @@
+{"class": "0x3bdb7a5c", "field": "DataValues", "from": {"type": "Map", "key": "String", "value": "F32"}, "to": {"type": "Map", "key": "String", "value": "Embed"}}
+{"class": "0x64c79a58", "field": "DataValues", "from": {"type": "Map", "key": "String", "value": "Embed"}, "to": {"type": "Map", "key": "String", "value": "Embed"}}
+{"class": "MonarchFloatingInventoryViewController", "field": "InventoryTemplate", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
+{"class": "MonarchPlayerInventoryViewController", "field": "0x84cebf33", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
+{"class": "MonarchPlayerInventoryViewController", "field": "0x8d550f2e", "from": {"type": "Embed"}, "to": {"type": "Embed"}}

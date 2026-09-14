@@ -1,0 +1,4 @@
+{"class": "0x71fdeba8", "field": "ConnectedNodes", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
+{"class": "0x71fdeba8", "field": "Node", "from": {"type": "Link"}, "to": {"type": "Link"}}
+{"class": "0xe4b58196", "field": "0x667975df", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
+{"class": "IAugment", "field": "RootSpell", "from": {"type": "Hash"}, "to": {"type": "Link"}}

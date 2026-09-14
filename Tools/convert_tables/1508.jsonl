@@ -1,0 +1,2 @@
+{"class": "0x22a6b567", "field": "RewardTemplate", "from": {"type": "Hash"}, "to": {"type": "Embed"}}
+{"class": "0x9f30b8a6", "field": "BaseGold", "from": {"type": "F32"}, "to": {"type": "List2", "value": "F32"}}
