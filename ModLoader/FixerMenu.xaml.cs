@@ -983,9 +983,9 @@ namespace ModManager
                 // Since this runs on the background thread now, FixiniYoursSkini MUST use 
                 // the thread-safe LowerLog/UpperLog/UpdateProgress methods we updated in Step 1.
                 var fixerTimer = System.Diagnostics.Stopwatch.StartNew();
+                Fixer.FixiniYoursSkini(this);
                 try
                 {
-                    Fixer.FixiniYoursSkini(this);
                 }
                 catch (Exception ex) {
                     MessageBox.Show($"Fixer got drunk and failed, sry.\nDetails:\n{ex.Message}");

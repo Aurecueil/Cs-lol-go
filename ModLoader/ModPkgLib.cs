@@ -1012,6 +1012,7 @@ namespace ModPkgLibSpace
         public void Dispose() => _reader?.Dispose();
     }
 
+
     internal class ModpkgWriter : IDisposable
     {
         private readonly string _outputPath;
@@ -1021,6 +1022,9 @@ namespace ModPkgLibSpace
         private readonly List<(string Path, byte[] Data)> _otherMetaChunks = new();
         private readonly List<string> _extraHeaderPaths = new();
         private readonly List<ModpkgChunk> _finalChunks = new();
+
+        // Tracks content signatures to deduplicate identical payloads written to the stream
+        private readonly Dictionary<ulong, (ulong DataOffset, CompressionType Compression, ulong CompressedSize, ulong UncompressedSize, ulong CompressedChecksum, ulong UncompressedChecksum)> _writtenPayloads = new();
 
         public ModpkgWriter(string outputPath) => _outputPath = outputPath;
 
@@ -1273,9 +1277,9 @@ namespace ModPkgLibSpace
             var pathToIndex = chunkPaths.Select((p, i) => (p, i)).ToDictionary(x => x.p, x => (uint)x.i, StringComparer.OrdinalIgnoreCase);
 
             var wads = _chunksToProcess.Select(c => c.WadName)
-                                       .Where(w => !string.IsNullOrEmpty(w))
-                                       .Distinct(StringComparer.OrdinalIgnoreCase)
-                                       .ToList();
+                                     .Where(w => !string.IsNullOrEmpty(w))
+                                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                                     .ToList();
             var wadToIndex = wads.Select((w, i) => (w, i)).ToDictionary(x => x.w, x => (uint)x.i, StringComparer.OrdinalIgnoreCase);
 
             var totalChunks = 1 + _otherMetaChunks.Count + _chunksToProcess.Count;
@@ -1354,8 +1358,30 @@ namespace ModPkgLibSpace
         }
 
         private void ProcessAndWriteChunk(BinaryWriter writer, string path, byte[] data,
-          Dictionary<string, uint> pathToIndex, uint layerIndex, uint wadIndex, bool isMetaChunk)
+            Dictionary<string, uint> pathToIndex, uint layerIndex, uint wadIndex, bool isMetaChunk)
         {
+            // Use the uncompressed checksum as a unique identifier for payload deduplication
+            ulong uncompressedChecksum = ModPkgLib.XXH3_64(data);
+
+            if (!isMetaChunk && _writtenPayloads.TryGetValue(uncompressedChecksum, out var existing))
+            {
+                // Payload already exists in the stream; reuse its offset and metadata descriptors without writing duplicates
+                _finalChunks.Add(new ModpkgChunk
+                {
+                    PathHash = ModPkgLib.HashChunkName(path),
+                    DataOffset = existing.DataOffset,
+                    Compression = existing.Compression,
+                    CompressedSize = existing.CompressedSize,
+                    UncompressedSize = existing.UncompressedSize,
+                    CompressedChecksum = existing.CompressedChecksum,
+                    UncompressedChecksum = existing.UncompressedChecksum,
+                    PathIndex = pathToIndex[path],
+                    LayerIndex = layerIndex,
+                    WadIndex = wadIndex
+                });
+                return;
+            }
+
             var dataOffset = (ulong)writer.BaseStream.Position;
             byte[] compressedData = data;
             CompressionType compression = CompressionType.None;
@@ -1373,6 +1399,13 @@ namespace ModPkgLibSpace
 
             writer.Write(compressedData);
 
+            var compressedChecksum = ModPkgLib.XXH3_64(compressedData);
+
+            if (!isMetaChunk)
+            {
+                _writtenPayloads[uncompressedChecksum] = (dataOffset, compression, (ulong)compressedData.Length, (ulong)data.Length, compressedChecksum, uncompressedChecksum);
+            }
+
             _finalChunks.Add(new ModpkgChunk
             {
                 PathHash = ModPkgLib.HashChunkName(path),
@@ -1380,8 +1413,8 @@ namespace ModPkgLibSpace
                 Compression = compression,
                 CompressedSize = (ulong)compressedData.Length,
                 UncompressedSize = (ulong)data.Length,
-                CompressedChecksum = ModPkgLib.XXH3_64(compressedData),
-                UncompressedChecksum = ModPkgLib.XXH3_64(data),
+                CompressedChecksum = compressedChecksum,
+                UncompressedChecksum = uncompressedChecksum,
                 PathIndex = pathToIndex[path],
                 LayerIndex = layerIndex,
                 WadIndex = wadIndex

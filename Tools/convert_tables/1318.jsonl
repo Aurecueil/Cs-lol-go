@@ -1,0 +1,1 @@
+{"class": "MapPlaceableContainer", "field": "items", "from": {"type": "Map", "key": "Hash", "value": "Pointer"}, "to": {"type": "Map", "key": "Hash", "value": "Pointer"}}

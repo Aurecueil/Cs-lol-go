@@ -1,0 +1,6 @@
+{"class": "0x83456589", "field": "0xac3cf5bd", "from": {"type": "Vec3"}, "to": {"type": "Embed"}}
+{"class": "0x83456589", "field": "intensityScale", "from": {"type": "F32"}, "to": {"type": "Embed"}}
+{"class": "0x83456589", "field": "lightColor", "from": {"type": "Vec4"}, "to": {"type": "Embed"}}
+{"class": "0x83456589", "field": "radius", "from": {"type": "F32"}, "to": {"type": "Embed"}}
+{"class": "0x0f4e577e", "field": "ChampionComponents", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Link"}}
+{"class": "TftItemData", "field": "ItemTags", "from": {"type": "List", "value": "Hash"}, "to": {"type": "List2", "value": "Hash"}}

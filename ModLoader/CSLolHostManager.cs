@@ -10,7 +10,7 @@ namespace ModManager
     {
         public static bool IsRunning()
         {
-            return CSLolHostManager.IsRunning || CSLolManager.IsRunning;
+            return CSLolHostManager.IsRunning; // || CSLolManager.IsRunning;
         }
     }
 

@@ -1,0 +1,4 @@
+{"class": "0x6b91544a", "field": "VfxSystems", "from": {"type": "Map", "key": "Hash", "value": "Link"}, "to": {"type": "List2", "value": "Embed"}}
+{"class": "CherryScoreboardViewController", "field": "ScoreLineUi", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
+{"class": "TftUnitFloatingInfoBarData", "field": "Healthbar", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}
+{"class": "TftUnitFloatingInfoBarData", "field": "ParBar", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}

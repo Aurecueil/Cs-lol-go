@@ -9,11 +9,13 @@ using System.IO;
 using System.IO.Compression;
 using System.IO.Hashing;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls.Primitives;
 using ZstdSharp;
 using static ModManager.Repatheruwu;
@@ -165,7 +167,6 @@ namespace ModManager
                 }
                 else
                 {
-                    // Unconverted field: harvest values strictly as temporary hashes
                     CollectRawStrings(field.Value, tracker?.UnconvertedTempStrings);
                 }
 
@@ -185,7 +186,6 @@ namespace ModManager
                 }
                 else
                 {
-                    // Unconverted field: harvest values strictly as temporary hashes
                     CollectRawStrings(field.Value, tracker?.UnconvertedTempStrings);
                 }
 
@@ -236,7 +236,6 @@ namespace ModManager
 
             switch (val)
             {
-                // Harvest string/hash/file values only (no field names)
                 case BinString s when !string.IsNullOrWhiteSpace(s.Value):
                     bag.Add(s.Value.Trim());
                     break;
@@ -291,10 +290,13 @@ namespace ModManager
 
         private void ApplyRuleToField(BinField field, ConversionRule rule, ConvertedStringsTracker? tracker)
         {
-            // 1. String -> File / Hash
-            if (rule.From.Type == "String")
+            string fromType = rule.From.Type;
+            string toType = rule.To.Type;
+
+            // Handle string-to-file/hash conversions
+            if (fromType == "String")
             {
-                if (rule.To.Type == "File" && field.Value is BinString sFile)
+                if (toType == "File" && field.Value is BinString sFile)
                 {
                     if (!string.IsNullOrWhiteSpace(sFile.Value))
                         tracker?.GameFiles.Add(sFile.Value.Trim());
@@ -302,7 +304,7 @@ namespace ModManager
                     field.Value = ConvertStringToBinFile(sFile.Value);
                     return;
                 }
-                if (rule.To.Type == "Hash" && field.Value is BinString sHash)
+                if (toType == "Hash" && field.Value is BinString sHash)
                 {
                     if (!string.IsNullOrWhiteSpace(sHash.Value))
                         tracker?.BinEntries.Add(sHash.Value.Trim());
@@ -312,8 +314,7 @@ namespace ModManager
                 }
             }
 
-            // 2. Hash -> File
-            if (rule.From.Type == "Hash" && rule.To.Type == "File")
+            if (fromType == "Hash" && toType == "File")
             {
                 if (field.Value is BinHash h)
                 {
@@ -325,8 +326,7 @@ namespace ModManager
                 return;
             }
 
-            // 3. Embed -> Pointer
-            if (rule.From.Type == "Embed" && rule.To.Type == "Pointer")
+            if (fromType == "Embed" && toType == "Pointer")
             {
                 if (field.Value is BinEmbed embed)
                 {
@@ -337,177 +337,164 @@ namespace ModManager
                 return;
             }
 
-            // 4. List conversion
-            if (rule.From.Type == "List" && field.Value is BinList list)
+            // Handle numeric, vector, matrix, and color primitives conversion
+            if (TryParseBinType(fromType, out _) && TryParseBinType(toType, out BinType targetBinType))
             {
-                if (rule.To.ValueType == "File")
+                try
                 {
-                    list.ValueType = BinType.File;
-                    for (int i = 0; i < list.Items.Count; i++)
-                    {
-                        if (list.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.GameFiles.Add(s.Value.Trim());
-                            list.Items[i] = ConvertStringToBinFile(s.Value);
-                        }
-                    }
+                    field.Value = BinTypeConverter.ConvertValue(field.Value, targetBinType);
                 }
-                else if (rule.To.ValueType == "Hash")
+                catch (Exception ex)
                 {
-                    list.ValueType = BinType.Hash;
-                    for (int i = 0; i < list.Items.Count; i++)
-                    {
-                        if (list.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.BinEntries.Add(s.Value.Trim());
-                            list.Items[i] = ConvertStringToBinHash(s.Value);
-                        }
-                    }
+                    Debug.WriteLine($"[BinConverter] Failed to convert field {rule.FieldName} from {fromType} to {toType}: {ex.Message}");
                 }
                 return;
             }
 
-            // 5. List2 conversion
-            if (rule.From.Type == "List2" && field.Value is BinList2 list2)
+            if ((fromType is "List" or "List2" or "Container" or "UnorderedContainer") && field.Value is BinList list)
             {
-                if (rule.To.ValueType == "File")
-                {
-                    list2.ValueType = BinType.File;
-                    for (int i = 0; i < list2.Items.Count; i++)
-                    {
-                        if (list2.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.GameFiles.Add(s.Value.Trim());
-                            list2.Items[i] = ConvertStringToBinFile(s.Value);
-                        }
-                    }
-                }
-                else if (rule.To.ValueType == "Hash")
-                {
-                    list2.ValueType = BinType.Hash;
-                    for (int i = 0; i < list2.Items.Count; i++)
-                    {
-                        if (list2.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.BinEntries.Add(s.Value.Trim());
-                            list2.Items[i] = ConvertStringToBinHash(s.Value);
-                        }
-                    }
-                }
-                else if (rule.To.ValueType == "Embed" && !string.IsNullOrEmpty(rule.To.ClassName))
-                {
-                    uint newClassHash = ParseHashOrName(rule.To.ClassName);
-                    foreach (var item in list2.Items)
-                    {
-                        if (item is BinEmbed e)
-                            e.Name = new FNV1a(newClassHash);
-                    }
-                }
+                ApplyListConversion(list, rule.To.ValueType, tracker);
+                return;
+            }
+            if ((fromType is "List" or "List2" or "Container" or "UnorderedContainer") && field.Value is BinList2 list2)
+            {
+                ApplyList2Conversion(list2, rule.To, tracker);
                 return;
             }
 
-            // 6. Option conversion
-            if (rule.From.Type == "Option" && field.Value is BinOption opt)
+            if ((fromType is "Option" or "Optional") && field.Value is BinOption opt)
             {
-                if (rule.To.ValueType == "File")
-                {
-                    opt.ValueType = BinType.File;
-                    for (int i = 0; i < opt.Items.Count; i++)
-                    {
-                        if (opt.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.GameFiles.Add(s.Value.Trim());
-                            opt.Items[i] = ConvertStringToBinFile(s.Value);
-                        }
-                    }
-                }
-                else if (rule.To.ValueType == "Hash")
-                {
-                    opt.ValueType = BinType.Hash;
-                    for (int i = 0; i < opt.Items.Count; i++)
-                    {
-                        if (opt.Items[i] is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.BinEntries.Add(s.Value.Trim());
-                            opt.Items[i] = ConvertStringToBinHash(s.Value);
-                        }
-                    }
-                }
+                ApplyOptionConversion(opt, rule.To.ValueType, tracker);
                 return;
             }
 
-            // 7. Map conversion
-            if (rule.From.Type == "Map" && field.Value is BinMap map)
+            if (fromType == "Map" && field.Value is BinMap map)
             {
-                if (rule.To.ValueType == "File")
+                ApplyMapConversion(map, rule.To, tracker);
+                return;
+            }
+        }
+
+        private static bool TryParseBinType(string typeName, out BinType binType)
+        {
+            binType = typeName.ToLowerInvariant() switch
+            {
+                "i8" => BinType.I8,
+                "u8" => BinType.U8,
+                "i16" => BinType.I16,
+                "u16" => BinType.U16,
+                "i32" or "int" => BinType.I32,
+                "u32" or "uint" => BinType.U32,
+                "i64" => BinType.I64,
+                "u64" => BinType.U64,
+                "f32" or "float" => BinType.F32,
+                "vec2" => BinType.Vec2,
+                "vec3" => BinType.Vec3,
+                "vec4" => BinType.Vec4,
+                "mtx44" or "mat44" => BinType.Mtx44,
+                "rgba" or "color" => BinType.Rgba,
+                _ => BinType.None
+            };
+            return binType != BinType.None;
+        }
+
+
+        private void ApplyListListInternal(IList<BinValue> items, string? targetValueType, ConvertedStringsTracker? tracker)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] is BinString s)
                 {
-                    map.ValueType = BinType.File;
-                    for (int i = 0; i < map.Items.Count; i++)
+                    if (!string.IsNullOrWhiteSpace(s.Value))
                     {
-                        var kvp = map.Items[i];
-                        if (kvp.Value is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.GameFiles.Add(s.Value.Trim());
-                            map.Items[i] = new KeyValuePair<BinValue, BinValue>(kvp.Key, ConvertStringToBinFile(s.Value));
-                        }
+                        if (targetValueType == "File") tracker?.GameFiles.Add(s.Value.Trim());
+                        else if (targetValueType == "Hash") tracker?.BinEntries.Add(s.Value.Trim());
                     }
+
+                    if (targetValueType == "File") items[i] = ConvertStringToBinFile(s.Value);
+                    else if (targetValueType == "Hash") items[i] = ConvertStringToBinHash(s.Value);
                 }
-                else if (rule.To.ValueType == "Hash")
+                else if (items[i] is BinHash h && targetValueType == "File")
                 {
-                    map.ValueType = BinType.Hash;
-                    for (int i = 0; i < map.Items.Count; i++)
-                    {
-                        var kvp = map.Items[i];
-                        if (kvp.Value is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.BinEntries.Add(s.Value.Trim());
-                            map.Items[i] = new KeyValuePair<BinValue, BinValue>(kvp.Key, ConvertStringToBinHash(s.Value));
-                        }
-                    }
+                    if (!string.IsNullOrWhiteSpace(h.Value.String)) tracker?.GameFiles.Add(h.Value.String.Trim());
+                    items[i] = new BinFile(new XXH64(h.Value.Hash, h.Value.String));
+                }
+            }
+        }
+
+        private void ApplyListConversion(BinList list, string? targetValueType, ConvertedStringsTracker? tracker)
+        {
+            if (targetValueType == "File") list.ValueType = BinType.File;
+            else if (targetValueType == "Hash") list.ValueType = BinType.Hash;
+            ApplyListListInternal(list.Items, targetValueType, tracker);
+        }
+
+        private void ApplyList2Conversion(BinList2 list2, TypeDescriptor toDesc, ConvertedStringsTracker? tracker)
+        {
+            string? targetValueType = toDesc.ValueType;
+            if (targetValueType == "File") list2.ValueType = BinType.File;
+            else if (targetValueType == "Hash") list2.ValueType = BinType.Hash;
+
+            ApplyListListInternal(list2.Items, targetValueType, tracker);
+
+            if (targetValueType == "Embed" && !string.IsNullOrEmpty(toDesc.ClassName))
+            {
+                uint newClassHash = ParseHashOrName(toDesc.ClassName);
+                foreach (var item in list2.Items)
+                {
+                    if (item is BinEmbed e)
+                        e.Name = new FNV1a(newClassHash);
+                }
+            }
+        }
+
+        private void ApplyOptionConversion(BinOption opt, string? targetValueType, ConvertedStringsTracker? tracker)
+        {
+            if (targetValueType == "File") opt.ValueType = BinType.File;
+            else if (targetValueType == "Hash") opt.ValueType = BinType.Hash;
+            ApplyListListInternal(opt.Items, targetValueType, tracker);
+        }
+
+        private void ApplyMapConversion(BinMap map, TypeDescriptor toDesc, ConvertedStringsTracker? tracker)
+        {
+            string? targetKeyType = toDesc.KeyType;
+            string? targetValueType = toDesc.ValueType;
+
+            if (targetKeyType == "File") map.KeyType = BinType.File;
+            else if (targetKeyType == "Hash") map.KeyType = BinType.Hash;
+
+            if (targetValueType == "File") map.ValueType = BinType.File;
+            else if (targetValueType == "Hash") map.ValueType = BinType.Hash;
+
+            for (int i = 0; i < map.Items.Count; i++)
+            {
+                var kvp = map.Items[i];
+                BinValue newKey = kvp.Key;
+                BinValue newVal = kvp.Value;
+
+                if (targetKeyType == "File" && kvp.Key is BinString ks)
+                {
+                    if (!string.IsNullOrWhiteSpace(ks.Value)) tracker?.GameFiles.Add(ks.Value.Trim());
+                    newKey = ConvertStringToBinFile(ks.Value);
+                }
+                else if (targetKeyType == "Hash" && kvp.Key is BinString kh)
+                {
+                    if (!string.IsNullOrWhiteSpace(kh.Value)) tracker?.BinEntries.Add(kh.Value.Trim());
+                    newKey = ConvertStringToBinHash(kh.Value);
                 }
 
-                if (rule.To.KeyType == "File")
+                if (targetValueType == "File" && kvp.Value is BinString vs)
                 {
-                    map.KeyType = BinType.File;
-                    for (int i = 0; i < map.Items.Count; i++)
-                    {
-                        var kvp = map.Items[i];
-                        if (kvp.Key is BinHash h)
-                        {
-                            if (!string.IsNullOrWhiteSpace(h.Value.String))
-                                tracker?.GameFiles.Add(h.Value.String.Trim());
-                            map.Items[i] = new KeyValuePair<BinValue, BinValue>(new BinFile(new XXH64(h.Value.Hash, h.Value.String)), kvp.Value);
-                        }
-                        else if (kvp.Key is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.GameFiles.Add(s.Value.Trim());
-                            map.Items[i] = new KeyValuePair<BinValue, BinValue>(ConvertStringToBinFile(s.Value), kvp.Value);
-                        }
-                    }
+                    if (!string.IsNullOrWhiteSpace(vs.Value)) tracker?.GameFiles.Add(vs.Value.Trim());
+                    newVal = ConvertStringToBinFile(vs.Value);
                 }
-                else if (rule.To.KeyType == "Hash")
+                else if (targetValueType == "Hash" && kvp.Value is BinString vh)
                 {
-                    map.KeyType = BinType.Hash;
-                    for (int i = 0; i < map.Items.Count; i++)
-                    {
-                        var kvp = map.Items[i];
-                        if (kvp.Key is BinString s)
-                        {
-                            if (!string.IsNullOrWhiteSpace(s.Value))
-                                tracker?.BinEntries.Add(s.Value.Trim());
-                            map.Items[i] = new KeyValuePair<BinValue, BinValue>(ConvertStringToBinHash(s.Value), kvp.Value);
-                        }
-                    }
+                    if (!string.IsNullOrWhiteSpace(vh.Value)) tracker?.BinEntries.Add(vh.Value.Trim());
+                    newVal = ConvertStringToBinHash(vh.Value);
                 }
+
+                map.Items[i] = new KeyValuePair<BinValue, BinValue>(newKey, newVal);
             }
         }
 
@@ -559,7 +546,7 @@ namespace ModManager
         {
             _extractor = extractor ?? throw new ArgumentNullException(nameof(extractor));
             _converter = converter ?? throw new ArgumentNullException(nameof(converter));
-                _main = main;
+            _main = main;
         }
         private void ReportProgress(double progress)
         {
@@ -572,16 +559,24 @@ namespace ModManager
             else
                 _main.Dispatcher.InvokeAsync(() => _main.SetProgress3(clamped));
         }
-        public async Task ProcessFolderAsync(string targetDirectory, CancellationToken ct = default)
+        public async Task ProcessFolderAsync(string modpath, CancellationToken ct = default)
         {
+            string targetDirectory = Path.Combine(modpath, "WAD");
             if (!Directory.Exists(targetDirectory))
                 throw new DirectoryNotFoundException($"Target directory not found: {targetDirectory}");
             ReportProgress(0.0);
-            await PreseedCommonSkinHashesAsync(targetDirectory, ct);
+            var tracker = new ConvertedStringsTracker();
+            string hash_path = Path.Combine(modpath, "META", "hashes", "game.hashes.txt");
+            if (File.Exists(hash_path))
+            {
+                foreach (string line in File.ReadLines(hash_path))
+                {
+                    tracker.GameFiles.Add(line.Trim());
+                }
+            }
             ReportProgress(0.02);
             var extractedWadFolders = await ProcessAllWadsInDirectoryAsync(targetDirectory, ct);
 
-            var tracker = new ConvertedStringsTracker();
             bool hasNewPaths = true;
             int pass = 0;
 
@@ -592,7 +587,6 @@ namespace ModManager
 
                 ConvertAllBinsInDirectory(targetDirectory, tracker);
 
-                // Register converted AND unconverted fields into HashMaster
                 var allDiscovered = tracker.GameFiles
                     .Concat(tracker.BinEntries)
                     .Concat(tracker.UnconvertedTempStrings)
@@ -615,7 +609,6 @@ namespace ModManager
             }
 
             ReportProgress(1);
-            // Save strictly converted strings to files
             SaveTrackedStrings(targetDirectory, tracker);
         }
 
@@ -645,9 +638,6 @@ namespace ModManager
                     await HashMaster.AddTemporaryHashesAsync(stringList, ct);
                 }
             }
-
-            await PreseedCommonSkinHashesAsync(targetDirectory, ct);
-
             var tracker = new ConvertedStringsTracker();
             var allFiles = Directory.GetFiles(targetDirectory, "*", SearchOption.AllDirectories);
 
@@ -789,18 +779,19 @@ namespace ModManager
 
         private static async Task RecoverFieldAsync(BinField field, ConversionRule rule, ConvertedStringsTracker tracker, CancellationToken ct)
         {
-            if (rule.To.Type == "File")
+            string toType = rule.To.Type;
+            string? valType = rule.To.ValueType;
+            string? keyType = rule.To.KeyType;
+
+            if (toType == "File" && field.Value is BinFile fileVal)
             {
-                if (field.Value is BinFile fileVal)
-                {
-                    string? str = await ResolveFileStringAsync(fileVal, ct);
-                    if (!string.IsNullOrEmpty(str))
-                        tracker.GameFiles.Add(str);
-                }
+                string? str = await ResolveFileStringAsync(fileVal, ct);
+                if (!string.IsNullOrEmpty(str))
+                    tracker.GameFiles.Add(str);
                 return;
             }
 
-            if (rule.To.Type == "Hash")
+            if (toType == "Hash")
             {
                 if (field.Value is BinFile errFile)
                 {
@@ -811,133 +802,43 @@ namespace ModManager
                         tracker.BinEntries.Add(str);
                     }
                 }
-                else if (field.Value is BinHash bh)
+                else if (field.Value is BinHash bh && !string.IsNullOrEmpty(bh.Value.String))
                 {
-                    string? str = bh.Value.String;
-                    if (string.IsNullOrEmpty(str))
-                    {
-                        var unhashed = await HashMaster.UnhashBatchAsync(new[] { (ulong)bh.Value.Hash }, ct);
-                        if (unhashed.TryGetValue(bh.Value.Hash, out var r) && !string.IsNullOrEmpty(r))
-                            str = r;
-                    }
-
-                    if (!string.IsNullOrEmpty(str))
-                        tracker.BinEntries.Add(str);
+                    tracker.BinEntries.Add(bh.Value.String);
                 }
                 return;
             }
 
-            if (rule.To.ValueType == "File")
+            if (valType == "File")
             {
-                if (field.Value is BinList list)
-                {
-                    foreach (var item in list.Items)
-                    {
-                        if (item is BinFile f)
-                        {
-                            string? str = await ResolveFileStringAsync(f, ct);
-                            if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
-                        }
-                    }
-                }
-                else if (field.Value is BinList2 list2)
-                {
-                    foreach (var item in list2.Items)
-                    {
-                        if (item is BinFile f)
-                        {
-                            string? str = await ResolveFileStringAsync(f, ct);
-                            if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
-                        }
-                    }
-                }
-                else if (field.Value is BinOption opt)
-                {
-                    foreach (var item in opt.Items)
-                    {
-                        if (item is BinFile f)
-                        {
-                            string? str = await ResolveFileStringAsync(f, ct);
-                            if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
-                        }
-                    }
-                }
-                else if (field.Value is BinMap map)
-                {
-                    foreach (var kvp in map.Items)
-                    {
-                        if (kvp.Value is BinFile f)
-                        {
-                            string? str = await ResolveFileStringAsync(f, ct);
-                            if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
-                        }
-                    }
-                }
+                if (field.Value is BinList l) foreach (var item in l.Items.OfType<BinFile>()) await ProcessFileItemAsync(item, tracker, ct);
+                if (field.Value is BinList2 l2) foreach (var item in l2.Items.OfType<BinFile>()) await ProcessFileItemAsync(item, tracker, ct);
+                if (field.Value is BinOption opt) foreach (var item in opt.Items.OfType<BinFile>()) await ProcessFileItemAsync(item, tracker, ct);
+                if (field.Value is BinMap m) foreach (var kvp in m.Items.Where(x => x.Value is BinFile).Select(x => (BinFile)x.Value)) await ProcessFileItemAsync(kvp, tracker, ct);
             }
-            else if (rule.To.ValueType == "Hash")
+            else if (valType == "Hash")
             {
-                if (field.Value is BinList list)
-                {
-                    for (int i = 0; i < list.Items.Count; i++)
-                    {
-                        if (list.Items[i] is BinFile errFile)
-                        {
-                            string? str = await ResolveFileStringAsync(errFile, ct);
-                            if (!string.IsNullOrEmpty(str))
-                            {
-                                list.Items[i] = BinFieldConverter.ConvertStringToBinHash(str);
-                                tracker.BinEntries.Add(str);
-                            }
-                        }
-                        else if (list.Items[i] is BinHash bh && !string.IsNullOrEmpty(bh.Value.String))
-                        {
-                            tracker.BinEntries.Add(bh.Value.String);
-                        }
-                    }
-                }
-                else if (field.Value is BinOption opt)
-                {
-                    for (int i = 0; i < opt.Items.Count; i++)
-                    {
-                        if (opt.Items[i] is BinFile errFile)
-                        {
-                            string? str = await ResolveFileStringAsync(errFile, ct);
-                            if (!string.IsNullOrEmpty(str))
-                            {
-                                opt.Items[i] = BinFieldConverter.ConvertStringToBinHash(str);
-                                tracker.BinEntries.Add(str);
-                            }
-                        }
-                        else if (opt.Items[i] is BinHash bh && !string.IsNullOrEmpty(bh.Value.String))
-                        {
-                            tracker.BinEntries.Add(bh.Value.String);
-                        }
-                    }
-                }
+                if (field.Value is BinList l) await ProcessListHashRecoveryAsync(l.Items, tracker, ct);
+                if (field.Value is BinList2 l2) await ProcessListHashRecoveryAsync(l2.Items, tracker, ct);
+                if (field.Value is BinOption opt) await ProcessListHashRecoveryAsync(opt.Items, tracker, ct);
             }
 
-            if (rule.To.KeyType == "File" && field.Value is BinMap mapKFile)
+            if (keyType == "File" && field.Value is BinMap mapKF)
             {
-                foreach (var kvp in mapKFile.Items)
-                {
-                    if (kvp.Key is BinFile f)
-                    {
-                        string? str = await ResolveFileStringAsync(f, ct);
-                        if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
-                    }
-                }
+                foreach (var kvp in mapKF.Items.Where(x => x.Key is BinFile).Select(x => (BinFile)x.Key))
+                    await ProcessFileItemAsync(kvp, tracker, ct);
             }
-            else if (rule.To.KeyType == "Hash" && field.Value is BinMap mapKHash)
+            else if (keyType == "Hash" && field.Value is BinMap mapKH)
             {
-                for (int i = 0; i < mapKHash.Items.Count; i++)
+                for (int i = 0; i < mapKH.Items.Count; i++)
                 {
-                    var kvp = mapKHash.Items[i];
+                    var kvp = mapKH.Items[i];
                     if (kvp.Key is BinFile errFile)
                     {
                         string? str = await ResolveFileStringAsync(errFile, ct);
                         if (!string.IsNullOrEmpty(str))
                         {
-                            mapKHash.Items[i] = new KeyValuePair<BinValue, BinValue>(BinFieldConverter.ConvertStringToBinHash(str), kvp.Value);
+                            mapKH.Items[i] = new KeyValuePair<BinValue, BinValue>(BinFieldConverter.ConvertStringToBinHash(str), kvp.Value);
                             tracker.BinEntries.Add(str);
                         }
                     }
@@ -945,6 +846,32 @@ namespace ModManager
                     {
                         tracker.BinEntries.Add(bh.Value.String);
                     }
+                }
+            }
+        }
+
+        private static async Task ProcessFileItemAsync(BinFile file, ConvertedStringsTracker tracker, CancellationToken ct)
+        {
+            string? str = await ResolveFileStringAsync(file, ct);
+            if (!string.IsNullOrEmpty(str)) tracker.GameFiles.Add(str);
+        }
+
+        private static async Task ProcessListHashRecoveryAsync(IList<BinValue> items, ConvertedStringsTracker tracker, CancellationToken ct)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] is BinFile errFile)
+                {
+                    string? str = await ResolveFileStringAsync(errFile, ct);
+                    if (!string.IsNullOrEmpty(str))
+                    {
+                        items[i] = BinFieldConverter.ConvertStringToBinHash(str);
+                        tracker.BinEntries.Add(str);
+                    }
+                }
+                else if (items[i] is BinHash bh && !string.IsNullOrEmpty(bh.Value.String))
+                {
+                    tracker.BinEntries.Add(bh.Value.String);
                 }
             }
         }
@@ -1088,49 +1015,6 @@ namespace ModManager
             File.WriteAllLines(filePath, existing.OrderBy(x => x, StringComparer.OrdinalIgnoreCase), Encoding.UTF8);
         }
 
-        private async Task PreseedCommonSkinHashesAsync(string rootDirectory, CancellationToken ct)
-        {
-            var candidateNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var wadFiles = Directory.GetFiles(rootDirectory, "*", SearchOption.AllDirectories)
-                .Where(f => f.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) ||
-                            f.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase));
-
-            foreach (var f in wadFiles)
-            {
-                string name = Path.GetFileName(f);
-                int firstDot = name.IndexOf('.');
-                string champ = firstDot > 0 ? name[..firstDot] : name;
-                if (!string.IsNullOrWhiteSpace(champ)) candidateNames.Add(champ.ToLowerInvariant());
-            }
-
-            foreach (var dir in Directory.GetDirectories(rootDirectory, "*", SearchOption.TopDirectoryOnly))
-            {
-                string dirName = Path.GetFileName(dir);
-                int firstDot = dirName.IndexOf('.');
-                string champ = firstDot > 0 ? dirName[..firstDot] : dirName;
-                if (!string.IsNullOrWhiteSpace(champ)) candidateNames.Add(champ.ToLowerInvariant());
-            }
-
-            var generatedPaths = new List<string>();
-            foreach (var champ in candidateNames)
-            {
-                generatedPaths.Add($"data/characters/{champ}/{champ}.bin");
-                generatedPaths.Add($"data/characters/{champ}/skins/root.bin");
-
-                for (int i = 0; i <= 100; i++)
-                {
-                    generatedPaths.Add($"data/characters/{champ}/skins/skin{i}.bin");
-                    generatedPaths.Add($"data/characters/{champ}/animations/skin{i}.bin");
-                }
-            }
-
-            if (generatedPaths.Count > 0)
-            {
-                await HashMaster.AddTemporaryHashesAsync(generatedPaths, ct);
-            }
-        }
-
         private async Task<List<string>> ProcessAllWadsInDirectoryAsync(string directory, CancellationToken ct)
         {
             var wadFiles = Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
@@ -1158,7 +1042,7 @@ namespace ModManager
                     if (!Directory.Exists(outputExtractFolder))
                         Directory.CreateDirectory(outputExtractFolder);
 
-                    await ExtractWadFileAsync(tempWadPath, outputExtractFolder, ct, progress , 0.93 / sections);
+                    await ExtractWadFileAsync(tempWadPath, outputExtractFolder, ct, progress, 0.93 / sections);
                     extractedFolders.Add(outputExtractFolder);
                 }
                 finally
@@ -1192,7 +1076,6 @@ namespace ModManager
 
         private static byte[] DecompressDeflateOrZlib(byte[] data, int length)
         {
-            // 1. Standard Gzip wrapper
             if (IsGzip(data, length))
             {
                 try
@@ -1206,7 +1089,6 @@ namespace ModManager
                 catch { }
             }
 
-            // 2. Zlib wrapper (RFC 1950)
             try
             {
                 using var ms = new MemoryStream(data, 0, length);
@@ -1217,7 +1099,6 @@ namespace ModManager
             }
             catch { }
 
-            // 3. Raw Deflate fallback (RFC 1951)
             try
             {
                 using var ms = new MemoryStream(data, 0, length);
@@ -1228,7 +1109,6 @@ namespace ModManager
             }
             catch { }
 
-            // 4. Raw Deflate stripping 2-byte zlib header (0x78 ...)
             if (length > 2 && data[0] == 0x78)
             {
                 try
@@ -1249,7 +1129,6 @@ namespace ModManager
 
         private static byte[] DecompressZstd(byte[] data, int length, uint uncompressedSize)
         {
-            // Fast unwrap for single-frame Zstd
             if (uncompressedSize > 0)
             {
                 try
@@ -1260,13 +1139,9 @@ namespace ModManager
                     if (written == (int)uncompressedSize)
                         return outBuffer;
                 }
-                catch
-                {
-                    // Fall back to stream decompression for multi-frame / chunked frames
-                }
+                catch { }
             }
 
-            // DecompressionStream decodes multi-frame and ZstdChunked completely without truncation
             using var inMs = new MemoryStream(data, 0, length);
             using var zs = new ZstdSharp.DecompressionStream(inMs);
             using var outMs = uncompressedSize > 0 ? new MemoryStream((int)uncompressedSize) : new MemoryStream();
@@ -1281,7 +1156,6 @@ namespace ModManager
 
             byte compType = (byte)(entry.Type & 0x0F);
 
-            // Type 3: Zstd, Type 4: ZstdChunked, or data starting with Zstd magic header
             if (compType == 3 || compType == 4 || IsZstd(compBuffer, bytesRead))
             {
                 try
@@ -1295,7 +1169,6 @@ namespace ModManager
                     return fallback;
                 }
             }
-            // Type 1: GZip / Zlib / Deflate
             else if (compType == 1 || IsGzip(compBuffer, bytesRead) || (bytesRead >= 2 && compBuffer[0] == 0x78))
             {
                 try
@@ -1311,7 +1184,6 @@ namespace ModManager
             }
             else
             {
-                // Type 0: Uncompressed data
                 byte[] raw = new byte[bytesRead];
                 Array.Copy(compBuffer, raw, bytesRead);
                 return raw;
@@ -1341,7 +1213,7 @@ namespace ModManager
                     if (fs.Length < 272) return;
                     fs.Seek(268, SeekOrigin.Begin);
                     fileCount = br.ReadUInt32();
-                    entrySize = 32; // Both 3.0-3.3 and 3.4+ TOC entries are 32 bytes
+                    entrySize = 32;
                 }
                 else if (major == 2)
                 {
@@ -1463,7 +1335,6 @@ namespace ModManager
                                        .Replace('\\', Path.DirectorySeparatorChar)
                                        .TrimStart(Path.DirectorySeparatorChar);
 
-            // Sanitize illegal path chars
             char[] invalidChars = Path.GetInvalidPathChars();
             if (relativePath.IndexOfAny(invalidChars) >= 0)
             {
@@ -1511,14 +1382,11 @@ namespace ModManager
             if (data == null || data.Length == 0)
                 return ".bin";
 
-            // 1. Text-based checks (Custom Python script & JSON)
-            // Checks for "#PROP_text" header (10 bytes)
             if (data.Length >= 10 && Encoding.ASCII.GetString(data, 0, 10) == "#PROP_text")
             {
                 return ".py";
             }
 
-            // Basic JSON detection (skipping leading whitespace)
             int firstNonWhitespace = -1;
             for (int i = 0; i < Math.Min(data.Length, 64); i++)
             {
@@ -1539,7 +1407,6 @@ namespace ModManager
                 }
             }
 
-            // 2. 4-byte ASCII Magic strings
             if (data.Length >= 4)
             {
                 string magic = Encoding.ASCII.GetString(data, 0, 4);
@@ -1551,17 +1418,12 @@ namespace ModManager
                 if (magic.StartsWith("r3d")) return ".scb";
             }
 
-            // 3. Binary Magic Numbers / Byte Signatures
-
-            // JPEG / JPG (FF D8 FF)
             if (data.Length >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF)
                 return ".jpg";
 
-            // GIF (GIF87a or GIF89a)
             if (data.Length >= 3 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46)
                 return ".gif";
 
-            // PNG (\x89PNG)
             if (data.Length >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47)
                 return ".png";
 

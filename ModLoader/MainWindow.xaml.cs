@@ -1051,7 +1051,6 @@ try
 
     var downloads = new (string Url, string FileName)[]
     {
-        ("https://raw.githubusercontent.com/Aurecueil/Cs-lol-go/main/Tools/cslol-dll.dll", "cslol-dll.dll"),
         ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
         ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
     };
@@ -1359,6 +1358,7 @@ try
             return false;
         }
         private bool hash_done_update = false;
+        private bool convert_done_update = false;
         public void StartHashUpdate()
         {
             Task.Run(async () =>
@@ -1366,14 +1366,90 @@ try
                 Dispatcher.Invoke(() => ToggleFeed(true, 2));
                 try
                 {
-                    Dispatcher.Invoke(() => Feed2.Text = "Checking for hash updates...");
 
                     string gameTxtPath = Path.Combine(BasePath, "hashes.game.txt");
                     string gameBinPath = Path.Combine(BasePath, "hashes.game.bin");
                     string checkFilePath = Path.Combine(BasePath, "hashes.check.txt");
+                    string convertTablesDir = Path.Combine(BasePath, "convert_tables");
 
                     Directory.CreateDirectory(BasePath);
+                    Directory.CreateDirectory(convertTablesDir);
 
+                    Dispatcher.Invoke(() => Feed2.Text = "Checking for convert table updates...");
+                    using var client = new HttpClient();
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Cs-Lol-Go-Updater");
+
+                    string apiUrl = "https://api.github.com/repos/Aurecueil/Cs-lol-go/contents/Tools/convert_tables";
+                    var apiResponse = await client.GetStringAsync(apiUrl);
+
+                    using var doc = System.Text.Json.JsonDocument.Parse(apiResponse);
+                    var remoteFiles = doc.RootElement.EnumerateArray()
+                        .Where(x => x.GetProperty("type").GetString() == "file" && x.GetProperty("name").GetString().EndsWith(".jsonl"))
+                        .Select(x => new {
+                            Name = x.GetProperty("name").GetString(),
+                            DownloadUrl = x.GetProperty("download_url").GetString()
+                        })
+                        .ToList();
+
+                    var existingFiles = Directory.GetFiles(convertTablesDir, "*.jsonl");
+
+                    if (existingFiles.Length == 0)
+                    {
+                        Dispatcher.Invoke(() => Feed2.Text = "Downloading all convert tables...");
+                        foreach (var file in remoteFiles)
+                        {
+                            string destPath = Path.Combine(convertTablesDir, file.Name);
+                            var content = await client.GetByteArrayAsync(file.DownloadUrl);
+                            await File.WriteAllBytesAsync(destPath, content);
+                        }
+                    }
+                    else
+                    {
+                        var versions = new List<int>();
+                        foreach (var filePath in existingFiles)
+                        {
+                            string fileName = Path.GetFileNameWithoutExtension(filePath);
+                            if (int.TryParse(fileName, out int ver))
+                            {
+                                versions.Add(ver);
+                            }
+                        }
+
+                        if (versions.Count > 0)
+                        {
+                            int maxVersion = versions.Max();
+                            int major = maxVersion / 100;
+                            int minor = maxVersion % 100;
+
+                            var targetVersions = new List<int>
+                        {
+                            major * 100 + (minor + 1)
+                        };
+
+                            if (minor >= 18)
+                            {
+                                targetVersions.Add((major + 1) * 100 + 1);
+                            }
+
+                            foreach (var targetVer in targetVersions)
+                            {
+                                string targetFileName = $"{targetVer}.jsonl";
+                                var remoteFile = remoteFiles.FirstOrDefault(f => f.Name.Equals(targetFileName, StringComparison.OrdinalIgnoreCase));
+                                if (remoteFile != null)
+                                {
+                                    string destPath = Path.Combine(convertTablesDir, targetFileName);
+                                    if (!File.Exists(destPath))
+                                    {
+                                        Dispatcher.Invoke(() => Feed2.Text = $"Downloading convert table {targetFileName}...");
+                                        var content = await client.GetByteArrayAsync(remoteFile.DownloadUrl);
+                                        await File.WriteAllBytesAsync(destPath, content);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    convert_done_update = true;
+                    Dispatcher.Invoke(() => Feed2.Text = "Checking for hash updates...");
                     long lastUpdateTicks = 0;
                     if (File.Exists(checkFilePath))
                     {
@@ -1728,6 +1804,15 @@ try
                         await Task.Delay(500);
                     }
                 }
+                else
+                {
+                    SetLoading("Checking Conversion Table Updates", 1, 0);
+                    StartHashUpdate();
+                    while (!convert_done_update)
+                    {
+                        await Task.Delay(500);
+                    }
+                }
                 SetProgress3(1);
                 SetLoading("WAD Index", 1, 0);
                 await Task.Run(() => LoadWadFiles());
@@ -1745,10 +1830,6 @@ try
                 }
                 RefreshModListPanel(Current_location_folder);
                 InitializeSearchBox();
-                if (settings.auto_update_hashes)
-                {
-                    StartHashUpdate();
-                }
 
                 tftModButton.Checked += tft_mode_enable;
                 tftModButton.Unchecked += tft_mode_disable;
@@ -1796,11 +1877,9 @@ try
                 settings.ver = DisplayVersion;
                 save_settings();
                 string whats_new = """
-                    Fixed .modpkg Implementation
-                    Further fixer minor optimizations and improvments
-                    Fixed import issue occuring with older (2y+) mods
-                    Change Min Width for mod elements to 220
-                    Low Width will now use expandable ... for action buttons
+                    Fixed Topaz fixer bug "Unable to read beyonf the end of the stream"
+                    Updated Binfiles convertion to account for changes ranging from patch 13.16 to 16.18
+                    Convertion tables will now be also seamlessly updated when needed
                     """;
                 CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
@@ -2817,7 +2896,7 @@ try
         {
             try
             {
-                await Task.Run(() => CSLolManager.Stop()); // Move heavy sync work off UI thread
+                // await Task.Run(() => CSLolManager.Stop()); // Move heavy sync work off UI thread
                 await Task.Run(() => CSLolHostManager.Stop()); // Move heavy sync work off UI thread
             }
             catch (Exception ex)
@@ -3158,56 +3237,56 @@ try
     );
 
         }
-        private void StartCSLol(CancellationToken token)
-        {
-            CSLolManager.Initialize(
-    Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile, "overlay")
-        + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
-            ? "‗PBE‗profile"
-            : ""),
-    token,
-                text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
-                () => Application.Current.Dispatcher.Invoke(() =>
-                {
-                    ToggleFeed(false);
-                    _isLoaderRunning = false;
-                    _modLoadCts = null;
-                }),
-                // Game status changed callback - reinitialize mods
-                () => Application.Current.Dispatcher.Invoke(async () =>
-                {
-                    if (!token.IsCancellationRequested)
-                    {
-                        if (settings.reinitialize) { 
-                            try
-                            {
-                                Thread.Sleep(500);
-                                Feed.Text = "Re-Loading mods...";
-                                ToggleOverlay(true);
-                                ClearPaintActiveMods();
-                                await InitializeModsAsync(token);
-                                Feed.Text = "Mods re-loaded. Waiting for game to start...";
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                // Expected when cancellation is requested
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                            }
-                        }
-                    }
-                }),
-                errorMsg => Application.Current.Dispatcher.Invoke(() =>
-                {
-                    ToggleFeed(false);
-                    _isLoaderRunning = false;
-                    MessageBox.Show(errorMsg, "CSLol Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Stop_loader_internal();
-                })
-            );
-        }
+    //     private void StartCSLol(CancellationToken token)
+    //     {
+    //         CSLolManager.Initialize(
+    //     Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile, "overlay")
+    //         + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
+    //             ? "‗PBE‗profile"
+    //             : ""),
+    //     token,
+    //             text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
+    //             () => Application.Current.Dispatcher.Invoke(() =>
+    //             {
+    //                 ToggleFeed(false);
+    //                 _isLoaderRunning = false;
+    //                 _modLoadCts = null;
+    //             }),
+    //             // Game status changed callback - reinitialize mods
+    //             () => Application.Current.Dispatcher.Invoke(async () =>
+    //             {
+    //                 if (!token.IsCancellationRequested)
+    //                 {
+    //                     if (settings.reinitialize) { 
+    //                         try
+    //                         {
+    //                             Thread.Sleep(500);
+    //                             Feed.Text = "Re-Loading mods...";
+    //                             ToggleOverlay(true);
+    //                             ClearPaintActiveMods();
+    //                             await InitializeModsAsync(token);
+    //                             Feed.Text = "Mods re-loaded. Waiting for game to start...";
+    //                         }
+    //                         catch (OperationCanceledException)
+    //                         {
+    //                             // Expected when cancellation is requested
+    //                         }
+    //                         catch (Exception ex)
+    //                         {
+    //                             MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+    //                         }
+    //                     }
+    //                 }
+    //             }),
+    //             errorMsg => Application.Current.Dispatcher.Invoke(() =>
+    //             {
+    //                 ToggleFeed(false);
+    //                 _isLoaderRunning = false;
+    //                 MessageBox.Show(errorMsg, "CSLol Error", MessageBoxButton.OK, MessageBoxImage.Error);
+    //                 Stop_loader_internal();
+    //             })
+    //         );
+    //     }
         private void OnDropMode(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(typeof(ModListEntry)))
@@ -3446,8 +3525,28 @@ try
             bool test = false;
             if (test)
             {
-                OverlayTool ovrl = new OverlayTool();
-                ovrl.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
+                // var builder = new LtkOverlayBuilder(new OverlayBuilderOptions
+                // {
+                //     EnableDiffBins = false,       // Default: treat as standard raw assets
+                //     EnableAudioPatching = false,   // Default: treat as standard raw assets
+                //     FallbackWadName = "data.wad.client"
+                // });
+                // 
+                List<string> wadFolders = mods_loaded_in
+                    .Select(mod => Path.Combine("installed",mod, "wad"))
+                    .Where(Directory.Exists)
+                    .SelectMany(Directory.GetDirectories)
+                    .ToList();
+                string overlayDirectory = $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}";
+                // 
+                // await builder.BuildOverlayAsync(game_path, wadFolders, overlayDirectory);
+
+
+                var builder = new WadOverlayBuilder();
+                await builder.BuildOverlayAsync(game_path, overlayDirectory, wadFolders);
+
+                // OverlayTool ovrl = new OverlayTool();
+                // ovrl.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
             }
             else
             {
@@ -4954,18 +5053,23 @@ try
                 string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
-            if (Directory.Exists(hashesPath)) { modDetails.check_up = 2; }
-            if (modDetails.check_up < 2)
+            if (modDetails.check_up < 3)
             {
                 // 1. Set up dependencies
                 var settings = new FixerSettings();
                 var extractor = new WadExtractor(settings);
-                var converter = new BinFieldConverter("cslol-tools/binfile_migration_16.17.8087655.jsonl");
+                var converter = new BinFieldConverter();
+
+                foreach (string filePath in Directory.GetFiles("cslol-tools/convert_tables/"))
+                {
+                    converter.LoadRulesFromFile(filePath);
+                    // MessageBox.Show(filePath);
+                }
 
                 var processor = new WadBatchProcessor(extractor, converter, this);
                 Dispatcher.Invoke(() => SetLoading($"Applying Fixes: {modInfo.Name}", 1, 2137));
 
-                await processor.ProcessFolderAsync(wadPath);
+                await processor.ProcessFolderAsync(modFolderPath);
                 string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
                 if (File.Exists(game_hash_path))
                 {
@@ -4988,7 +5092,42 @@ try
                         Bits = 32
                     });
                 }
-                modDetails.check_up = 2;
+                modDetails.check_up = 1618;
+                File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            else if(File.Exists($"cslol-tools/convert_tables/{modDetails.check_up+1}.jsonl"))
+                {
+                var settings = new FixerSettings();
+                var extractor = new WadExtractor(settings);
+                var converter = new BinFieldConverter($"cslol-tools/convert_tables/{modDetails.check_up + 1}.jsonl");
+
+                var processor = new WadBatchProcessor(extractor, converter, this);
+                Dispatcher.Invoke(() => SetLoading($"Applying Fixes: {modInfo.Name}", 1, 2137));
+
+                await processor.ProcessFolderAsync(modFolderPath);
+                string game_hash_path = Path.Combine(metaPath, "hashes", "game.hashes.txt");
+                if (File.Exists(game_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/game.hashes.txt",
+                        Category = "game",
+                        Algorithm = "xxh64",
+                        Bits = 64
+                    });
+                }
+                string binentries_hash_path = Path.Combine(metaPath, "hashes", "binentries.hashes.txt");
+                if (File.Exists(binentries_hash_path))
+                {
+                    modInfo.Hashtables.Add(new Hashtables
+                    {
+                        Path = "META/hashes/binentries.hashes.txt",
+                        Category = "binentries",
+                        Algorithm = "fnv1a_32",
+                        Bits = 32
+                    });
+                }
+                modDetails.check_up = 1618;
                 File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
             }
 

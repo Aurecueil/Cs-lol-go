@@ -23,3 +23,6 @@ ModLoader/exploreros.xaml.cs
 ModLoader/RFModEntry.xaml
 ModLoader/RFModEntry.xaml.cs
 /ModLoader/Properties/PublishProfiles
+ModLoader/CSLolInterop.cs
+ModLoader/CSLolInterop.cs
+ModLoader/Loader.cs

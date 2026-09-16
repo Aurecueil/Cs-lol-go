@@ -1,5 +1,7 @@
 ﻿using Jade.Ritobin;
+using Microsoft.Win32.SafeHandles;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
@@ -600,9 +602,12 @@ namespace ModManager
             _wadExtractor.x = this.x;
             string tmp = Path.Combine(Path.GetTempPath(), "cslolgo_fixer_" + Guid.NewGuid().ToString());
 
-            if (Settings.apply1617binconvertion) { 
-                string rules = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cslol-tools", "binfile_migration_16.17.8087655.jsonl");
-                binconverter.LoadRulesFromFile(rules);
+            if (Settings.apply1617binconvertion) {
+                foreach (string filePath in Directory.GetFiles("cslol-tools/convert_tables/"))
+                {
+                    binconverter.LoadRulesFromFile(filePath);
+                    // MessageBox.Show(filePath);
+                }
             }
             Directory.CreateDirectory(tmp);
             Settings.inputDir = tmp;
@@ -2966,92 +2971,91 @@ namespace ModManager
 
                 string mapFilePath = Path.Combine(sourceDirectory, "topaz.map");
 
-                // Exclude any existing topaz.map from indexing
+                // 1. Gather files excluding any existing map file
                 var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories)
                                      .Where(f => !Path.GetFileName(f).Equals("topaz.map", StringComparison.OrdinalIgnoreCase))
                                      .ToArray();
 
-                var entries = new (ulong Hash, string Path)[files.Length];
-                var tempPaths = new ConcurrentBag<string>();
+                int count = files.Length;
+                var entries = new (ulong Hash, byte[] Utf8Path, string WadPath)[count];
 
-                Parallel.For(0, files.Length, i =>
+                // 2. Parallel processing: compute hashes and encode UTF8 once
+                Parallel.For(0, count, i =>
                 {
                     string file = files[i];
                     string relativePath = Path.GetRelativePath(sourceDirectory, file);
                     string wadPath = relativePath.Replace('\\', '/').ToLowerInvariant();
-                    tempPaths.Add(wadPath);
 
                     ulong pathHash;
                     bool isRootFile = !relativePath.Contains(Path.DirectorySeparatorChar)
                                       && !relativePath.Contains(Path.AltDirectorySeparatorChar);
 
-                    if (isRootFile)
+                    if (isRootFile && ulong.TryParse(Path.GetFileNameWithoutExtension(file),
+                                                     System.Globalization.NumberStyles.HexNumber,
+                                                     null, out ulong manualHash))
                     {
-                        string filenameNoExt = Path.GetFileNameWithoutExtension(file);
-
-                        if (ulong.TryParse(filenameNoExt, System.Globalization.NumberStyles.HexNumber, null, out ulong manualHash))
-                        {
-                            pathHash = manualHash;
-                        }
-                        else
-                        {
-                            pathHash = HashMaster.HashPath(wadPath);
-                            HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
-                        }
+                        pathHash = manualHash;
                     }
                     else
                     {
                         pathHash = HashMaster.HashPath(wadPath);
-                        HashMaster.AddTemporaryHashesAsync([wadPath]).GetAwaiter();
                     }
 
-                    entries[i] = (pathHash, wadPath);
+                    byte[] utf8Bytes = Encoding.UTF8.GetBytes(wadPath);
+                    entries[i] = (pathHash, utf8Bytes, wadPath);
                 });
 
-                bonusPaths.AddRange(tempPaths);
+                // Populate bonus paths & notify hashes
+                bonusPaths.AddRange(entries.Select(e => e.WadPath));
+                _ = HashMaster.AddTemporaryHashesAsync(entries.Select(e => e.WadPath).ToArray());
 
-                // Sort ascending by hash to enable O(log N) binary searching
+                // 3. Sort by hash ascending for binary search
                 Array.Sort(entries, (a, b) => a.Hash.CompareTo(b.Hash));
 
-                using (var fs = new FileStream(mapFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                using (var bw = new BinaryWriter(fs))
+                // 4. Calculate table layout directly (No seeking back required!)
+                const int headerSize = 16;
+                const int recordSize = 16;
+                long stringTableOffset = headerSize + ((long)count * recordSize);
+
+                // 5. High-speed sequential write with 64KB buffer
+                using var fs = new FileStream(mapFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, FileOptions.SequentialScan);
+
+                // Header: [Magic: 4B][Count: 4B][StringTableOffset: 8B]
+                Span<byte> header = stackalloc byte[headerSize];
+                header[0] = (byte)'T';
+                header[1] = (byte)'P';
+                header[2] = (byte)'Z';
+                header[3] = (byte)'M';
+                BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(4, 4), (uint)count);
+                BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(8, 8), (ulong)stringTableOffset);
+                fs.Write(header);
+
+                // Stream 1: Index Records (16 bytes each)
+                // [Hash: 8B][StringOffset: 4B][Length: 2B][Padding: 2B]
+                Span<byte> record = stackalloc byte[recordSize];
+                uint runningStringOffset = 0;
+
+                for (int i = 0; i < count; i++)
                 {
-                    bw.Write(new char[] { 'T', 'P', 'Z', 'M' }); // 4-byte magic
-                    bw.Write((uint)entries.Length);              // 4-byte entry count
+                    ushort strLen = (ushort)entries[i].Utf8Path.Length;
 
-                    long stringTableOffsetPos = fs.Position;
-                    bw.Write((ulong)0); // Placeholder for string pool byte offset
+                    BinaryPrimitives.WriteUInt64LittleEndian(record.Slice(0, 8), entries[i].Hash);
+                    BinaryPrimitives.WriteUInt32LittleEndian(record.Slice(8, 4), runningStringOffset);
+                    BinaryPrimitives.WriteUInt16LittleEndian(record.Slice(12, 2), strLen);
+                    BinaryPrimitives.WriteUInt16LittleEndian(record.Slice(14, 2), 0); // Reserved / alignment
 
-                    byte[][] utf8Paths = new byte[entries.Length][];
-                    uint runningStringOffset = 0;
-
-                    // Fixed 16-byte records: [Hash: 8B][StringOffset: 4B][Length: 2B][Reserved: 2B]
-                    for (int i = 0; i < entries.Length; i++)
-                    {
-                        byte[] encoded = Encoding.UTF8.GetBytes(entries[i].Path);
-                        utf8Paths[i] = encoded;
-
-                        bw.Write(entries[i].Hash);
-                        bw.Write(runningStringOffset);
-                        bw.Write((ushort)encoded.Length);
-                        bw.Write((ushort)0); // Alignment padding
-
-                        runningStringOffset += (uint)encoded.Length;
-                    }
-
-                    long stringTableOffset = fs.Position;
-
-                    for (int i = 0; i < entries.Length; i++)
-                    {
-                        bw.Write(utf8Paths[i]);
-                    }
-
-                    // Backfill string pool start offset
-                    fs.Seek(stringTableOffsetPos, SeekOrigin.Begin);
-                    bw.Write((ulong)stringTableOffset);
+                    fs.Write(record);
+                    runningStringOffset += strLen;
                 }
-            }
 
+                // Stream 2: String Pool
+                for (int i = 0; i < count; i++)
+                {
+                    fs.Write(entries[i].Utf8Path);
+                }
+
+                fs.Flush();
+            }
             public void ExtractAndLoadTemporaryHashes(List<string> wadPaths)
             {
                 if (wadPaths == null || wadPaths.Count == 0) return;
@@ -3217,37 +3221,59 @@ namespace ModManager
 
             private static string? FindPathInTopazMap(string mapFilePath, ulong targetHash)
             {
-                using var fs = new FileStream(mapFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var br = new BinaryReader(fs);
+                // 1. Open handle directly - bypasses FileStream overhead entirely
+                using SafeFileHandle handle = File.OpenHandle(mapFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
 
-                if (fs.Length < 16) return null;
+                long fileLength = RandomAccess.GetLength(handle);
+                const int headerSize = 16;
+                const int recordSize = 16;
 
-                char[] magic = br.ReadChars(4);
-                if (new string(magic) != "TPZM") return null;
+                if (fileLength < headerSize) return null;
 
-                uint count = br.ReadUInt32();
-                long stringTableOffset = (long)br.ReadUInt64();
+                Span<byte> header = stackalloc byte[headerSize];
+                RandomAccess.Read(handle, header, 0);
+
+                // Validate 4-byte magic "TPZM"
+                if (header[0] != 'T' || header[1] != 'P' || header[2] != 'Z' || header[3] != 'M')
+                    return null;
+
+                uint count = BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(4));
+                if (count == 0) return null;
+
+                long stringTableOffset = (long)BinaryPrimitives.ReadUInt64LittleEndian(header.Slice(8));
+                long recordBlockSize = (long)count * recordSize;
+
+                if (fileLength < headerSize + recordBlockSize || stringTableOffset < headerSize + recordBlockSize)
+                    return null;
 
                 long low = 0;
                 long high = count - 1;
-
-                const int headerSize = 16;
-                const int recordSize = 16;
+                Span<byte> recordBuffer = stackalloc byte[recordSize];
 
                 while (low <= high)
                 {
                     long mid = low + ((high - low) / 2);
-                    fs.Seek(headerSize + (mid * recordSize), SeekOrigin.Begin);
+                    long targetOffset = headerSize + (mid * recordSize);
 
-                    ulong currentHash = br.ReadUInt64();
+                    // 2. Read exact byte offsets from OS without mutating a stream position
+                    RandomAccess.Read(handle, recordBuffer, targetOffset);
+
+                    ulong currentHash = BinaryPrimitives.ReadUInt64LittleEndian(recordBuffer);
 
                     if (currentHash == targetHash)
                     {
-                        uint stringOffset = br.ReadUInt32();
-                        ushort stringLength = br.ReadUInt16();
+                        uint stringOffset = BinaryPrimitives.ReadUInt32LittleEndian(recordBuffer.Slice(8));
+                        ushort stringLength = BinaryPrimitives.ReadUInt16LittleEndian(recordBuffer.Slice(12));
 
-                        fs.Seek(stringTableOffset + stringOffset, SeekOrigin.Begin);
-                        byte[] stringBytes = br.ReadBytes(stringLength);
+                        long finalStrPos = stringTableOffset + stringOffset;
+                        if (finalStrPos + stringLength > fileLength) return null;
+
+                        // 3. Prevent heap allocation for normal-sized file paths (under 512 bytes)
+                        Span<byte> stringBytes = stringLength <= 512
+                            ? stackalloc byte[stringLength]
+                            : new byte[stringLength];
+
+                        RandomAccess.Read(handle, stringBytes, finalStrPos);
                         return Encoding.UTF8.GetString(stringBytes);
                     }
 
@@ -3259,6 +3285,7 @@ namespace ModManager
 
                 return null;
             }
+
             public (uint version, uint id) CheckLanguageID(List<string> wadPaths, string target)
             {
                 ulong targetHash = HashMaster.HashPath(target);

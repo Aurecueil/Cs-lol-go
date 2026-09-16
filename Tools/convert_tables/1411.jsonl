@@ -1,0 +1,20 @@
+{"class": "0x24e1cb45", "field": "0xc080021c", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "0x11f10a40", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "0x907442e7", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "0x937cc95a", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "0xfe1b406e", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "AssistDurationOverride", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "BaseGold", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x9f30b8a6", "field": "FirstBloodBonus", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0xb53e2f1a", "field": "0x00490b09", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "0x296018d6", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "0x00490b09", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "0xc649ac3c", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "BaronGoldValue", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "DragonGoldValue", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "DragonSoulGoldValue", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "RiftHeraldGoldValue", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0x0e6f0047", "field": "TurretGoldValue", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "0xe75aad84", "field": "0x10a065ec", "from": {"type": "List2", "value": "U8"}, "to": {"type": "List2", "value": "F32"}}
+{"class": "0xf01e253c", "field": "0x00490b09", "from": {"type": "U32"}, "to": {"type": "F32"}}
+{"class": "CharacterRecord", "field": "Script", "from": {"type": "Pointer"}, "to": {"type": "Link"}}
