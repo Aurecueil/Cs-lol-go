@@ -1,0 +1,12 @@
+{"class": "AtlasDataBase", "field": "mTextureName", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "AudioPriorityBehavior", "field": "TargetQueue", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "AudioQueueConfig", "field": "0x1c6439cf", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}
+{"class": "AudioQueueConfigList", "field": "queues", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}
+{"class": "EvolutionDescription", "field": "mIconNames", "from": {"type": "List", "key": "0x4", "value": "String"}, "to": {"type": "List", "key": "0x4", "value": "File"}, "conversion": "hash_value"}
+{"class": "MapBakeProperties", "field": "RmaStaticLightGridTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapClouds", "field": "CloudsTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapCubemapProbe", "field": "CubemapProbePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "MapTerrainPaint", "field": "TerrainPaintTexturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "StaticMaterialDef", "field": "type", "from": {"type": "U32"}, "to": {"type": "U8"}}
+{"class": "TextureResource", "field": "texturePath", "from": {"type": "String"}, "to": {"type": "File"}, "conversion": "hash_value"}
+{"class": "UiElementParticleSystemData", "field": "TextureOverrides", "from": {"type": "Map", "key": "File", "value": "String"}, "to": {"type": "Map", "key": "File", "value": "File"}, "conversion": "hash_value"}
