@@ -1,3 +1,0 @@
-{"class": "DoubleSidedTipStyle", "field": "ReverseDirectionalTipElements", "from": {"type": "List", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "NeutralTimerData", "field": "TimerKeyName", "from": {"type": "String"}, "to": {"type": "U16"}}
-{"class": "TipStyleBase", "field": "DirectionalTipElements", "from": {"type": "List", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}

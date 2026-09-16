@@ -1,4 +1,0 @@
-{"class": "EnchantmentGroup", "field": "mItemIdRangeMaximum", "from": {"type": "I32"}, "to": {"type": "U32"}}
-{"class": "EnchantmentGroup", "field": "mItemIdRangeMinimum", "from": {"type": "I32"}, "to": {"type": "U32"}}
-{"class": "ItemData", "field": "itemID", "from": {"type": "I32"}, "to": {"type": "U32"}}
-{"class": "ItemData", "field": "specialRecipe", "from": {"type": "I32"}, "to": {"type": "U32"}}

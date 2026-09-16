@@ -1,4 +1,0 @@
-{"class": "DoubleSidedTipStyle", "field": "ReverseDirectionalTipElements", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "DoubleSidedTipStyle", "field": "Sliver", "from": {"type": "Link"}, "to": {"type": "Link"}}
-{"class": "TipStyleBase", "field": "DirectionalTipElements", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "UiElementGroupMeterData", "field": "BarElements", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}

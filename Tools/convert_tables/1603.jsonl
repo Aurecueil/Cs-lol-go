@@ -1,3 +1,0 @@
-{"class": "VfxEmissionBox", "field": "Distribution", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}
-{"class": "VfxEmissionCylinder", "field": "0x654153c3", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}
-{"class": "VfxEmissionSphere", "field": "0x654153c3", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}

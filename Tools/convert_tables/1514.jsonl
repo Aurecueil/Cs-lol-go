@@ -1,2 +1,0 @@
-{"class": "0xdca4615b", "field": "0x55f70b25", "from": {"type": "List", "key": "0x5", "value": "Embed"}, "to": {"type": "List", "key": "0x6", "value": "Embed"}}
-{"class": "AugmentDataListConfig", "field": "AugmentList", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}

@@ -1,4 +1,0 @@
-{"class": "0xf15fa548", "field": "missions", "from": {"type": "List2", "value": "Embed"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "AugmentFallbackPool", "field": "AugmentPool", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}
-{"class": "EasedBoolConceptLogicDriver", "field": "Concept", "from": {"type": "Link"}, "to": {"type": "Link"}}
-{"class": "IAugment", "field": "RootSpell", "from": {"type": "Hash"}, "to": {"type": "Link"}}

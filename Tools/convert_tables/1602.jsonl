@@ -1,1 +1,0 @@
-{"class": "AugmentDataListConfig", "field": "AugmentList", "from": {"type": "List2", "value": "Hash"}, "to": {"type": "List2", "value": "Link"}}

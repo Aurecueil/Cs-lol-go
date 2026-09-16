@@ -1,9 +1,0 @@
-{"class": "0xbbca8e5a", "field": "MissionTemplate", "from": {"type": "Link"}, "to": {"type": "Embed"}}
-{"class": "EnvironmentEntity", "field": "definition", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
-{"class": "IAugment", "field": "RootSpell", "from": {"type": "Link"}, "to": {"type": "Hash"}}
-{"class": "SeqActionCameraShakeRelative", "field": "TargetLocation", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "SeqActionSfxAttached", "field": "AttachTo", "from": {"type": "Pointer"}, "to": {"type": "Link"}}
-{"class": "SeqActionSfxBeam", "field": "TargetLocation", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "SeqActionSfxMoving", "field": "EndLocation", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "SeqActionSfxMoving", "field": "StartLocation", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "SeqActionSfxStatic", "field": "Location", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}

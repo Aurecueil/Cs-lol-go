@@ -1,4 +1,0 @@
-{"class": "BehaviorLevelController", "field": "LevelBehaviors", "from": {"type": "Map", "key": "U32", "value": "Pointer"}, "to": {"type": "Map", "key": "Hash", "value": "Pointer"}}
-{"class": "LevelControlScript", "field": "sequences", "from": {"type": "Map", "key": "U32", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "TFTCharacterRoleCardViewController", "field": "HeaderData", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
-{"class": "TftUnitInfoViewController", "field": "CharacterRoleData", "from": {"type": "List", "key": "0x1", "value": "Embed"}, "to": {"type": "Embed"}}

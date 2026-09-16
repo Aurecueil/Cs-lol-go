@@ -1,3 +1,0 @@
-{"class": "0x9fffbec6", "field": "AdditiveVfxs", "from": {"type": "List2", "value": "Hash"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "TftScoreboardViewController", "field": "PlayerOpponentTemplate", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}
-{"class": "TftScoreboardViewController", "field": "PlayerSelfTemplate", "from": {"type": "Embed"}, "to": {"type": "Pointer"}}

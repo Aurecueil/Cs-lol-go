@@ -1,8 +1,0 @@
-{"class": "CharacterRecord", "field": "0xeb74898c", "from": {"type": "F32"}, "to": {"type": "Option", "value": "F32"}}
-{"class": "PlayerInventoryViewController", "field": "0x5d9c5949", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "TftRequiredUnitProperty", "field": "Property", "from": {"type": "Link"}, "to": {"type": "Hash"}}
-{"class": "VfxLegacyPhysicsComponent", "field": "0x469f89dc", "from": {"type": "Bool"}, "to": {"type": "Flag"}}
-{"class": "VfxLegacyPhysicsComponent", "field": "IsEmitterSpace", "from": {"type": "Bool"}, "to": {"type": "Flag"}}
-{"class": "VfxLegacyPhysicsComponent", "field": "hasPostRotateOrientation", "from": {"type": "Bool"}, "to": {"type": "Flag"}}
-{"class": "VfxLegacyPhysicsComponent", "field": "isDirectionOriented", "from": {"type": "Bool"}, "to": {"type": "Flag"}}
-{"class": "VfxLegacyPhysicsComponent", "field": "isFollowingTerrain", "from": {"type": "Bool"}, "to": {"type": "Flag"}}

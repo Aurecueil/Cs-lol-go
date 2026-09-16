@@ -1,8 +1,0 @@
-{"class": "0x0b7b2875", "field": "0xcbfa2678", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
-{"class": "BehaviorScript", "field": "sequences", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "CherryConfigs", "field": "ArenaData", "from": {"type": "List", "value": "Embed"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "CherryConfigs", "field": "AugmentColors", "from": {"type": "List", "value": "Color"}, "to": {"type": "List2", "value": "Color"}}
-{"class": "GameScript", "field": "CustomSequences", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "GameScript", "field": "sequences", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "LevelControlScript", "field": "sequences", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "LolModesTeamConfig", "field": "TeamDisplayData", "from": {"type": "List", "value": "Embed"}, "to": {"type": "List2", "value": "Embed"}}

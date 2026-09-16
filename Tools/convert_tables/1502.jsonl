@@ -1,5 +1,0 @@
-{"class": "0x7e0ad0f9", "field": "0x8862947d", "from": {"type": "Hash"}, "to": {"type": "Embed"}}
-{"class": "0x7e0ad0f9", "field": "0xf0464464", "from": {"type": "Hash"}, "to": {"type": "Embed"}}
-{"class": "DestroyCustomTableBlock", "field": "TableName", "from": {"type": "Embed"}, "to": {"type": "Embed"}}
-{"class": "TftItemData", "field": "0x41b0f90b", "from": {"type": "Link"}, "to": {"type": "Hash"}}
-{"class": "TftItemData", "field": "IconMaterial", "from": {"type": "Link"}, "to": {"type": "Hash"}}

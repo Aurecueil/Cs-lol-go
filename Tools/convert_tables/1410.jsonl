@@ -1,7 +1,0 @@
-{"class": "0x51db35d3", "field": "ClaimableDefaultIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "0x51db35d3", "field": "ClaimableHoverIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "0x51db35d3", "field": "CompleteDefaultIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "0x51db35d3", "field": "CompleteHoverIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "0x51db35d3", "field": "LockedDefaultIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "0x51db35d3", "field": "LockedHoverIcon", "from": {"type": "Hash"}, "to": {"type": "String"}}
-{"class": "ScriptTableSet", "field": "Var", "from": {"type": "Hash"}, "to": {"type": "String"}}

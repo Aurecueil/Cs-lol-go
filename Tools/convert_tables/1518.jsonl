@@ -1,4 +1,0 @@
-{"class": "0x3b6f488e", "field": "0x12cef16b", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "0x3f04641e", "field": "0x7511a599", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "0x05f33c34", "field": "0x12cef16b", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "0xd7ec4ad6", "field": "0x12cef16b", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}

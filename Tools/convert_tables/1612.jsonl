@@ -1,8 +1,0 @@
-{"class": "0xb87473b5", "field": "0x72fce42a", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
-{"class": "EventBusApScreenDisplayEnd", "field": "ElementName", "from": {"type": "String"}, "to": {"type": "Option", "value": "String"}}
-{"class": "EventBusApScreenDisplayEnd", "field": "ModalName", "from": {"type": "String"}, "to": {"type": "Option", "value": "String"}}
-{"class": "EventBusApScreenDisplayStart", "field": "ElementName", "from": {"type": "String"}, "to": {"type": "Option", "value": "String"}}
-{"class": "EventBusApScreenDisplayStart", "field": "ModalName", "from": {"type": "String"}, "to": {"type": "Option", "value": "String"}}
-{"class": "LolKeybindSet", "field": "0x72fce42a", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
-{"class": "LolKeybindSet", "field": "0x815ebffc", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Pointer"}}
-{"class": "PortraitSet", "field": "0x5fde1a0b", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}

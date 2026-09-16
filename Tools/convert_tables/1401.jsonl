@@ -1,6 +1,0 @@
-{"class": "0x48f3fe52", "field": "Treatments", "from": {"type": "List2", "value": "Embed"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "0xe75aad84", "field": "SpawnLocation", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "0xe75aad84", "field": "WaveShape", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "LolSpellScript", "field": "CustomSequences", "from": {"type": "Map", "key": "String", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
-{"class": "MapCharacterList", "field": "characters", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "TFTModeData", "field": "ItemTagOptions", "from": {"type": "List", "value": "Hash"}, "to": {"type": "List2", "value": "Hash"}}

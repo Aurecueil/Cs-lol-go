@@ -1,1 +1,0 @@
-{"class": "TftMapCharacterSkinData", "field": "SquareIconTexturePath", "from": {"type": "String"}, "to": {"type": "Option", "value": "String"}}

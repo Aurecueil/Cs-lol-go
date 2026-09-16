@@ -1,4 +1,0 @@
-{"class": "0x7d98777d", "field": "GlobalContextualActionData", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "0xc7b33dbc", "field": "spells", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "GameEntityScriptDefinition", "field": "Script", "from": {"type": "Link"}, "to": {"type": "Link"}}
-{"class": "LolCursorContextAwareKeybind", "field": "InputEvent", "from": {"type": "Link"}, "to": {"type": "Link"}}

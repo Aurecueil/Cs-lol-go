@@ -1,3 +1,0 @@
-{"class": "SkinCharacterDataProperties", "field": "0x2d790b62", "from": {"type": "U32"}, "to": {"type": "U8"}}
-{"class": "SkinCharacterDataProperties", "field": "0x46558f0e", "from": {"type": "U32"}, "to": {"type": "U8"}}
-{"class": "VfxGeometryComponent", "field": "primitive", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}

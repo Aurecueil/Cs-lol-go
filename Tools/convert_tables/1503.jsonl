@@ -1,2 +1,0 @@
-{"class": "0xb34ac035", "field": "Entity", "from": {"type": "Pointer"}, "to": {"type": "Hash"}}
-{"class": "TableValueExistsScriptCondition", "field": "TableValue", "from": {"type": "Embed"}, "to": {"type": "Embed"}}

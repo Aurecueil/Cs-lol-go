@@ -1,2 +1,0 @@
-{"class": "LogicDriverViewEntry", "field": "0x3fe8a3b5", "from": {"type": "List2", "value": "Pointer"}, "to": {"type": "List2", "value": "Embed"}}
-{"class": "NexusFinisher", "field": "Sequence", "from": {"type": "Link"}, "to": {"type": "Hash"}}

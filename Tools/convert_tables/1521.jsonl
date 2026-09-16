@@ -1,9 +1,0 @@
-{"class": "0x4f77ae52", "field": "0x13241378", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Link"}}
-{"class": "AreaTriggerDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "BarracksDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "CreateEntityBlock", "field": "Prefab", "from": {"type": "Link"}, "to": {"type": "Link"}}
-{"class": "MonarchTeamConfig", "field": "0x3434677d", "from": {"type": "Link"}, "to": {"type": "Link"}}
-{"class": "NeutralCampDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "SkinCharacterDefinition", "field": "IconHelper", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "VfxMaterialRenderComponent", "field": "0x3c60f9ee", "from": {"type": "Map", "key": "String", "value": "Pointer"}, "to": {"type": "Map", "key": "U8", "value": "Pointer"}}
-{"class": "VfxRibbonDefinitionData", "field": "birthTilingSize", "from": {"type": "Embed"}, "to": {"type": "Embed"}}

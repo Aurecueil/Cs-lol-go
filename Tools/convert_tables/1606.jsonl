@@ -1,2 +1,0 @@
-{"class": "VfxComponents", "field": "GeometryComponent", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
-{"class": "VfxEmitterDefinitionData", "field": "primitive", "from": {"type": "Pointer"}, "to": {"type": "Pointer"}}
