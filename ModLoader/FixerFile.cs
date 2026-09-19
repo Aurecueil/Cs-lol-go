@@ -1,4 +1,4 @@
-﻿using Jade.Ritobin;
+using Jade.Ritobin;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
 using System.Buffers.Binary;
@@ -3424,8 +3424,10 @@ namespace ModManager
                             : Path.ChangeExtension(target.OutputString, extension);
                     }
                     if (string.IsNullOrEmpty(Path.GetFileNameWithoutExtension(final_out)))
-                        final_out = Path.Combine(Path.GetDirectoryName(final_out) ?? "", $"dot_{Guid.NewGuid().ToString().Substring(0, 4)}{extension}");
-
+					{
+						string parentDir = Path.GetDirectoryName(final_out)?.Replace('\\', '/') ?? "";
+						final_out = $"{parentDir}/dot_{Guid.NewGuid().ToString().Substring(0, 4)}{extension}";
+					}
                     if (!string.IsNullOrEmpty(target.OutputPath))
                     {
                         string outPath = Path.Combine(target.OutputPath, final_out);
@@ -4063,7 +4065,7 @@ namespace ModManager
                 }
                 while (!seen.Add(candidate));
 
-                return candidate;
+                return candidate.Replace('\\', '/');
             }
 
             public string FixPath_local(string finalPath)
