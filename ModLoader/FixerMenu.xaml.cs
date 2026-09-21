@@ -961,6 +961,7 @@ namespace ModManager
                 HashSet<string> hashtables = new(StringComparer.OrdinalIgnoreCase)
                 {
                     Path.Combine(modMeta, "hashes", "game.hashes.txt"),
+                    Path.Combine(modMeta, "hashes", "game.harvested.txt"),
                     Path.Combine(modMeta, "files.txt"),
                     Path.Combine(modMeta, "hashes.txt")
                 };

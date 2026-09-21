@@ -574,6 +574,14 @@ namespace ModManager
                     tracker.GameFiles.Add(line.Trim());
                 }
             }
+            hash_path = Path.Combine(modpath, "META", "hashes", "game.harvested.txt");
+            if (File.Exists(hash_path))
+            {
+                foreach (string line in File.ReadLines(hash_path))
+                {
+                    tracker.GameFiles.Add(line.Trim());
+                }
+            }
             ReportProgress(0.02);
             var extractedWadFolders = await ProcessAllWadsInDirectoryAsync(targetDirectory, ct);
 

@@ -624,6 +624,7 @@ namespace ModManager
                 }
 
             }
+
             _wadExtractor.ExtractAndLoadTemporaryHashes(Settings.base_wad_path);
             if (Settings.AllAviable)
             {
@@ -3060,7 +3061,7 @@ namespace ModManager
             {
                 if (wadPaths == null || wadPaths.Count == 0) return;
 
-                var targetFileNames = new List<string> { "hashes.game.txt", "files.txt", "hashes.txt" };
+                var targetFileNames = new List<string> { "hashes.harvested.txt", "hashes.game.txt", "files.txt", "hashes.txt" };
 
                 var targetHashes = new HashSet<ulong>();
                 foreach (var target in targetFileNames)
@@ -4152,8 +4153,8 @@ namespace ModManager
                 if (rootIndex == -1)
                 {
                     string ext = parts.Length > 0
-                    ? Path.GetExtension(parts[^1]).ToLower()
-                    : "";
+                        ? Path.GetExtension(parts[^1]).ToLower()
+                        : "";
                     string prefixRoot = (ext == ".bin" || ext == "")
                         ? "DATA"
                         : "ASSETS";
@@ -4165,50 +4166,46 @@ namespace ModManager
                 {
                     parts = parts.Skip(rootIndex).ToArray();
                 }
-                if (parts.Length == 2)
+
+                if (parts.Length <= 1)
                 {
                     return string.Join("/", parts);
                 }
-                if (parts.Length > 2)
+
+                // Search from index 1 up to the last directory before the filename (or parts.Length - 1)
+                // to find where the category is located
+                int categoryIndex = -1;
+                string matchedCategory = "";
+
+                for (int i = 1; i < parts.Length; i++)
                 {
-                    string check = parts[1].ToLower();
-                    foreach (string r in Categories)
+                    string segLower = parts[i].ToLower();
+                    foreach (string cat in Categories)
                     {
-                        if (check == r)
+                        if (segLower == cat || segLower.Contains(cat))
                         {
-                            return string.Join("/", parts);
-                        }
-                        if (check.Contains(r))
-                        {
-                            parts[1] = r;
-                            return string.Join("/", parts);
+                            categoryIndex = i;
+                            matchedCategory = cat;
+                            break;
                         }
                     }
+                    if (categoryIndex != -1) break;
                 }
-                if (parts.Length > 3)
+
+                // If a category was found deeper than parts[1], drop all intermediate folders between root and category
+                if (categoryIndex != -1)
                 {
-                    string check = parts[2].ToLower();
-                    foreach (string r in Categories)
+                    parts[categoryIndex] = matchedCategory;
+
+                    if (categoryIndex > 1)
                     {
-                        if (check == r)
-                        {
-                            return string.Join(
-    "/",
-    parts.Where((value, index) => index != 1)
-);
-
-                        }
-                        if (check.Contains(r))
-                        {
-                            parts[2] = r;
-                            return string.Join(
-    "/",
-    parts.Where((value, index) => index != 1)
-);
-
-                        }
+                        // Keep parts[0] (root) and parts[categoryIndex..^1] (category + remaining path)
+                        parts = new[] { parts[0] }
+                            .Concat(parts.Skip(categoryIndex))
+                            .ToArray();
                     }
                 }
+
                 return string.Join("/", parts);
             }
         }

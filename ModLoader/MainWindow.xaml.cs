@@ -131,6 +131,7 @@ namespace ModManager
     }
     public class Settings
     {
+        public bool? auto_binfield_fix { get; set; } = null;
         public bool in_file_path { get; set; } = true;
         public string repath_affix { get; set; } = "";
         public int Loader_version { get; set; } = 1;
@@ -204,6 +205,7 @@ namespace ModManager
         public List<string> Wads { get; set; } = new List<string>();
         public string rf_ID { get; set; }
         public string rf_RE { get; set; }
+        public bool IsNew { get; set; }
 
     }
     public class ModInfo
@@ -1363,227 +1365,208 @@ try
         {
             Task.Run(async () =>
             {
-                Dispatcher.Invoke(() => ToggleFeed(true, 2));
                 try
                 {
-
                     string gameTxtPath = Path.Combine(BasePath, "hashes.game.txt");
                     string gameBinPath = Path.Combine(BasePath, "hashes.game.bin");
-                    string checkFilePath = Path.Combine(BasePath, "hashes.check.txt");
                     string convertTablesDir = Path.Combine(BasePath, "convert_tables");
+                    string timeStampPath = Path.Combine(BasePath, "last_hash_update.txt"); // Track last check
 
                     Directory.CreateDirectory(BasePath);
                     Directory.CreateDirectory(convertTablesDir);
 
-                    Dispatcher.Invoke(() => Feed2.Text = "Checking for convert table updates...");
-                    using var client = new HttpClient();
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Cs-Lol-Go-Updater");
+                    // ----------------------------------------------------
+                    // CHECK IF UPDATE IS NEEDED (Thursday Cooldown)
+                    // ----------------------------------------------------
+                    bool needsUpdate = false;
 
-                    string apiUrl = "https://api.github.com/repos/Aurecueil/Cs-lol-go/contents/Tools/convert_tables";
-                    var apiResponse = await client.GetStringAsync(apiUrl);
-
-                    using var doc = System.Text.Json.JsonDocument.Parse(apiResponse);
-                    var remoteFiles = doc.RootElement.EnumerateArray()
-                        .Where(x => x.GetProperty("type").GetString() == "file" && x.GetProperty("name").GetString().EndsWith(".jsonl"))
-                        .Select(x => new {
-                            Name = x.GetProperty("name").GetString(),
-                            DownloadUrl = x.GetProperty("download_url").GetString()
-                        })
-                        .ToList();
-
-                    var existingFiles = Directory.GetFiles(convertTablesDir, "*.jsonl");
-
-                    if (existingFiles.Length == 0)
+                    if (!File.Exists(gameBinPath) || !File.Exists(BinEntriesFilePath))
                     {
-                        Dispatcher.Invoke(() => Feed2.Text = "Downloading all convert tables...");
-                        foreach (var file in remoteFiles)
+                        needsUpdate = true; // Essential files missing, force update
+                    }
+                    else if (File.Exists(timeStampPath))
+                    {
+                        if (DateTime.TryParse(File.ReadAllText(timeStampPath), out DateTime lastCheck))
                         {
-                            string destPath = Path.Combine(convertTablesDir, file.Name);
-                            var content = await client.GetByteArrayAsync(file.DownloadUrl);
-                            await File.WriteAllBytesAsync(destPath, content);
+                            DateTime now = DateTime.Now;
+                            // Find the most recent Thursday (including today, if today is Thursday)
+                            int daysSinceThursday = (int)now.DayOfWeek - (int)DayOfWeek.Thursday;
+                            if (daysSinceThursday < 0) daysSinceThursday += 7;
+                            DateTime mostRecentThursday = now.Date.AddDays(-daysSinceThursday);
+
+                            // If we haven't updated since the most recent Thursday, flag for update
+                            if (lastCheck.Date < mostRecentThursday)
+                            {
+                                needsUpdate = true;
+                            }
+                        }
+                        else
+                        {
+                            needsUpdate = true; // Invalid date format in timestamp file
                         }
                     }
                     else
                     {
-                        var versions = new List<int>();
-                        foreach (var filePath in existingFiles)
-                        {
-                            string fileName = Path.GetFileNameWithoutExtension(filePath);
-                            if (int.TryParse(fileName, out int ver))
-                            {
-                                versions.Add(ver);
-                            }
-                        }
-
-                        if (versions.Count > 0)
-                        {
-                            int maxVersion = versions.Max();
-                            int major = maxVersion / 100;
-                            int minor = maxVersion % 100;
-
-                            var targetVersions = new List<int>
-                        {
-                            major * 100 + (minor + 1)
-                        };
-
-                            if (minor >= 18)
-                            {
-                                targetVersions.Add((major + 1) * 100 + 1);
-                            }
-
-                            foreach (var targetVer in targetVersions)
-                            {
-                                string targetFileName = $"{targetVer}.jsonl";
-                                var remoteFile = remoteFiles.FirstOrDefault(f => f.Name.Equals(targetFileName, StringComparison.OrdinalIgnoreCase));
-                                if (remoteFile != null)
-                                {
-                                    string destPath = Path.Combine(convertTablesDir, targetFileName);
-                                    if (!File.Exists(destPath))
-                                    {
-                                        Dispatcher.Invoke(() => Feed2.Text = $"Downloading convert table {targetFileName}...");
-                                        var content = await client.GetByteArrayAsync(remoteFile.DownloadUrl);
-                                        await File.WriteAllBytesAsync(destPath, content);
-                                    }
-                                }
-                            }
-                        }
+                        needsUpdate = true; // Timestamp file missing
                     }
-                    convert_done_update = true;
-                    Dispatcher.Invoke(() => Feed2.Text = "Checking for hash updates...");
-                    long lastUpdateTicks = 0;
-                    if (File.Exists(checkFilePath))
-                    {
-                        long.TryParse(File.ReadAllText(checkFilePath).Trim(), out lastUpdateTicks);
-                    }
-                    DateTimeOffset lastUpdate = new DateTimeOffset(lastUpdateTicks, TimeSpan.Zero);
-
-                    bool binExists = File.Exists(gameBinPath);
-                    bool txtExists = File.Exists(gameTxtPath);
-
-                    bool needsUpdate = (!binExists && !txtExists) || lastUpdateTicks == 0;
 
                     if (!needsUpdate)
                     {
-                        foreach (var url in GitHubUrls)
-                        {
-                            Dispatcher.Invoke(() => Feed2.Text = $"Checking {Path.GetFileName(url)}...");
+                        // Skip execution. The 'return' forces the 'finally' block at the bottom 
+                        // to execute instantly, which safely sets both toggles to true.
+                        return;
+                    }
+                    // ----------------------------------------------------
 
-                            var curlOutput = await RunCurlCommandAsync(url);
-                            DateTimeOffset? remoteModified = null;
+                    using var client = new HttpClient();
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Cs-Lol-Go-Updater");
+                    client.Timeout = TimeSpan.FromSeconds(30);
 
-                            if (!string.IsNullOrEmpty(curlOutput))
+                    // ----------------------------------------------------
+                    // 1. CONVERT TABLES UPDATE
+                    // ----------------------------------------------------
+                    try
+                    {
+                        string apiUrl = "https://api.github.com/repos/Aurecueil/Cs-lol-go/contents/Tools/convert_tables";
+                        var apiResponse = await client.GetStringAsync(apiUrl);
+
+                        using var doc = System.Text.Json.JsonDocument.Parse(apiResponse);
+                        var remoteFiles = doc.RootElement.EnumerateArray()
+                            .Where(x => x.GetProperty("type").GetString() == "file" && x.GetProperty("name").GetString().EndsWith(".jsonl"))
+                            .Select(x => new
                             {
-                                var lines = curlOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                                var lastModifiedLine = lines.FirstOrDefault(line => line.StartsWith("Last-Modified:", StringComparison.OrdinalIgnoreCase));
+                                Name = x.GetProperty("name").GetString(),
+                                DownloadUrl = x.GetProperty("download_url").GetString()
+                            })
+                            .ToList();
 
-                                if (lastModifiedLine != null)
+                        var existingFiles = Directory.GetFiles(convertTablesDir, "*.jsonl");
+
+                        if (existingFiles.Length == 0)
+                        {
+                            foreach (var file in remoteFiles)
+                            {
+                                string destPath = Path.Combine(convertTablesDir, file.Name);
+                                var content = await client.GetByteArrayAsync(file.DownloadUrl);
+                                await File.WriteAllBytesAsync(destPath, content);
+                            }
+                        }
+                        else
+                        {
+                            var versions = existingFiles
+                                .Select(f => Path.GetFileNameWithoutExtension(f))
+                                .Where(name => int.TryParse(name, out _))
+                                .Select(int.Parse)
+                                .ToList();
+
+                            if (versions.Count > 0)
+                            {
+                                int maxVersion = versions.Max();
+                                int major = maxVersion / 100;
+                                int minor = maxVersion % 100;
+
+                                var targetVersions = new List<int> { major * 100 + (minor + 1) };
+                                if (minor >= 18)
                                 {
-                                    var lastModifiedValue = lastModifiedLine.Substring("Last-Modified:".Length).Trim();
-                                    if (DateTimeOffset.TryParse(lastModifiedValue, out var parsedDate))
+                                    targetVersions.Add((major + 1) * 100 + 1);
+                                }
+
+                                foreach (var targetVer in targetVersions)
+                                {
+                                    string targetFileName = $"{targetVer}.jsonl";
+                                    var remoteFile = remoteFiles.FirstOrDefault(f => f.Name.Equals(targetFileName, StringComparison.OrdinalIgnoreCase));
+                                    if (remoteFile != null)
                                     {
-                                        remoteModified = parsedDate;
+                                        string destPath = Path.Combine(convertTablesDir, targetFileName);
+                                        if (!File.Exists(destPath))
+                                        {
+                                            var content = await client.GetByteArrayAsync(remoteFile.DownloadUrl);
+                                            await File.WriteAllBytesAsync(destPath, content);
+                                        }
                                     }
                                 }
                             }
-
-                            if (remoteModified.HasValue)
-                            {
-                                if (remoteModified.Value > lastUpdate)
-                                {
-                                    needsUpdate = true;
-                                    Dispatcher.Invoke(() => Feed2.Text = $"Update detected on {Path.GetFileName(url)}.");
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                Dispatcher.Invoke(() => Feed2.Text = $"Could not check {Path.GetFileName(url)}.");
-                            }
                         }
                     }
-
-                    // Branch 1: Download & convert directly to .bin
-                    if (needsUpdate)
+                    catch (Exception ex)
                     {
-                        using var httpClient = new HttpClient();
-                        Dispatcher.Invoke(() => Feed2.Text = "Downloading and converting game hashes to binary...");
+                        Logger.LogError($"Convert tables update failed: {ex.Message}", ex);
+                    }
+                    finally
+                    {
+                        // Unblock dependent workflows immediately even if network failed
+                        convert_done_update = true;
+                    }
 
-                        using var httpStream = await httpClient.GetStreamAsync(DownloadUrl);
-                        await BuildOptimizedBinaryFileAsync(httpStream, gameBinPath);
+                    // ----------------------------------------------------
+                    // 2. GAME HASHES (.bin / .txt)
+                    // ----------------------------------------------------
+                    bool binExists = File.Exists(gameBinPath);
+                    bool txtExists = File.Exists(gameTxtPath);
 
-                        // Optional: If you no longer need the local .txt file, remove it
-                        if (File.Exists(gameTxtPath))
+                    try
+                    {
+                        // Case A: Missing .bin entirely -> Download and build
+                        if (!binExists && !txtExists)
                         {
+                            using var httpStream = await client.GetStreamAsync(DownloadUrl);
+                            await BuildOptimizedBinaryFileAsync(httpStream, gameBinPath);
+                        }
+                        // Case B: .txt exists locally, compile to .bin once
+                        else if (!binExists && txtExists)
+                        {
+                            using var fileStream = new FileStream(gameTxtPath, FileMode.Open, FileAccess.Read, FileShare.Read, 512 * 1024, useAsync: true);
+                            await BuildOptimizedBinaryFileAsync(fileStream, gameBinPath);
+
                             try { File.Delete(gameTxtPath); } catch { }
                         }
-
-                        await File.WriteAllTextAsync(checkFilePath, DateTimeOffset.UtcNow.Ticks.ToString());
-                        Dispatcher.Invoke(() => Feed2.Text = "Hashes updated and converted to binary.");
                     }
-                    // Branch 2: Local .txt exists, no remote update required, but .bin does not exist yet -> Convert
-                    else if (!binExists && txtExists)
+                    catch (Exception ex)
                     {
-                        Dispatcher.Invoke(() => Feed2.Text = "Converting existing text hashes to binary...");
-
-                        using var fileStream = new FileStream(gameTxtPath, FileMode.Open, FileAccess.Read, FileShare.Read, 512 * 1024, useAsync: true);
-                        await BuildOptimizedBinaryFileAsync(fileStream, gameBinPath);
-
-                        Dispatcher.Invoke(() => Feed2.Text = "Conversion complete.");
+                        Logger.LogError($"Hashes build failed: {ex.Message}", ex);
                     }
 
-
-                    if (!File.Exists(BinEntriesFilePath) || needsUpdate)
+                    // ----------------------------------------------------
+                    // 3. SHADERS (binentries)
+                    // ----------------------------------------------------
+                    if (!File.Exists(BinEntriesFilePath))
                     {
-                        using var httpClient = new HttpClient();
-
-                        Dispatcher.Invoke(() => Feed2.Text = "Downloading and filtering shaders...");
-
                         try
                         {
-                            // 1. Download the raw content
-                            var binEntriesContent = await httpClient.GetStringAsync(BinEntriesDownloadUrl);
-
-                            // 2. Split into lines
+                            var binEntriesContent = await client.GetStringAsync(BinEntriesDownloadUrl);
                             var lines = binEntriesContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
-                            // 3. Filter: Keep only lines where the path (after the hash) starts with "Shaders/"
                             var filteredLines = lines.Where(line =>
                             {
-                                // Format is usually: "HASH PATH" (e.g., "12345678 Shaders/MyShader.prop")
                                 int spaceIndex = line.IndexOf(' ');
-                                if (spaceIndex > -1 && spaceIndex + 1 < line.Length)
-                                {
-                                    // check the part after the space
-                                    string pathPart = line.Substring(spaceIndex + 1);
-                                    return pathPart.StartsWith("Shaders/", StringComparison.OrdinalIgnoreCase);
-                                }
-                                return false;
+                                return spaceIndex > -1 && spaceIndex + 1 < line.Length &&
+                                       line.Substring(spaceIndex + 1).StartsWith("Shaders/", StringComparison.OrdinalIgnoreCase);
                             });
 
-                            // 4. Save the filtered result
                             await File.WriteAllLinesAsync(BinEntriesFilePath, filteredLines);
                         }
                         catch (Exception ex)
                         {
-                            // Optional: Log specific error for the binentries part so it doesn't fail the whole update
-                            Dispatcher.Invoke(() => Feed2.Text = $"Warning: Failed to update shaders. {ex.Message}");
+                            Logger.LogError($"Shaders download failed: {ex.Message}", ex);
                         }
                     }
-                    Dispatcher.Invoke(() => Feed2.Text = "Hashes are up-to-date.");
+
+                    // Successfully completed check, write timestamp
+                    File.WriteAllText(timeStampPath, DateTime.Now.ToString("o"));
                 }
                 catch (Exception ex)
                 {
-                    Dispatcher.Invoke(() => Feed2.Text = $"Error: {ex.Message}");
+                    Logger.LogError($"Unexpected update failure: {ex.Message}", ex);
                 }
                 finally
                 {
+                    // Ensure flag releases state locks even if catastrophic failure occurred OR if skipped via return
+                    convert_done_update = true;
                     hash_done_update = true;
-                    await Task.Delay(1000);
-                    Dispatcher.Invoke(() => ToggleFeed(false, 2));
                 }
             });
         }
-
+        
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             // This fires after window has closed
@@ -1728,7 +1711,7 @@ try
                 await CheckForAppUpdates();
             }
             catch { }
-            DownloadCslolDll();
+            // DownloadCslolDll();
 
             try
             {
@@ -1795,6 +1778,8 @@ try
                 };
                 hierarchyById[-1] = tft_root_folder;
 
+
+
                 if (!File.Exists("cslol-tools/hashes.game.bin"))
                 {
                     SetLoading("Updating Hashes (might take a while)", 1, 0);
@@ -1812,6 +1797,11 @@ try
                     {
                         await Task.Delay(500);
                     }
+                }
+                if (settings.auto_binfield_fix is null)
+                {
+                    var result = CustomMessageBox.Show("Do you want to enable auto bin fix?", ["Yes", "No"]);
+                    settings.auto_binfield_fix = result == "Yes";
                 }
                 SetProgress3(1);
                 SetLoading("WAD Index", 1, 0);
@@ -1877,9 +1867,8 @@ try
                 settings.ver = DisplayVersion;
                 save_settings();
                 string whats_new = """
-                    Fixed Topaz fixer bug "Unable to read beyonf the end of the stream"
-                    Updated Binfiles convertion to account for changes ranging from patch 13.16 to 16.18
-                    Convertion tables will now be also seamlessly updated when needed
+                    Fixed minor fixer bug.
+                    Added glow indicating newly added mods.
                     """;
                 CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
@@ -4124,6 +4113,16 @@ try
         }
         static async Task CheckForAppUpdates()
         {
+            string lastCheckFile = "last_update_check.txt";
+            if (File.Exists(lastCheckFile))
+            {
+                if (DateTime.TryParse(File.ReadAllText(lastCheckFile), out DateTime lastCheck))
+                {
+                    // Only check for updates every 6 hours
+                    if ((DateTime.Now - lastCheck).TotalHours < 48) return;
+                }
+            }
+
             const string OWNER = "Aurecueil";
             const string REPO = "Cs-lol-go";
 
@@ -4225,6 +4224,7 @@ try
                         File.Copy(file, dest, overwrite: true);
                     }
                     Directory.Delete(tempDir, true);
+                    File.WriteAllText(lastCheckFile, DateTime.Now.ToString("o"));
                 }
                 catch (Exception e)
                 {
@@ -5053,7 +5053,7 @@ try
                 string defaultDetailsJson = JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(infoPath, defaultDetailsJson);
             }
-            if (modDetails.check_up < 3)
+            if (modDetails.check_up < 3 && settings.auto_binfield_fix == true)
             {
                 // 1. Set up dependencies
                 var settings = new FixerSettings();
@@ -5095,7 +5095,7 @@ try
                 modDetails.check_up = 1618;
                 File.WriteAllText(infoPath, JsonSerializer.Serialize(modInfo, new JsonSerializerOptions { WriteIndented = true }));
             }
-            else if(File.Exists($"cslol-tools/convert_tables/{modDetails.check_up+1}.jsonl"))
+            else if(File.Exists($"cslol-tools/convert_tables/{modDetails.check_up+1}.jsonl") && settings.auto_binfield_fix == true)
                 {
                 var settings = new FixerSettings();
                 var extractor = new WadExtractor(settings);
@@ -5398,6 +5398,7 @@ try
                     }
                     string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
                     Mod new_mod = await CreateModFromFolder(extractTargetDir, true);
+                    new_mod.IsNew = true;
                     if (new_mod == null) {
                         Application.Current.Dispatcher.Invoke(() =>
                    CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
@@ -5740,7 +5741,7 @@ try
 
                             string folderName = Path.GetFileName(extractTargetDir.TrimEnd(Path.DirectorySeparatorChar));
                             Mod newmod = await CreateModFromFolder(extractTargetDir, true);
-
+                            newmod.IsNew = true;
                             if (newmod == null)
                             {
                                 Application.Current.Dispatcher.InvokeAsync(() =>
@@ -5890,7 +5891,8 @@ try
 
             string folderName = Path.GetFileName(installPath.TrimEnd(Path.DirectorySeparatorChar));
             Mod moddi = await CreateModFromFolder(installPath, true);
-            if(moddi == null)
+            moddi.IsNew = true;
+            if (moddi == null)
                             {
                 Application.Current.Dispatcher.Invoke(() =>
                    CustomMessageBox.Show("skinhacks are not supported, get lost"), null, "No Skins?");
@@ -5920,7 +5922,8 @@ try
 
                     // Copy directory recursively
                     CopyDirectory(path, installedPat);
-                    CreateModFromFolder(installedPat, true);
+                    Mod newMod = await CreateModFromFolder(installedPat, true);
+                    newMod.IsNew = true;
                     return;
                 }
             }

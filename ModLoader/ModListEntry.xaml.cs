@@ -88,6 +88,14 @@ namespace ModManager
             UpdateUIForMod(true, true, true, true);
         }
 
+        private void ClearNewModState()
+        {
+            if (IsMod)
+            {
+                ModElement.IsNew = false;
+                UpdateSelectionVisual();
+            }
+        }
         private void UpdateUIForParentFolder(int parentId)
         {
             IsParentFolder = true;
@@ -118,6 +126,7 @@ namespace ModManager
 
         private void ActiveCheckbox_Checked(object sender, RoutedEventArgs e)
         {
+            ClearNewModState();
             if (fixerRunning) return;
             if (IsSelected)
             {
@@ -156,6 +165,8 @@ namespace ModManager
 
         private void ActiveCheckbox_Unchecked(object sender, RoutedEventArgs e)
         {
+            ClearNewModState();
+
             if (fixerRunning) return;
             if (IsSelected)
             {
@@ -682,6 +693,12 @@ namespace ModManager
                     border.BorderThickness = new Thickness(2);
                     BGBorder.Background = new SolidColorBrush(Color.FromArgb(50, 173, 216, 230)); // Light blue with transparency
                 }
+                else if (IsMod && ModElement != null && ModElement.IsNew)
+                {
+                    border.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 204, 153, 0));
+                    border.BorderThickness = new Thickness(3);
+                    BGBorder.Background = new SolidColorBrush(Color.FromArgb(255, 42, 42, 42));
+                }
                 else
                 {
                     border.BorderBrush = null;
@@ -849,6 +866,10 @@ namespace ModManager
             if (fixerRunning || exporter)
             {
                 return;
+            }
+            if (selected)
+            {
+                ClearNewModState();
             }
 
             if (IsSelected != selected)
