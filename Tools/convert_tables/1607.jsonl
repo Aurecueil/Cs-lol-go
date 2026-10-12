@@ -1,7 +1,7 @@
-{"class": "0x665c9fe7", "field": "0xf3ca8ece", "from": {"type": "I32"}, "to": {"type": "U16"}}
 {"class": "0x6e93dac5", "field": "Augment", "from": {"type": "Link"}, "to": {"type": "Hash"}}
 {"class": "AugmentSelectionViewController", "field": "0xb25b0bc0", "from": {"type": "Map", "key": "Hash", "value": "Embed"}, "to": {"type": "Map", "key": "Hash", "value": "Embed"}}
 {"class": "AugmentSelectionViewController", "field": "MaxAugmentSlots", "from": {"type": "U32"}, "to": {"type": "U8"}}
+{"class": "PhysicsSimGlobalSettings", "field": "ConstraintIterations", "from": {"type": "I32"}, "to": {"type": "U16"}}
 {"class": "VfxAnimatedColor", "field": "InterpModes", "from": {"type": "List", "value": "U32"}, "to": {"type": "List2", "value": "U8"}}
 {"class": "VfxAnimatedColor", "field": "times", "from": {"type": "List", "value": "F32"}, "to": {"type": "List2", "value": "F32"}}
 {"class": "VfxAnimatedColor", "field": "values", "from": {"type": "List", "value": "Vec4"}, "to": {"type": "List2", "value": "Vec4"}}

@@ -1,5 +1,5 @@
-{"class": "0x4f0aa8a0", "field": "TooltipText", "from": {"type": "String"}, "to": {"type": "Pointer"}}
 {"class": "IAugment", "field": "RootSpell", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "LogicDriverElementTooltip", "field": "TooltipText", "from": {"type": "String"}, "to": {"type": "Pointer"}}
 {"class": "VfxAnimatedColor", "field": "times", "from": {"type": "List2", "value": "F32"}, "to": {"type": "List", "value": "F32"}}
 {"class": "VfxAnimatedColor", "field": "values", "from": {"type": "List2", "value": "Vec4"}, "to": {"type": "List", "value": "Vec4"}}
 {"class": "VfxAnimatedFloat", "field": "times", "from": {"type": "List2", "value": "F32"}, "to": {"type": "List", "value": "F32"}}

@@ -4122,6 +4122,7 @@ try
                     if ((DateTime.Now - lastCheck).TotalHours < 48) return;
                 }
             }
+            DownloadCslolDll();
 
             const string OWNER = "Aurecueil";
             const string REPO = "Cs-lol-go";

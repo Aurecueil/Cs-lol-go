@@ -14,7 +14,7 @@
 {"class": "0xdbb4f634", "field": "OutroDuration", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
 {"class": "0xdbb4f634", "field": "particleLifetime", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
 {"class": "0xdbb4f634", "field": "startDelay", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
-{"class": "0xdc53945d", "field": "0x1ea15738", "from": {"type": "List", "key": "0x5", "value": "Hash"}, "to": {"type": "List", "key": "0x6", "value": "Hash"}}
+{"class": "TftWebViewViewController", "field": "0x1ea15738", "from": {"type": "List", "key": "0x5", "value": "Hash"}, "to": {"type": "List", "key": "0x6", "value": "Hash"}}
 {"class": "VfxBurstSpawn", "field": "0x10498eed", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
 {"class": "VfxBurstSpawn", "field": "SpawnDuration", "from": {"type": "Pointer"}, "to": {"type": "Embed"}}
 {"class": "VfxPhysicsDragModifier", "field": "InitialDrag", "from": {"type": "Embed"}, "to": {"type": "Embed"}}

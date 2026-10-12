@@ -16,6 +16,7 @@ obj/
 # OS junk
 .DS_Store
 Thumbs.db
+patch_changes/*.jsonl
 
 # Unused
 ModLoader/exploreros.xaml

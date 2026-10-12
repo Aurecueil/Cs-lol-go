@@ -1001,26 +1001,31 @@ namespace ModManager
 
         private static void WriteUniqueStringsToFile(string filePath, IEnumerable<string> strings)
         {
+            // Ensure forward slash path separators only
+            filePath = filePath.Replace('\\', '/');
+
             var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (File.Exists(filePath))
             {
                 foreach (var line in File.ReadAllLines(filePath))
                 {
-                    var trimmed = line.Trim();
-                    if (!string.IsNullOrEmpty(trimmed))
-                        existing.Add(trimmed);
+                    if (!string.IsNullOrEmpty(line))
+                        existing.Add(line);
                 }
             }
 
-            foreach (var s in strings)
-            {
-                var trimmed = s.Trim();
-                if (!string.IsNullOrEmpty(trimmed))
-                    existing.Add(trimmed);
-            }
+            // Since strings are pre-normalized, add them directly
+            existing.UnionWith(strings);
 
-            File.WriteAllLines(filePath, existing.OrderBy(x => x, StringComparer.OrdinalIgnoreCase), Encoding.UTF8);
+            var orderedLines = existing.OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+
+            // Write with LF ('\n') line endings and UTF-8 without BOM
+            File.WriteAllText(
+                filePath,
+                string.Join("\n", orderedLines),
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
+            );
         }
 
         private async Task<List<string>> ProcessAllWadsInDirectoryAsync(string directory, CancellationToken ct)
@@ -1423,6 +1428,23 @@ namespace ModManager
                 if (magic == "DDS ") return ".dds";
                 if (magic == "OggS") return ".ogg";
                 if (magic == "%PDF") return ".pdf";
+
+                // Added / Updated checks
+                if (magic == "\0XET") return ".tex";             // 0x00584554 in little-endian bytes
+                if (magic == "\x33\x22\x11\x00") return ".skn";   // 0x00112233 in little-endian bytes (or check individual bytes below)
+            }
+
+            // Longer magic string checks (e.g. 8 bytes for r3d2anmd)
+            if (data.Length >= 8)
+            {
+                string magic8 = Encoding.ASCII.GetString(data, 0, 8);
+                if (magic8 == "r3d2anmd") return ".anm";
+                if (magic8.StartsWith("r3d2sklt")) return ".skl"; // or check equality if it's strictly r3d2sklt
+            }
+
+            if (data.Length >= 4)
+            {
+                string magic = Encoding.ASCII.GetString(data, 0, 4);
                 if (magic.StartsWith("r3d")) return ".scb";
             }
 
@@ -1434,6 +1456,10 @@ namespace ModManager
 
             if (data.Length >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47)
                 return ".png";
+
+            // Safe byte-level fallback for 0x00112233 (.skn) if endianness representation varies:
+            if (data.Length >= 4 && data[0] == 0x33 && data[1] == 0x22 && data[2] == 0x11 && data[3] == 0x00)
+                return ".skn";
 
             return ".bin";
         }

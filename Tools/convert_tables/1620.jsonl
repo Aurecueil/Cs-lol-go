@@ -1,0 +1,6 @@
+{"class": "0x6cec0484", "field": "0x0ba947a2", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "0x70cd6a18", "field": "0x0ba947a2", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "AudioGlobalEventManager", "field": "GlobalContextualActionData", "from": {"type": "List2", "value": "Link"}, "to": {"type": "List2", "value": "Hash"}}
+{"class": "CapEntitlementsReward", "field": "0x0ba947a2", "from": {"type": "Link"}, "to": {"type": "Hash"}}
+{"class": "ContextualConditionBuffCounterReachedLimitFromZero", "field": "mCounterHighestReached", "from": {"type": "U8"}, "to": {"type": "I32"}}
+{"class": "ContextualConditionBuffCounterSetToZeroAfterLimitReached", "field": "mCounterHighestReached", "from": {"type": "U8"}, "to": {"type": "I32"}}
