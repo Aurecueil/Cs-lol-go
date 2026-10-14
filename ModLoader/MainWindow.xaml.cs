@@ -1231,7 +1231,7 @@ try
             var dialog = new OpenFileDialog
             {
                 Title = "Select file(s)",
-                Filter = "Supported Files (*.fantome, *.modpkg, *.zip, *.wad, *.client)|*.fantome;*.zip;*.wad;*.client|All Files (*.*)|*.*",
+                Filter = "Supported Files (*.fantome, *.modpkg, *.zip, *.wad, *.client)|*.fantome;*.modpkg;*.zip;*.wad;*.client|All Files (*.*)|*.*",
                 Multiselect = allowMultiple
             };
 
@@ -3501,6 +3501,19 @@ try
             }
 
             mods_loaded_in.UnionWith(mods_loaded_in_over);
+            if (mods_loaded_in.Any(m => GameDataMods.HasDeclarations(Path.Combine("installed", m))))
+            {
+                string profile = Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
+                    + (settings.tft_mode ? "‗TFT" : "")
+                    + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "");
+                await GameDataMods.BuildAsync(Path.GetDirectoryName(settings.gamepath)!, profile,
+                    mods_loaded_in, settings.not_tft,
+                    line => Application.Current.Dispatcher.Invoke(() => { Feed.Text = line; Logger.Log(line); }), token);
+                PaintActiveMods();
+                currentProgress = 1;
+                SetProgress();
+                return;
+            }
             string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
             string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
             // CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
@@ -3673,6 +3686,12 @@ try
                 {
                     if (modByFolder.TryGetValue(id, out var mod))
                     {
+                        // A declaration-only mod has no WAD assets to enumerate.
+                        if (GameDataMods.HasDeclarations(Path.Combine("installed", mod.ModFolder)))
+                        {
+                            if (overrride) mods_loaded_in.Add(mod.ModFolder);
+                            else mods_loaded_in_over.Add(mod.ModFolder);
+                        }
                         foreach (string wad in mod.Wads)
                         {
                             string trimmedWad = TrimWadName(wad);
@@ -5164,11 +5183,11 @@ try
             // Remove non-existent layers
             modDetails.Layers.RemoveAll(l =>
             {
-                return !wadFolders.Contains(l.folder_name);
+                return l.folder_name != "WAD" && !wadFolders.Contains(l.folder_name);
             });
 
             string layerName = "base";
-            modDetails.Layers.Add(new LayerInfo
+            if (!modDetails.Layers.Any(l => l.Name.Equals(layerName, StringComparison.OrdinalIgnoreCase))) modDetails.Layers.Add(new LayerInfo
             {
                 Name = layerName,
                 Priority = modDetails.Layers.Count + 1,
@@ -5183,15 +5202,6 @@ try
                     modDetails.Layers.Add(new LayerInfo
                     {
                         Name = layerName,
-                        Priority = modDetails.Layers.Count + 1,
-                        folder_name = wadDir
-                    });
-                }
-                else
-                {
-                    modDetails.Layers.Add(new LayerInfo
-                    {
-                        Name = $"{layerName}_2",
                         Priority = modDetails.Layers.Count + 1,
                         folder_name = wadDir
                     });
@@ -5415,7 +5425,8 @@ try
             }
             else if (ext == ".modpkg")
             {
-                install_modpkg(path, true);
+                try { await install_modpkg(path, true); }
+                catch (Exception ex) { MessageBox.Show($"Modpkg import failed: {ex.Message}", "Import Error"); }
             }
             else
             {
@@ -5768,10 +5779,7 @@ try
                     }
                     else if (ext == ".modpkg")
                     {
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            install_modpkg(path);
-                        });
+                        await Application.Current.Dispatcher.InvokeAsync(() => install_modpkg(path)).Task.Unwrap();
                     }
 
                     // The catch-all block from original code

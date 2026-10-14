@@ -1,6 +1,8 @@
 # Build results
 bin/
 obj/
+game-data-overlay/target/
+Tools/game-data-overlay.exe
 
 # Visual Studio cache / IDE state
 .vs/

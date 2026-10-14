@@ -16,6 +16,7 @@
 - Random mod selection
 - [Runeforge](https://www.runeforge.dev/) one-click downloads
 - [Modpkg](https://github.com/LeagueToolkit/league-mod) import/export
+- [BIN delta modpkg support](docs/bin-deltas.md) (reimport packages installed by older versions)
 - Flexible importing
 - Best mod fixer
 - Mod thumbnails

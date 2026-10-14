@@ -18,7 +18,22 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: |
+          8.0.x
+          10.0.x
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Test BIN delta builder
+      run: cargo test --locked --manifest-path game-data-overlay/Cargo.toml
+
+    - name: Build BIN delta helper
+      run: |
+        cargo build --release --locked --manifest-path game-data-overlay/Cargo.toml
+
+    - name: Test modpkg import and export
+      run: dotnet test tests/ModPkg.Tests/ModPkg.Tests.csproj --configuration Release
 
     - name: Restore dependencies
       run: dotnet restore ModLoader.sln
