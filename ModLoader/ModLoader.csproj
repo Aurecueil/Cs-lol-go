@@ -28,12 +28,22 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Include="..\Tools\**\*">
+		<None Include="..\Tools\**\*" Exclude="..\Tools\game-data-overlay.exe">
 			<Link>cslol-tools\%(RecursiveDir)%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</None>
 	</ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\game-data-overlay\target\release\game-data-overlay.exe"
+          Link="cslol-tools\game-data-overlay.exe"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildGameDataOverlay" BeforeTargets="PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipGameDataBuild)' != 'true'">
+    <Exec Command="cargo build --release --locked --manifest-path &quot;$(MSBuildProjectDirectory)\..\game-data-overlay\Cargo.toml&quot;" />
+  </Target>
 
 
 	<ItemGroup>

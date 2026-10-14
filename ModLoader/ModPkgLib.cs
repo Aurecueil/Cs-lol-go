@@ -69,6 +69,8 @@ namespace ModPkgLibSpace
 
     public class ModpkgLayerMetadata
     {
+        // Keep the original MessagePack value, including numeric widths and future fields.
+        public byte[] GameData { get; set; }
         public string Name { get; set; } = string.Empty;
         public int Priority { get; set; }
         public string Description { get; set; }
@@ -317,6 +319,9 @@ namespace ModPkgLibSpace
         {
             using var reader = new ModpkgReader(modpkgPath);
             Directory.CreateDirectory(outputDir);
+            GameDataMods.SaveDeclarations(outputDir, reader.Metadata.Layers);
+            foreach (var layer in reader.Layers.Values)
+                Directory.CreateDirectory(Path.Combine(outputDir, GameDataMods.LayerFolder(layer.Name)));
 
             string metaFolderName = Directory.Exists(Path.Combine(outputDir, "meta")) ? "meta" :
                                     Directory.Exists(Path.Combine(outputDir, "META")) ? "META" : "meta";
@@ -388,7 +393,8 @@ namespace ModPkgLibSpace
                         }
                         else
                         {
-                            filePath = Path.Combine(layerDir, chunkPath);
+                            // No-WAD chunks are layer build inputs, not game assets.
+                            filePath = GameDataMods.ResourcePath(outputDir, l.Name, chunkPath);
                         }
                     }
 
@@ -398,6 +404,7 @@ namespace ModPkgLibSpace
                         catch { finalData = data; }
                     }
 
+                    GameDataMods.RequireInside(outputDir, filePath);
                     var fileDir = Path.GetDirectoryName(filePath);
                     if (!string.IsNullOrEmpty(fileDir)) Directory.CreateDirectory(fileDir);
 
@@ -584,6 +591,13 @@ namespace ModPkgLibSpace
                 {
                     metadata.Layers.Add(new ModpkgLayerMetadata(layerName, priority));
                 }
+
+                var layerMetadata = metadata.Layers.First(l => l.Name.Equals(layerName, StringComparison.OrdinalIgnoreCase));
+                var modDirectory = Directory.GetParent(Path.GetFullPath(folderPath))!.FullName;
+                layerMetadata.GameData = GameDataMods.ReadDeclaration(modDirectory, layerName);
+                if (layerMetadata.GameData != null) metadata.SchemaVersion = Math.Max(metadata.SchemaVersion, 4);
+                foreach (var resource in GameDataMods.Resources(modDirectory, layerName))
+                    writer.AddChunk(resource.Path, File.ReadAllBytes(resource.File), layerName, null);
             }
 
             writer.SetMetadata(metadata);
@@ -731,7 +745,7 @@ namespace ModPkgLibSpace
         private static void SkipMsgpackValue(MemoryStream stream)
         {
             var header = stream.ReadByte();
-            if (header == -1) return;
+            if (header == -1) throw new EndOfStreamException();
             if ((header & 0x80) == 0x00 || (header & 0xE0) == 0xE0) return;
             if ((header & 0xE0) == 0xA0) { stream.Seek(header & 0x1F, SeekOrigin.Current); return; }
             if ((header & 0xF0) == 0x90) { uint len = (uint)(header & 0x0F); for (int i = 0; i < len; i++) SkipMsgpackValue(stream); return; }
@@ -741,8 +755,11 @@ namespace ModPkgLibSpace
                 case 0xC0: case 0xC2: case 0xC3: return;
                 case 0xCC: case 0xD0: stream.Seek(1, SeekOrigin.Current); return;
                 case 0xCD: case 0xD1: stream.Seek(2, SeekOrigin.Current); return;
-                case 0xCE: case 0xD2: stream.Seek(4, SeekOrigin.Current); return;
-                case 0xCF: case 0xD3: stream.Seek(8, SeekOrigin.Current); return;
+                case 0xCA: case 0xCE: case 0xD2: stream.Seek(4, SeekOrigin.Current); return;
+                case 0xCB: case 0xCF: case 0xD3: stream.Seek(8, SeekOrigin.Current); return;
+                case 0xC4: stream.Seek(stream.ReadByte(), SeekOrigin.Current); return;
+                case 0xC5: stream.Seek(ReadBigEndianUInt16(stream), SeekOrigin.Current); return;
+                case 0xC6: stream.Seek(ReadBigEndianUInt32(stream), SeekOrigin.Current); return;
                 case 0xD9: int len8 = stream.ReadByte(); stream.Seek(len8, SeekOrigin.Current); return;
                 case 0xDA: int len16 = ReadBigEndianUInt16(stream); stream.Seek(len16, SeekOrigin.Current); return;
                 case 0xDB: long len32 = ReadBigEndianUInt32(stream); stream.Seek(len32, SeekOrigin.Current); return;
@@ -750,6 +767,7 @@ namespace ModPkgLibSpace
                 case 0xDD: uint arr32 = ReadBigEndianUInt32(stream); for (int i = 0; i < arr32; i++) SkipMsgpackValue(stream); return;
                 case 0xDE: uint map16 = ReadBigEndianUInt16(stream); for (int i = 0; i < map16 * 2; i++) SkipMsgpackValue(stream); return;
                 case 0xDF: uint map32 = ReadBigEndianUInt32(stream); for (int i = 0; i < map32 * 2; i++) SkipMsgpackValue(stream); return;
+                default: throw new InvalidDataException($"Unsupported MessagePack value: 0x{header:X2}");
             }
         }
 
@@ -901,7 +919,7 @@ namespace ModPkgLibSpace
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error parsing metadata chunk: {ex.Message}");
+                throw new InvalidDataException("Invalid modpkg metadata; refusing a partial import.", ex);
             }
             return metadata;
         }
@@ -916,6 +934,7 @@ namespace ModPkgLibSpace
                 string name = string.Empty;
                 string desc = null;
                 int priority = 0;
+                byte[] gameData = null;
 
                 for (uint j = 0; j < fieldCount; j++)
                 {
@@ -925,10 +944,18 @@ namespace ModPkgLibSpace
                         case "name": name = ReadMsgpackString(stream); break;
                         case "priority": priority = (int)ReadMsgpackInt(stream); break;
                         case "description": desc = ReadMsgpackNil(stream) ? null : ReadMsgpackString(stream); break;
+                        case "game_data":
+                            if (!ReadMsgpackNil(stream))
+                            {
+                                long start = stream.Position;
+                                SkipMsgpackValue(stream);
+                                gameData = stream.ToArray().AsSpan((int)start, (int)(stream.Position - start)).ToArray();
+                            }
+                            break;
                         default: SkipMsgpackValue(stream); break;
                     }
                 }
-                layers.Add(new ModpkgLayerMetadata(name, priority, desc));
+                layers.Add(new ModpkgLayerMetadata(name, priority, desc) { GameData = gameData });
             }
         }
 
@@ -1229,7 +1256,7 @@ namespace ModPkgLibSpace
             WriteMsgpackArrayHeader(stream, (uint)layers.Count);
             foreach (var layer in layers)
             {
-                WriteMsgpackMapHeader(stream, 3);
+                WriteMsgpackMapHeader(stream, layer.GameData == null ? 3u : 4u);
                 WriteMsgpackString(stream, "name");
                 WriteMsgpackString(stream, layer.Name ?? string.Empty);
                 WriteMsgpackString(stream, "priority");
@@ -1237,6 +1264,11 @@ namespace ModPkgLibSpace
                 WriteMsgpackString(stream, "description");
                 if (layer.Description == null) WriteMsgpackNil(stream);
                 else WriteMsgpackString(stream, layer.Description);
+                if (layer.GameData != null)
+                {
+                    WriteMsgpackString(stream, "game_data");
+                    stream.Write(layer.GameData);
+                }
             }
 
             return stream.ToArray();
