@@ -12,7 +12,7 @@
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
 	<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <FileVersion>2.17.0</FileVersion>
+    <FileVersion>2.18.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,12 +36,9 @@
 	</ItemGroup>
 
   <ItemGroup>
-    <None Include="..\game-data-overlay\target\release\game-data-overlay.exe"
-          Link="cslol-tools\game-data-overlay.exe"
-          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\game-data-overlay\target\release\game-data-overlay.exe" Link="cslol-tools\game-data-overlay.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="BuildGameDataOverlay" BeforeTargets="PrepareForBuild"
-          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipGameDataBuild)' != 'true'">
+  <Target Name="BuildGameDataOverlay" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipGameDataBuild)' != 'true'">
     <Exec Command="cargo build --release --locked --manifest-path &quot;$(MSBuildProjectDirectory)\..\game-data-overlay\Cargo.toml&quot;" />
   </Target>
 

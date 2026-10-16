@@ -1867,8 +1867,7 @@ try
                 settings.ver = DisplayVersion;
                 save_settings();
                 string whats_new = """
-                    Fixed minor fixer bug.
-                    Added glow indicating newly added mods.
+                    Diffrential Bin Mods (Contributed by budlibu and gpt Astra)
                     """;
                 CustomMessageBox.Show(whats_new, ["Kay"],"What's New");
             }
