@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="../../ModLoader/ModPkgLib.cs" Link="ModPkgLib.cs" />
     <Compile Include="../../ModLoader/GameDataMods.cs" Link="GameDataMods.cs" />
+    <Compile Include="../../ModLoader/ProfileOverlay.cs" Link="ProfileOverlay.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />

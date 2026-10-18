@@ -99,7 +99,7 @@ internal static class GameDataMods
             game = Path.GetFullPath(game),
             output = Path.GetFullPath(Path.Combine(profile, "overlay")),
             state = Path.GetFullPath(state),
-            mods = mods.Select(m => Path.GetFullPath(Path.Combine("installed", m))).ToArray(),
+            mods = mods.Select(Path.GetFullPath).ToArray(),
             no_tft = noTft
         }), token);
         var start = new ProcessStartInfo(helper)
@@ -115,9 +115,19 @@ internal static class GameDataMods
             catch (InvalidOperationException) { }
         });
         var errors = process.StandardError.ReadToEndAsync();
-        while (await process.StandardOutput.ReadLineAsync(token) is { } line) progress(line);
-        await process.WaitForExitAsync(token);
+        try
+        {
+            while (await process.StandardOutput.ReadLineAsync(token) is { } line) progress(line);
+            await process.WaitForExitAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            await process.WaitForExitAsync(CancellationToken.None);
+            await errors;
+            throw;
+        }
         string error = await errors;
+        await File.WriteAllTextAsync(Path.Combine(state, "stderr.txt"), error, CancellationToken.None);
         token.ThrowIfCancellationRequested();
         if (process.ExitCode != 0) throw new InvalidOperationException($"BIN delta build failed:\n{error}");
     }

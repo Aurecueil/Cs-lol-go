@@ -61,6 +61,23 @@ public sealed class DeltaTests : IDisposable
     public void OrdinaryModDoesNotUseDeltaBuilder() => Assert.False(GameDataMods.HasDeclarations(root));
 
     [Fact]
+    public void LegacyWadQualifiedAssetsWithoutWadIndexStillInstallAsAssets()
+    {
+        string package = Path.Combine(root, "legacy.modpkg");
+        using (var writer = new ModpkgWriter(package))
+        {
+            writer.AddLayer("base", 0);
+            writer.SetMetadata(new ModpkgMetadata { Name = "legacy", Layers = [new("base", 0)] });
+            writer.AddChunk("UI.wad.client/assets/example.dds", [1, 2, 3], "base");
+            writer.Write();
+        }
+        string mod = Path.Combine(root, "legacy");
+        ModPkgLib.Extract(package, mod);
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(Path.Combine(mod, "WAD/UI.wad.client/assets/example.dds")));
+        Assert.False(GameDataMods.HasDeclarations(mod));
+    }
+
+    [Fact]
     public void InactiveLayerDoesNotSwitchTheOverlayBackend()
     {
         GameDataMods.SaveDeclarations(root, [new("alternate", 5) { GameData = [0x80] }]);

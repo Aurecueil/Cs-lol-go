@@ -33,6 +33,8 @@ jobs:
         cargo build --release --locked --manifest-path game-data-overlay/Cargo.toml
 
     - name: Test modpkg import and export
+      env:
+        CSLOL_TEST_MOD_TOOLS: ${{ github.workspace }}\Tools\mod-tools.exe
       run: dotnet test tests/ModPkg.Tests/ModPkg.Tests.csproj --configuration Release
 
     - name: Restore dependencies
