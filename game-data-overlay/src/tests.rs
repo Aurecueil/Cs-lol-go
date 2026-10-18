@@ -169,6 +169,47 @@ fn installed_but_disabled_mods_cannot_affect_a_hud_build() {
 }
 
 #[test]
+fn corrupted_fixer_patch_is_rejected_before_publishing() {
+    let f = Fixture::new();
+    let hud = f.delta("hud", 20);
+    build(f.request(vec![hud.clone()])).unwrap();
+    let previous = f.bytes("data/test.bin");
+    // Reproduce the old C# writer: eight extra zero bytes before the PTCH version.
+    let mut broken = b"PTCH".to_vec();
+    broken.extend_from_slice(&[0; 8]);
+    broken.extend_from_slice(&1u32.to_le_bytes());
+    broken.extend_from_slice(&0u32.to_le_bytes());
+    broken.extend_from_slice(b"PROP");
+    broken.extend_from_slice(&3u32.to_le_bytes());
+    broken.extend_from_slice(&[0; 12]);
+    for packed in [false, true] {
+        let skin = f.mod_dir(if packed { "packed" } else { "loose" });
+        if packed {
+            write_wad(&skin.join("WAD/UI.wad.client"), &[("data/layout", &broken)]);
+        } else {
+            fs::create_dir_all(skin.join("WAD/UI.wad.client/data")).unwrap();
+            fs::write(skin.join("WAD/UI.wad.client/data/layout"), &broken).unwrap();
+        }
+        let error = build(f.request(vec![hud.clone(), skin])).unwrap_err();
+        assert!(format!("{error:#}").contains("Invalid PTCH asset"));
+        assert_eq!(f.bytes("data/test.bin"), previous);
+    }
+}
+
+#[test]
+fn interrupted_staging_is_not_reused_against_completed_build_state() {
+    let f = Fixture::new();
+    let hud = f.delta("hud", 20);
+    build(f.request(vec![hud.clone()])).unwrap();
+    let previous = f.bytes("data/test.bin");
+    let staging = f.root.join("profile/game-data/staging/DATA/FINAL");
+    fs::create_dir_all(&staging).unwrap();
+    fs::write(staging.join("UI.wad.client"), b"interrupted partial WAD").unwrap();
+    build(f.request(vec![hud])).unwrap();
+    assert_eq!(f.bytes("data/test.bin"), previous);
+}
+
+#[test]
 fn disabling_a_previously_built_skin_removes_its_overrides() {
     let f = Fixture::new();
     let hud = f.delta("installed/hud", 20);

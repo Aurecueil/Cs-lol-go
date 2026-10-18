@@ -28,19 +28,17 @@ public class BinWriter
         if (typeStr.Value == "PTCH")
         {
             _writer.Write(Encoding.ASCII.GetBytes("PTCH"));
-            _writer.Write((long)0); // Unknown 64-bit value, ritobin writes 1 then 0? No, wait.
-            // ritobin: writer.write(std::array{ 'P', 'T', 'C', 'H' }); writer.write(uint32_t{ 1 }); writer.write(uint32_t{ 0 });
-            // Wait, ritobin writes PTCH (4 bytes), then 1 (4 bytes), then 0 (4 bytes)?
-            // Let's check the C++ code again.
-            // writer.write(std::array{ 'P', 'T', 'C', 'H' });
-            // writer.write(uint32_t{ 1 });
-            // writer.write(uint32_t{ 0 });
-            // That's 12 bytes total.
-            // My reader read: ReadBytes(4) (PTCH), ReadU64() (unk), ReadBytes(4) (PROP).
-            // So ReadU64() covers the 1 and 0 if they are 32-bit each?
-            // 1 (u32) + 0 (u32) = 0x00000001 followed by 0x00000000 (little endian) -> 0x0000000000000001?
-            // Yes.
-            _writer.Write((ulong)1);
+            _writer.Write(1u); // Override-container version, followed by object deletions.
+            var deleted = bin.Sections.TryGetValue("deleted", out var deletedValue)
+                ? deletedValue as BinList ?? throw new InvalidDataException("Invalid PTCH deletions.")
+                : new BinList(BinType.Hash);
+            if (deleted.ValueType != BinType.Hash)
+                throw new InvalidDataException("PTCH deletions must be object hashes.");
+            _writer.Write((uint)deleted.Items.Count);
+            foreach (var item in deleted.Items)
+                _writer.Write(item is BinHash hash ? hash.Value.Hash : throw new InvalidDataException("Invalid PTCH deletion hash."));
+            if (bin.Sections.TryGetValue("linked", out var linked) && linked is BinList links && links.Items.Count != 0)
+                throw new InvalidDataException("PTCH files cannot contain linked dependencies.");
         }
 
         _writer.Write(Encoding.ASCII.GetBytes("PROP"));

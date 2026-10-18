@@ -76,10 +76,25 @@ fn build(request: Request) -> Result<()> {
         vec![]
     };
     let staging = request.state.join("staging");
+    // A cancelled build can leave partially rewritten WADs here. The saved
+    // overlay state describes the last completed build, not those partial files.
+    if staging.exists() {
+        anyhow::ensure!(
+            staging.canonicalize_utf8()? == request.state.canonicalize_utf8()?.join("staging"),
+            "Staging directory must not redirect outside the profile build state"
+        );
+        fs::remove_dir_all(&staging)?;
+    }
     let mut builder = OverlayBuilder::new(request.game, staging.clone(), request.state.clone())
         .with_game_data_schema(schema)
         .with_blocked_wads(blocked)
-        .with_progress(|p| println!("BIN deltas: {:?} {}/{}", p.stage, p.current, p.total));
+        .with_progress(|p| {
+            if p.total == 0 {
+                println!("BIN deltas: {:?}...", p.stage);
+            } else {
+                println!("BIN deltas: {:?} {}/{}", p.stage, p.current, p.total);
+            }
+        });
     // mod-tools --ignoreConflict uses last-mod-wins; LTK uses first-mod-wins.
     builder.set_enabled_mods(
         providers

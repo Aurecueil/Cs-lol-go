@@ -1,11 +1,16 @@
 use base64::{Engine, prelude::BASE64_STANDARD};
 use camino::{Utf8Path, Utf8PathBuf};
 use ltk_game_data::{DeclarationDocument, Declarations};
+use ltk_meta::BinOverride;
 use ltk_mod_project::ModProject;
 use ltk_overlay::{Error, ModContentProvider, Result};
 use ltk_wad::{Wad, WadHash};
 use serde::Deserialize;
-use std::{collections::HashSet, fs, io::BufReader};
+use std::{
+    collections::HashSet,
+    fs,
+    io::{BufReader, Cursor},
+};
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -26,6 +31,15 @@ fn io_error(path: &Utf8Path, error: impl std::fmt::Display) -> Error {
         path: path.to_owned(),
         source: std::io::Error::other(error.to_string()),
     }
+}
+
+fn validate_patch(path: &Utf8Path, bytes: &[u8]) -> Result<()> {
+    if bytes.starts_with(b"PTCH") {
+        BinOverride::from_reader(&mut Cursor::new(bytes)).map_err(|error| {
+            io_error(path, format!("Invalid PTCH asset: {error}. Reimport the original mod; an older BIN fixer may have corrupted its patch header."))
+        })?;
+    }
+    Ok(())
 }
 
 pub fn layer_folder(name: &str) -> String {
@@ -177,10 +191,9 @@ fn files(root: &Utf8Path) -> Result<Vec<(Utf8PathBuf, Vec<u8>)>> {
         if entry.file_type().is_file() {
             let path =
                 Utf8Path::from_path(entry.path()).ok_or_else(|| io_error(root, "non-UTF8 path"))?;
-            result.push((
-                path.strip_prefix(root).unwrap().to_owned(),
-                fs::read(path).map_err(|e| io_error(path, e))?,
-            ));
+            let bytes = fs::read(path).map_err(|e| io_error(path, e))?;
+            validate_patch(path, &bytes)?;
+            result.push((path.strip_prefix(root).unwrap().to_owned(), bytes));
         }
     }
     Ok(result)
@@ -245,6 +258,7 @@ impl ModContentProvider for InstalledMod {
                 let bytes = wad
                     .load_chunk_decompressed(&chunk)
                     .map_err(|e| io_error(&path, e))?;
+                validate_patch(&path.join(format!("{:016x}", chunk.path_hash.0)), &bytes)?;
                 Ok((format!("{:016x}", chunk.path_hash.0).into(), bytes.to_vec()))
             })
             .collect()

@@ -45,6 +45,26 @@ Legacy packages can encode a WAD-qualified asset path without a WAD table entry.
 Those paths are installed under `WAD/` again. Reimport such packages if 2.18
 previously imported them as build resources.
 
+## Corrupted PTCH assets
+
+The BIN fixer's old writer emitted eight extra bytes in `PTCH` headers, setting
+the container version to 0 and shifting the embedded `PROP` data. The correct
+header is `PTCH`, a 32-bit version of 1, a 32-bit deletion count, deletion hashes,
+then `PROP`. The reader/writer now preserve that header and object deletions.
+Ordinary `PROP` files continue using their existing format.
+
+In the investigated crash, all nine modified HUD patch assets had this exact
+defect. Copying an already processed `installed` folder carried the corruption
+into the new manager; that copy also lacked two long-path files. Reimport the
+original package to recover the complete assets. Updating the manager prevents
+new corruption but cannot restore missing files in an existing installation.
+
+The delta builder now rejects invalid PTCH assets in loose files and packed WADs
+before publishing an overlay. It also discards abandoned staging files after
+failed or cancelled builds, since those files do not match the last completed
+build state. Indeterminate progress no longer displays misleading `0/0` counts.
+The number of patched WADs depends on selected content, not all installed mods.
+
 For diagnostics, both backends record their selected inputs in
 `profiles/<profile>/<mod-tools-or-game-data>/request.json` and stderr in
 `stderr.txt`. `Simple_logs.txt` includes ordinary-builder output as well as delta
@@ -79,7 +99,11 @@ cargo clippy --locked --manifest-path game-data-overlay/Cargo.toml --all-targets
 ```
 
 Set `CSLOL_TEST_MOD_TOOLS` to `Tools/mod-tools.exe` to also run the native failure
-test (CI does this). The opt-in Rust test below compares every ordinary mod asset
+test (CI does this). Set `CSLOL_TEST_PTCH_DIR` to an original HUD's extracted
+`WAD` directory to check that every PTCH asset survives the fixer's reader/writer
+byte-for-byte. Synthetic tests also cover ordinary PROP, deletion lists, property
+patch records, malformed loose/packed assets, and interrupted staging recovery.
+The opt-in Rust test below compares every ordinary mod asset
 with the generated WAD through native → mixed → HUD-only → native builds. Use
 copies of installed mods, and a single base-layer WAD skin for this check:
 
