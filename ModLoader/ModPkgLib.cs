@@ -393,8 +393,12 @@ namespace ModPkgLibSpace
                         }
                         else
                         {
-                            // No-WAD chunks are layer build inputs, not game assets.
-                            filePath = GameDataMods.ResourcePath(outputDir, l.Name, chunkPath);
+                            // Older packages put the WAD name in the path instead of the
+                            // WAD table. Those are still assets, not delta build inputs.
+                            var (legacyWad, legacyPath) = ParseWadPath(chunkPath);
+                            filePath = legacyWad != null
+                                ? Path.Combine(layerDir, legacyWad, legacyPath)
+                                : GameDataMods.ResourcePath(outputDir, l.Name, chunkPath);
                         }
                     }
 

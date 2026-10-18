@@ -11,6 +11,11 @@ were discarded at import; the original package is needed to recover them.
 ## Loading and export
 
 - Profiles without active declarations still use `mod-tools.exe`.
+- Both builders receive only the selected profile's mods. An installed but disabled
+  delta mod does not select the delta builder. RAW-only mods are selectable too.
+- Ordinary builds now use a separate staging directory and publish only on success.
+  A nonzero exit stops loading instead of injecting a stale or partially written
+  overlay. The builder and injector share the same TFT/PBE profile path.
 - Profiles with declarations use `game-data-overlay.exe`, a small Rust wrapper
   around the public [LeagueToolkit libraries](https://github.com/LeagueToolkit/league-mod).
   It builds the complete selected profile so delta and ordinary asset mods compose
@@ -35,6 +40,35 @@ fields during export. No-WAD layer resources are kept under
 `META/game-data/<WAD-or-WAD_layer>/`. A `game_data.yaml`, `.yml`, `.json`, or `.toml`
 manifest there takes precedence over legacy embedded declarations. Resources are
 not installed as game assets.
+
+Legacy packages can encode a WAD-qualified asset path without a WAD table entry.
+Those paths are installed under `WAD/` again. Reimport such packages if 2.18
+previously imported them as build resources.
+
+## Corrupted PTCH assets
+
+The BIN fixer's old writer emitted eight extra bytes in `PTCH` headers, setting
+the container version to 0 and shifting the embedded `PROP` data. The correct
+header is `PTCH`, a 32-bit version of 1, a 32-bit deletion count, deletion hashes,
+then `PROP`. The reader/writer now preserve that header and object deletions.
+Ordinary `PROP` files continue using their existing format.
+
+In the investigated crash, all nine modified HUD patch assets had this exact
+defect. Copying an already processed `installed` folder carried the corruption
+into the new manager; that copy also lacked two long-path files. Reimport the
+original package to recover the complete assets. Updating the manager prevents
+new corruption but cannot restore missing files in an existing installation.
+
+The delta builder now rejects invalid PTCH assets in loose files and packed WADs
+before publishing an overlay. It also discards abandoned staging files after
+failed or cancelled builds, since those files do not match the last completed
+build state. Indeterminate progress no longer displays misleading `0/0` counts.
+The number of patched WADs depends on selected content, not all installed mods.
+
+For diagnostics, both backends record their selected inputs in
+`profiles/<profile>/<mod-tools-or-game-data>/request.json` and stderr in
+`stderr.txt`. `Simple_logs.txt` includes ordinary-builder output as well as delta
+progress. These logs help distinguish selection, build and game-runtime failures.
 
 Use `.modpkg` when redistributing a delta mod. It exports the declarations back
 into standard package metadata and resources back into their original layer.
@@ -63,6 +97,27 @@ dotnet test tests/ModPkg.Tests/ModPkg.Tests.csproj -c Release
 cargo test --locked --manifest-path game-data-overlay/Cargo.toml
 cargo clippy --locked --manifest-path game-data-overlay/Cargo.toml --all-targets -- -D warnings
 ```
+
+Set `CSLOL_TEST_MOD_TOOLS` to `Tools/mod-tools.exe` to also run the native failure
+test (CI does this). Set `CSLOL_TEST_PTCH_DIR` to an original HUD's extracted
+`WAD` directory to check that every PTCH asset survives the fixer's reader/writer
+byte-for-byte. Synthetic tests also cover ordinary PROP, deletion lists, property
+patch records, malformed loose/packed assets, and interrupted staging recovery.
+The opt-in Rust test below compares every ordinary mod asset
+with the generated WAD through native → mixed → HUD-only → native builds. Use
+copies of installed mods, and a single base-layer WAD skin for this check:
+
+```powershell
+$env:CSLOL_GAME = 'C:\Riot Games\League of Legends\Game'
+$env:CSLOL_INSTALLED = 'C:\test-fixtures\installed'
+$env:CSLOL_HUD = 'hud-folder-name'
+$env:CSLOL_SKIN = 'skin-folder-name'
+$env:CSLOL_MOD_TOOLS = (Resolve-Path Tools/mod-tools.exe).Path
+cargo test --locked --manifest-path game-data-overlay/Cargo.toml real_profile_switching -- --ignored --nocapture
+```
+
+This verifies overlay contents, not game-runtime stability. In particular, a
+passing disabled-mod test does not establish the cause of a reported game crash.
 
 Tests use synthetic BIN/WAD/package fixtures, covering import/export preservation,
 declaration-only mods, manifests, resource containment, active layers, mixed mods,

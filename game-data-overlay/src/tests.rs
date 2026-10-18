@@ -151,6 +151,81 @@ fn mixed_profiles_keep_assets_and_use_last_mod_wins() {
 }
 
 #[test]
+fn installed_but_disabled_mods_cannot_affect_a_hud_build() {
+    let f = Fixture::new();
+    let hud = f.delta("installed/hud", 20);
+    build(f.request(vec![hud.clone()])).unwrap();
+    let before = f.bytes("data/test.bin");
+    let disabled = f.delta("installed/disabled", 99);
+    write_wad(
+        &disabled.join("WAD/UI.wad.client"),
+        &[("assets/texture", b"disabled")],
+    );
+    // A malformed disabled declaration must not even be parsed.
+    fs::write(disabled.join("META/game-data.json"), b"invalid").unwrap();
+    build(f.request(vec![hud])).unwrap();
+    assert_eq!(f.bytes("data/test.bin"), before);
+    assert_eq!(f.bytes("assets/texture"), b"original");
+}
+
+#[test]
+fn corrupted_fixer_patch_is_rejected_before_publishing() {
+    let f = Fixture::new();
+    let hud = f.delta("hud", 20);
+    build(f.request(vec![hud.clone()])).unwrap();
+    let previous = f.bytes("data/test.bin");
+    // Reproduce the old C# writer: eight extra zero bytes before the PTCH version.
+    let mut broken = b"PTCH".to_vec();
+    broken.extend_from_slice(&[0; 8]);
+    broken.extend_from_slice(&1u32.to_le_bytes());
+    broken.extend_from_slice(&0u32.to_le_bytes());
+    broken.extend_from_slice(b"PROP");
+    broken.extend_from_slice(&3u32.to_le_bytes());
+    broken.extend_from_slice(&[0; 12]);
+    for packed in [false, true] {
+        let skin = f.mod_dir(if packed { "packed" } else { "loose" });
+        if packed {
+            write_wad(&skin.join("WAD/UI.wad.client"), &[("data/layout", &broken)]);
+        } else {
+            fs::create_dir_all(skin.join("WAD/UI.wad.client/data")).unwrap();
+            fs::write(skin.join("WAD/UI.wad.client/data/layout"), &broken).unwrap();
+        }
+        let error = build(f.request(vec![hud.clone(), skin])).unwrap_err();
+        assert!(format!("{error:#}").contains("Invalid PTCH asset"));
+        assert_eq!(f.bytes("data/test.bin"), previous);
+    }
+}
+
+#[test]
+fn interrupted_staging_is_not_reused_against_completed_build_state() {
+    let f = Fixture::new();
+    let hud = f.delta("hud", 20);
+    build(f.request(vec![hud.clone()])).unwrap();
+    let previous = f.bytes("data/test.bin");
+    let staging = f.root.join("profile/game-data/staging/DATA/FINAL");
+    fs::create_dir_all(&staging).unwrap();
+    fs::write(staging.join("UI.wad.client"), b"interrupted partial WAD").unwrap();
+    build(f.request(vec![hud])).unwrap();
+    assert_eq!(f.bytes("data/test.bin"), previous);
+}
+
+#[test]
+fn disabling_a_previously_built_skin_removes_its_overrides() {
+    let f = Fixture::new();
+    let hud = f.delta("installed/hud", 20);
+    let skin = f.mod_dir("installed/skin");
+    write_wad(
+        &skin.join("WAD/UI.wad.client"),
+        &[("assets/texture", b"skin")],
+    );
+    build(f.request(vec![hud.clone(), skin])).unwrap();
+    assert_eq!(f.bytes("assets/texture"), b"skin");
+    build(f.request(vec![hud])).unwrap();
+    assert_eq!(f.value(0x33), 20);
+    assert_eq!(f.bytes("assets/texture"), b"original");
+}
+
+#[test]
 fn failed_delta_keeps_previous_overlay_and_reports_error() {
     let f = Fixture::new();
     let delta = f.delta("delta", 8);
@@ -319,4 +394,85 @@ fn installed_layer_selection_keeps_inactive_declarations_out() {
     .unwrap();
     build(f.request(vec![root])).unwrap();
     assert_eq!(f.value(0x33), 2);
+}
+
+/// Opt-in integration check against local assets; no game files enter the repository.
+#[test]
+#[ignore = "requires CSLOL_GAME, CSLOL_INSTALLED, CSLOL_HUD, CSLOL_SKIN, CSLOL_MOD_TOOLS"]
+fn real_profile_switching_preserves_skin_assets_and_removes_disabled_mods() {
+    let env = |name| Utf8PathBuf::from(std::env::var(name).unwrap());
+    let game = env("CSLOL_GAME");
+    let installed = env("CSLOL_INSTALLED");
+    let hud = std::env::var("CSLOL_HUD").unwrap();
+    let skin = std::env::var("CSLOL_SKIN").unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let profile = Utf8PathBuf::from_path_buf(temp.path().to_owned()).unwrap();
+    let request = |names: &[&str]| Request {
+        game: game.clone(),
+        output: profile.join("overlay"),
+        state: profile.join("game-data"),
+        mods: names.iter().map(|n| installed.join(n)).collect(),
+        no_tft: false,
+    };
+    let native = || {
+        let result = std::process::Command::new(env("CSLOL_MOD_TOOLS"))
+            .args([
+                "mkoverlay",
+                installed.as_str(),
+                profile.join("overlay").as_str(),
+            ])
+            .arg(format!("--game:{game}"))
+            .arg(format!("--mods:{skin}"))
+            .arg("--ignoreConflict")
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    };
+    let check_skin = || {
+        let mut source = InstalledMod::open(installed.join(&skin)).unwrap();
+        let mut checked = 0;
+        for name in source.list_layer_wads("base").unwrap() {
+            let output = walkdir::WalkDir::new(profile.join("overlay"))
+                .into_iter()
+                .map(Result::unwrap)
+                .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(&name))
+                .unwrap();
+            let mut wad =
+                Wad::mount(BufReader::new(fs::File::open(output.path()).unwrap())).unwrap();
+            for (path, bytes) in source.read_wad_overrides("base", &name).unwrap() {
+                let hash = ltk_overlay::utils::resolve_chunk_hash(&path, &bytes).unwrap();
+                let chunk = *wad
+                    .chunks()
+                    .get(hash)
+                    .unwrap_or_else(|| panic!("Missing {path}"));
+                assert_eq!(
+                    wad.load_chunk_decompressed(&chunk).unwrap().as_ref(),
+                    bytes.as_slice(),
+                    "{path}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 0);
+        println!("Verified {checked} ordinary mod assets byte-for-byte");
+    };
+    native();
+    check_skin();
+    build(request(&[&hud, &skin])).unwrap();
+    check_skin();
+    build(request(&[&hud])).unwrap();
+    assert!(
+        !profile.join("overlay/DATA/FINAL/Champions").exists()
+            || fs::read_dir(profile.join("overlay/DATA/FINAL/Champions"))
+                .unwrap()
+                .next()
+                .is_none()
+    );
+    native();
+    check_skin();
+    assert!(!profile.join("overlay/DATA/FINAL/UI.wad.client").exists());
 }

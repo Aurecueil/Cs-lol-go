@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using System.Text;
+using System.IO;
 
 namespace Jade.Ritobin;
 
@@ -29,7 +30,14 @@ public class BinReader
 
         if (magicStr == "PTCH")
         {
-            var unk = ReadU64(); // patch header?
+            uint patchVersion = ReadU32();
+            if (patchVersion != 1)
+                throw new InvalidDataException($"Unsupported PTCH version {patchVersion}. Reimport the original mod if an older fixer changed this file.");
+            uint deleteCount = ReadU32();
+            var deleted = new BinList(BinType.Hash);
+            for (uint i = 0; i < deleteCount; i++)
+                deleted.Items.Add(new BinHash(ReadFNV1a()));
+            bin.Sections["deleted"] = deleted;
             magic = ReadBytes(4);
             magicStr = Encoding.ASCII.GetString(magic);
             bin.Sections["type"] = new BinString("PTCH");
@@ -53,11 +61,13 @@ public class BinReader
         if (version >= 2)
         {
             ReadLinked(bin);
+            if (isPatch && ((BinList)bin.Sections["linked"]).Items.Count != 0)
+                throw new InvalidDataException("PTCH files cannot contain linked dependencies.");
         }
 
         ReadEntries(bin);
 
-        if (isPatch)
+        if (isPatch && version >= 3)
         {
             ReadPatches(bin);
         }

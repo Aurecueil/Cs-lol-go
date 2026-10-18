@@ -1570,7 +1570,7 @@ try
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             // This fires after window has closed
-            _currentRunner?.KillProcess();
+            _modLoadCts?.Cancel();
         }
         private void Internal_restart(int loc)
         {
@@ -2914,12 +2914,6 @@ try
                 ctsToCancel.Dispose();
             }
 
-            if (_currentRunner != null)
-            {
-                await Task.Run(() => _currentRunner.KillProcess()); // Also offload this
-                _currentRunner = null;
-            }
-
             ProfileComboBox.IsEnabled = true;
             refreshButton.IsEnabled = true;
             CreateProfile.IsEnabled = true;
@@ -3141,13 +3135,7 @@ try
 
         private void StartCSLol2(CancellationToken token)
         {
-            // Compute the base profile target directory path
-            string profileBase = Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
-                + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
-                    ? "‗PBE‗profile"
-                    : "");
-
-            string overlayPath = Path.Combine(profileBase, "overlay");
+            string overlayPath = Path.Combine(CurrentOverlayProfile(), "overlay");
 
             bool requiresElevation = false;
             if (Elevator.ShouldElevateInjector() == 1)
@@ -3196,6 +3184,7 @@ try
                     catch (Exception ex)
                     {
                         MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        await Stop_loader_internal();
                     }
                 }
             }
@@ -3485,152 +3474,42 @@ try
             }
         }
 
-        private ModToolsRunner _currentRunner;
-
         HashSet<string> mods_loaded_in = new HashSet<string>();
         HashSet<string> mods_loaded_in_over = new HashSet<string>();
         List<int> folders_loaded_in = new List<int>();
 
+        private string CurrentOverlayProfile() => ProfileOverlay.ProfilePath(
+            Directory.GetCurrentDirectory(), settings.CurrentProfile, settings.tft_mode, settings.gamepath);
+
         public async Task WriteWads(CancellationToken token)
         {
-            if (_currentRunner != null)
-            {
-                _currentRunner.KillProcess();
-                _currentRunner = null;
-            }
-
             mods_loaded_in.UnionWith(mods_loaded_in_over);
-            if (mods_loaded_in.Any(m => GameDataMods.HasDeclarations(Path.Combine("installed", m))))
+            var selected = mods_loaded_in.ToArray();
+            var paths = ProfileOverlay.SelectedPaths(Path.GetFullPath("installed"), selected);
+            string profile = CurrentOverlayProfile();
+            void Progress(string line) => Application.Current.Dispatcher.Invoke(() =>
             {
-                string profile = Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile)
-                    + (settings.tft_mode ? "‗TFT" : "")
-                    + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "");
+                Feed.Text = line;
+                Logger.Log(line);
+            });
+            Progress("Selected mods: " + string.Join(", ", selected));
+            if (paths.Any(GameDataMods.HasDeclarations))
+            {
                 await GameDataMods.BuildAsync(Path.GetDirectoryName(settings.gamepath)!, profile,
-                    mods_loaded_in, settings.not_tft,
-                    line => Application.Current.Dispatcher.Invoke(() => { Feed.Text = line; Logger.Log(line); }), token);
-                PaintActiveMods();
-                currentProgress = 1;
-                SetProgress();
-                return;
-            }
-            string mod_list = $"\"{string.Join("\"/\"", mods_loaded_in)}\"";
-            string mod_list_disp = $"{string.Join("\n", mods_loaded_in)}";
-            // CustomMessageBox.Show(mod_list_disp, new[] { "OK" }, "Mod List");
-            Logger.Log("-- WRITING MODS --");
-            Logger.Log(mod_list_disp);
-            Logger.Log("-- ------------ --");
-            var runner = new ModToolsRunner(Path.Combine(Directory.GetCurrentDirectory(), "cslol-tools", "mod-tools.exe"));
-            _currentRunner = runner;
-            string game_path = Path.GetDirectoryName(settings.gamepath);
-
-            bool test = false;
-            if (test)
-            {
-                // var builder = new LtkOverlayBuilder(new OverlayBuilderOptions
-                // {
-                //     EnableDiffBins = false,       // Default: treat as standard raw assets
-                //     EnableAudioPatching = false,   // Default: treat as standard raw assets
-                //     FallbackWadName = "data.wad.client"
-                // });
-                // 
-                List<string> wadFolders = mods_loaded_in
-                    .Select(mod => Path.Combine("installed",mod, "wad"))
-                    .Where(Directory.Exists)
-                    .SelectMany(Directory.GetDirectories)
-                    .ToList();
-                string overlayDirectory = $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}";
-                // 
-                // await builder.BuildOverlayAsync(game_path, wadFolders, overlayDirectory);
-
-
-                var builder = new WadOverlayBuilder();
-                await builder.BuildOverlayAsync(game_path, overlayDirectory, wadFolders);
-
-                // OverlayTool ovrl = new OverlayTool();
-                // ovrl.MkOverlay("installed", $"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}", game_path, mods_loaded_in);
+                    paths, settings.not_tft, Progress, token);
             }
             else
             {
-                var args = $"mkoverlay --src \"installed\" --dst \"{Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile) + (settings.tft_mode == true ? "‗TFT" : "") + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true ? "‗PBE‗profile" : "")}/overlay\" --game:\"{game_path}\" --mods:{mod_list}";
-
-
-                if (settings.not_tft)
-                {
-                    args += " --noTFT";
-                }
-
-                args += " --ignoreConflict";
-
-
-                string err_catch = "";
-                var outputLines = new List<string>();
-                var errorLines = new List<string>();
-                try
-                {
-                    int result = await runner.RunAsync(args,
-                    onOutput: line =>
-                    {
-                        outputLines.Add(line);
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            Feed.Text = line;
-                            string lastPart = line.Split('/').Last();
-                            string trimmedWad = lastPart.Replace(".wad.client", "");
-                            if (EMPTY_WADS.TryGetValue(trimmedWad, out var wadInfo))
-                            {
-                                int position = EMPTY_WADS.Keys
-                                    .Select((key, index) => new { key, index })
-                                    .FirstOrDefault(x => x.key.Equals(trimmedWad, StringComparison.OrdinalIgnoreCase))?.index ?? -1;
-
-                                if (position >= 0)
-                                {
-                                    int total = EMPTY_WADS.Count;
-                                    currentProgress = (double)(position + 1) / total;
-                                    SetProgress();
-
-
-                                }
-                            }
-                        });
-                    },
-                    onError: line =>
-                    {
-                        errorLines.Add(line);  // just collect errors, no immediate display
-                    }
-                );
-                    PaintActiveMods();
-
-                    // After RunAsync completes, display all error lines if any
-                    if (errorLines.Count > 0)
-                    {
-                        string allErrors = string.Join(Environment.NewLine, errorLines);
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            string allErrors = string.Join(Environment.NewLine, errorLines);
-                            _modLoadCts?.Cancel();
-                            ToggleFeed(false);
-                            err_catch = allErrors;
-                            _currentRunner = null;
-                            throw new InvalidOperationException(allErrors);
-                        });
-                    }
-                }
-                catch (Exception)
-                {
-                    Load_check_box.IsChecked = false;
-                    if (!string.IsNullOrEmpty(err_catch))
-                    {
-                        CustomMessageBox.Show(err_catch, new[] { "OK" }, "Error");
-                    }
-                }
+                await ProfileOverlay.BuildNativeAsync(
+                    Path.Combine(AppContext.BaseDirectory, "cslol-tools", "mod-tools.exe"),
+                    Path.GetDirectoryName(settings.gamepath)!, profile, Path.GetFullPath("installed"),
+                    selected, settings.not_tft, Progress, token);
             }
+            token.ThrowIfCancellationRequested();
+            PaintActiveMods();
             currentProgress = 1;
             SetProgress();
-            _currentRunner = null;
         }
-
-
-
 
         public async Task ProcessFolderChildrenAsync(int folderId, CancellationToken token, bool isRandomElement = false, bool overrride = false)
         {
@@ -3686,7 +3565,8 @@ try
                     if (modByFolder.TryGetValue(id, out var mod))
                     {
                         // A declaration-only mod has no WAD assets to enumerate.
-                        if (GameDataMods.HasDeclarations(Path.Combine("installed", mod.ModFolder)))
+                        if (GameDataMods.HasDeclarations(Path.Combine("installed", mod.ModFolder)) ||
+                            ProfileOverlay.HasRawAssets(Path.Combine("installed", mod.ModFolder)))
                         {
                             if (overrride) mods_loaded_in.Add(mod.ModFolder);
                             else mods_loaded_in_over.Add(mod.ModFolder);
