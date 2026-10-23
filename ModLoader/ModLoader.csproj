@@ -12,7 +12,7 @@
     <AssemblyName>$(MSBuildProjectName)</AssemblyName>
     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
 	<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <FileVersion>2.20.0</FileVersion>
+    <FileVersion>2.21.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
