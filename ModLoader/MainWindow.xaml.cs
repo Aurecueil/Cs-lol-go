@@ -1044,36 +1044,36 @@ namespace ModManager
 
         static async Task DownloadCslolDll()
         {
-try
-{
-    string targetDir = "cslol-tools";
-    Directory.CreateDirectory(targetDir);
+//try
+//{
+ //   string targetDir = "cslol-tools";
+ //   Directory.CreateDirectory(targetDir);
 
-    using HttpClient client = new HttpClient();
+ //   using HttpClient client = new HttpClient();
+//
+   // var downloads = new (string Url, string FileName)[]
+//    {
+        //("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
+      //  ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
+   // };
 
-    var downloads = new (string Url, string FileName)[]
-    {
-        ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
-        ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
-    };
-
-    foreach (var item in downloads)
-    {
-        string savePath = Path.Combine(targetDir, item.FileName);
+  //  foreach (var item in downloads)
+   // {
+    //    string savePath = Path.Combine(targetDir, item.FileName);
 
         // Send a request to inspect the response header first
-        using HttpResponseMessage response = await client.GetAsync(item.Url);
+    //    using HttpResponseMessage response = await client.GetAsync(item.Url);
         
         // Throws an exception if HTTP status is 404, 500, etc.
-        response.EnsureSuccessStatusCode(); 
+    //    response.EnsureSuccessStatusCode(); 
 
-        byte[] data = await response.Content.ReadAsByteArrayAsync();
-        await File.WriteAllBytesAsync(savePath, data);
+     //   byte[] data = await response.Content.ReadAsByteArrayAsync();
+     //   await File.WriteAllBytesAsync(savePath, data);
 
-        Console.WriteLine($"Successfully downloaded: {item.FileName}");
-    }
-}
-            catch { }
+     //   Console.WriteLine($"Successfully downloaded: {item.FileName}");
+//    }
+//}
+           // catch { }
         }
 
 
