@@ -330,5 +330,5 @@ public class BinReader
     }
 
     private FNV1a ReadFNV1a() => new FNV1a(ReadU32());
-    private XXH64 ReadXXH64() => new XXH64(ReadU64());
+    private XXH64 ReadXXH64() => new XXH64(ReadU32());
 }

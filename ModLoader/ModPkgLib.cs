@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SkiaSharp;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Hashing;
@@ -180,34 +181,42 @@ namespace ModPkgLibSpace
     {
         public class Bitmap : IDisposable
         {
-            private SixLabors.ImageSharp.Image image;
-            public Bitmap(string path) => image = SixLabors.ImageSharp.Image.Load(path);
-            public SixLabors.ImageSharp.Image GetImage() => image;
-            public void Dispose() => image?.Dispose();
-        }
+            private SKBitmap bitmap;
 
-        public class SimpleEncoder
-        {
-            public byte[] DecodeWebPToPng(byte[] webpData)
+            public Bitmap(string path)
             {
-                using var ms = new MemoryStream(webpData);
-                using var image = SixLabors.ImageSharp.Image.Load(ms);
-                using var outputMs = new MemoryStream();
-                var encoder = new SixLabors.ImageSharp.Formats.Png.PngEncoder();
-                image.Save(outputMs, encoder);
-                return outputMs.ToArray();
+                bitmap = SKBitmap.Decode(path);
             }
 
-            public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90)
-            {
-                using var ms = new MemoryStream(webpData);
-                using var image = SixLabors.ImageSharp.Image.Load(ms);
-                using var outputMs = new MemoryStream();
-                var encoder = new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = quality };
-                image.Save(outputMs, encoder);
-                return outputMs.ToArray();
-            }
+            public SKBitmap GetBitmap() => bitmap;
+
+            public void Dispose() => bitmap?.Dispose();
         }
+
+       public class SimpleEncoder
+            {
+                public byte[] DecodeWebPToPng(byte[] webpData)
+                {
+                    // SKBitmap.Decode can accept byte[] directly
+                    using var bitmap = SKBitmap.Decode(webpData);
+                    if (bitmap == null) return webpData; // Fallback if decoding fails
+
+                    using var image = SKImage.FromBitmap(bitmap);
+                    using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+                    return data.ToArray();
+                }
+
+                public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90)
+                {
+                    using var bitmap = SKBitmap.Decode(webpData);
+                    if (bitmap == null) return webpData; // Fallback if decoding fails
+
+                    using var image = SKImage.FromBitmap(bitmap);
+                    using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
+                    return data.ToArray();
+                }
+            }
+        
     }
 
     public static class ModPkgLib
@@ -451,10 +460,11 @@ namespace ModPkgLibSpace
                 if (extension == ".webp") return File.ReadAllBytes(thumbnailPath);
                 if (extension == ".png" || extension == ".jpg" || extension == ".jpeg")
                 {
-                    using var image = SixLabors.ImageSharp.Image.Load(thumbnailPath);
-                    using var ms = new MemoryStream();
-                    image.Save(ms, new SixLabors.ImageSharp.Formats.Webp.WebpEncoder { Quality = 100 });
-                    return ms.ToArray();
+                    using var bitmap = SKBitmap.Decode(thumbnailPath);
+                    using var image = SKImage.FromBitmap(bitmap);
+                    // If the package expects a WebP thumbnail inside the archive:
+                    using var data = image.Encode(SKEncodedImageFormat.Webp, 100);
+                    return data.ToArray();
                 }
                 return null;
             }

@@ -60,10 +60,6 @@ namespace ModManager
                 return $"{v.Major}.{v.Minor}.{Math.Max(v.Build, 0)}";
             }
         }
-
-        public static string Root => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cslol-go", "patcher");
-
         public static string BundledHost => Path.Combine(AppContext.BaseDirectory, "cslol-tools", HostName);
     }
 
