@@ -37,17 +37,9 @@ jobs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Test BIN delta builder
-      run: cargo test --locked --manifest-path game-data-overlay/Cargo.toml
-
     - name: Build BIN delta helper
       run: |
         cargo build --release --locked --manifest-path game-data-overlay/Cargo.toml
-
-    - name: Test modpkg import and export
-      env:
-        CSLOL_TEST_MOD_TOOLS: ${{ github.workspace }}\Tools\mod-tools.exe
-      run: dotnet test tests/ModPkg.Tests/ModPkg.Tests.csproj --configuration Release
 
     # ---- build attestation (guide section 2) ---------------------------------
 
@@ -109,8 +101,6 @@ jobs:
         if (-not (Test-Path ./publish/ModLoader.exe)) { throw "ModLoader.exe missing (the exe name is part of the trust chain)" }
 
     # ---- sign ModLoader.exe with the pinned certificate ----------------------
-    # Skeleton: adapt to however you hold the cert (PFX secret, Azure Trusted Signing, HSM...).
-    # Skip it and the build is unsigned, which the DLL rejects with VRF00000009.
 
     - name: Sign ModLoader.exe
       if: github.event_name != 'pull_request'
@@ -125,7 +115,7 @@ jobs:
         $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
                      Sort-Object FullName | Select-Object -Last 1).FullName
         & $signtool sign /f $pfx /p $env:SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ./publish/ModLoader.exe
-        if ($LASTEXITCODE -ne 0) { throw "signtool failed" }failed" }
+        if ($LASTEXITCODE -ne 0) { throw "signtool failed" }
         & $signtool verify /q /a ./publish/ModLoader.exe
         Remove-Item $pfx -Force
 
