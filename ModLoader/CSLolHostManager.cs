@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,9 +20,6 @@ namespace ModManager
         private static Process _hostProcess;
         private static CancellationTokenSource _cts;
 
-        private static readonly string HOST_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_host.exe");
-        private static readonly string DLL_REL_PATH = Path.Combine("cslol-tools", "ltk_patcher_dll.dll");
-
         private static readonly object _lock = new object();
         private static readonly object _fileLogLock = new object();
         private static DateTime? _collectDeadline = null;
@@ -29,38 +27,30 @@ namespace ModManager
         private static bool _poof = true;
         private static string _patcherLogFilePath = null;
         private static string _lastGameStatus = null;
+        private static Action _onEndOfLife = null;
 
         public static bool IsRunning => _hostProcess != null && !_hostProcess.HasExited;
 
-        private static string GetAbsoluteHostPath()
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, HOST_REL_PATH);
-        }
-
-        private static string GetAbsoluteDllPath()
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DLL_REL_PATH);
-        }
-
         public static void Initialize(
             string overlayPrefixPath,
-            bool elevate,
+            string hostPath,
             CancellationToken token,
             Action<string> onLog,
             Action onStopped,
-            Action<string, string> onGameStatusChanged = null, // Updated signature
+            Action<string, string> onGameStatusChanged = null,
             Action<string, string> onWadScanFailed = null,
             Action<string> onError = null,
+            Action onEndOfLife = null,
             bool poof = false)
         {
-            string hostPath = GetAbsoluteHostPath();
-            string dllPath = GetAbsoluteDllPath();
-
-            if (!File.Exists(hostPath))
+            if (string.IsNullOrWhiteSpace(hostPath) || !File.Exists(hostPath))
             {
                 onError?.Invoke($"Patcher host missing at '{hostPath}'");
                 return;
             }
+
+            hostPath = Path.GetFullPath(hostPath);
+            string dllPath = Path.Combine(Path.GetDirectoryName(hostPath) ?? "", "ltk_patcher_dll.dll");
 
             if (!File.Exists(dllPath))
             {
@@ -71,10 +61,9 @@ namespace ModManager
             Stop();
 
             _lastGameStatus = null;
+            _onEndOfLife = onEndOfLife;
             _cts = CancellationTokenSource.CreateLinkedTokenSource(token);
             _poof = poof;
-
-            int configFlags = _poof ? 0 : 4;
 
             try
             {
@@ -85,17 +74,17 @@ namespace ModManager
                     Directory.CreateDirectory(overlayPrefixPath);
                 }
 
-                _patcherLogFilePath = Path.GetFullPath(Path.Combine(overlayPrefixPath, "..", "patcher_log.txt"));
+                // Inside CSLolHostManager.Initialize, replace the _patcherLogFilePath setup with:
+                _patcherLogFilePath = PatcherConfig.LogFilePath;
                 string logDir = Path.GetDirectoryName(_patcherLogFilePath);
                 if (!string.IsNullOrEmpty(logDir) && !Directory.Exists(logDir))
                 {
                     Directory.CreateDirectory(logDir);
                 }
 
-                overlayPrefixPath = overlayPrefixPath.Replace('\\', '/');
-                if (!overlayPrefixPath.EndsWith("/"))
+                if (!overlayPrefixPath.EndsWith("\\"))
                 {
-                    overlayPrefixPath += "/";
+                    overlayPrefixPath += "\\";
                 }
             }
             catch (Exception ex)
@@ -112,83 +101,48 @@ namespace ModManager
                     {
                         FileName = hostPath,
                         WorkingDirectory = Path.GetDirectoryName(hostPath),
-                        CreateNoWindow = true
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        Arguments = "",
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
                     };
-
-                    if (elevate)
-                    {
-                        startInfo.UseShellExecute = true;
-                        startInfo.Verb = "runas";
-                        startInfo.Arguments = $"--elevate --config-loglevel 16 --config-flags {configFlags} --config-prefix \"{overlayPrefixPath}\" --start-scan";
-
-                        onLog?.Invoke("Launching elevated patcher host...");
-                    }
-                    else
-                    {
-                        startInfo.UseShellExecute = false;
-                        startInfo.Arguments = "";
-                        startInfo.RedirectStandardInput = true;
-                        startInfo.RedirectStandardOutput = true;
-                        startInfo.RedirectStandardError = true;
-                    }
 
                     _hostProcess = new Process { StartInfo = startInfo };
                     _hostProcess.Start();
                     var localProcess = _hostProcess;
 
-                    if (!elevate)
+                    onLog?.Invoke("Sending configuration to patcher host...");
+
+                    using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new UTF8Encoding(false)))
                     {
-                        onLog?.Invoke("Sending configuration to patcher host...");
+                        writer.AutoFlush = true;
 
-                        using (var writer = new StreamWriter(_hostProcess.StandardInput.BaseStream, new System.Text.UTF8Encoding(false)))
+                        await writer.WriteLineAsync("config loglevel 16");
+                        await writer.WriteLineAsync("config flags 0");
+                        await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
+                        await writer.WriteLineAsync("start scan");
+
+                        _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
+                        _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog?.Invoke($"[host-stderr] {err}"), null, null);
+
+                        while (!_cts.Token.IsCancellationRequested && !_hostProcess.HasExited)
                         {
-                            writer.AutoFlush = true;
-
-                            await writer.WriteLineAsync("config loglevel 16");
-                            await writer.WriteLineAsync("config log trace");
-                            await writer.WriteLineAsync($"config flags {configFlags}");
-                            await writer.WriteLineAsync($"config prefix {overlayPrefixPath}");
-                            await writer.WriteLineAsync("start scan");
-
-                            _ = ConsumeStreamAsync(localProcess.StandardOutput, onLog, onGameStatusChanged, onWadScanFailed);
-                            _ = ConsumeStreamAsync(localProcess.StandardError, err => onLog?.Invoke($"[host-stderr] {err}"), null, null);
-
-                            while (!_cts.Token.IsCancellationRequested && !_hostProcess.HasExited)
+                            lock (_lock)
                             {
-                                lock (_lock)
+                                if (_poof && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
                                 {
-                                    if (_poof && _collectDeadline.HasValue && DateTime.UtcNow >= _collectDeadline.Value)
-                                    {
-                                        onLog?.Invoke("Skinhack Detected, Modding Rejected");
-                                        _cts.Cancel();
-                                    }
+                                    onLog?.Invoke("Skinhack Detected, Modding Rejected");
+                                    _cts.Cancel();
                                 }
-                                await Task.Delay(100);
                             }
-
-                            if (!_hostProcess.HasExited)
-                            {
-                                try { await writer.WriteLineAsync("stop"); } catch { }
-                            }
+                            await Task.Delay(100);
                         }
-                    }
-                    else
-                    {
-                        onLog?.Invoke("Patcher host running elevated...");
 
-                        while (!_cts.Token.IsCancellationRequested)
+                        if (!_hostProcess.HasExited)
                         {
-                            var runningHosts = Process.GetProcessesByName("ltk_patcher_host");
-
-                            if (runningHosts.Length == 0)
-                            {
-                                onLog?.Invoke("Elevated patcher host closed.");
-                                break;
-                            }
-
-                            foreach (var p in runningHosts) p.Dispose();
-
-                            await Task.Delay(250);
+                            try { await writer.WriteLineAsync("stop"); } catch { }
                         }
                     }
                 }
@@ -207,7 +161,7 @@ namespace ModManager
         private static async Task ConsumeStreamAsync(
             StreamReader reader,
             Action<string> onLog,
-            Action<string, string> onGameStatusChanged, // Updated type
+            Action<string, string> onGameStatusChanged,
             Action<string, string> onWadScanFailed)
         {
             try
@@ -251,7 +205,7 @@ namespace ModManager
         private static void ParseProtocolLine(
             string line,
             Action<string> onLog,
-            Action<string, string> onGameStatusChanged, // Updated type
+            Action<string, string> onGameStatusChanged,
             Action<string, string> onWadScanFailed)
         {
             string[] parts = line.Split(new[] { ' ' }, 2);
@@ -280,7 +234,7 @@ namespace ModManager
         private static void HandleStatusTransition(
             string rest,
             Action<string> onLog,
-            Action<string, string> onGameStatusChanged) // Updated type
+            Action<string, string> onGameStatusChanged)
         {
             string[] tokens = rest.Split(new[] { ' ' }, 3);
             if (tokens.Length < 2) return;
@@ -321,6 +275,19 @@ namespace ModManager
 
             string msgContent = tokens[3];
 
+            if (msgContent.Contains("end of life reached"))
+            {
+                _onEndOfLife?.Invoke();
+            }
+
+            if (msgContent.Contains("host verification failed, refusing overlay"))
+            {
+                string explanation = msgContent.Contains("VRF00000008")
+                    ? "ModLoader.exe must be started directly from Windows Explorer (desktop shortcut, Start menu, or double-click in Explorer) — not from a terminal, Steam, or another launcher."
+                    : "Executable signature or process chain verification failed.";
+
+                onLog?.Invoke($"Patcher refused to run: {msgContent} ({explanation})");
+            }
             if (msgContent.Contains("WAD scan failed"))
             {
                 string status = "unknown";

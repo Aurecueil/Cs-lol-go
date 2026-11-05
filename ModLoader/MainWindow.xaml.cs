@@ -1044,36 +1044,36 @@ namespace ModManager
 
         static async Task DownloadCslolDll()
         {
-//try
-//{
- //   string targetDir = "cslol-tools";
- //   Directory.CreateDirectory(targetDir);
+try
+{
+string targetDir = "cslol-tools";
+Directory.CreateDirectory(targetDir);
 
- //   using HttpClient client = new HttpClient();
-//
-   // var downloads = new (string Url, string FileName)[]
-//    {
-        //("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
-      //  ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
-   // };
+using HttpClient client = new HttpClient();
 
-  //  foreach (var item in downloads)
-   // {
-    //    string savePath = Path.Combine(targetDir, item.FileName);
+var downloads = new (string Url, string FileName)[]
+{
+  ("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_dll.dll", "ltk_patcher_dll.dll"),
+("https://raw.githubusercontent.com/LeagueToolkit/ltk-manager/main/src-tauri/resources/ltk_patcher_host.exe", "ltk_patcher_host.exe")
+};
 
-        // Send a request to inspect the response header first
-    //    using HttpResponseMessage response = await client.GetAsync(item.Url);
-        
-        // Throws an exception if HTTP status is 404, 500, etc.
-    //    response.EnsureSuccessStatusCode(); 
+foreach (var item in downloads)
+{
+    string savePath = Path.Combine(targetDir, item.FileName);
 
-     //   byte[] data = await response.Content.ReadAsByteArrayAsync();
-     //   await File.WriteAllBytesAsync(savePath, data);
+    Send a request to inspect the response header first
+    using HttpResponseMessage response = await client.GetAsync(item.Url);
+   
+    Throws an exception if HTTP status is 404, 500, etc.
+    response.EnsureSuccessStatusCode(); 
 
-     //   Console.WriteLine($"Successfully downloaded: {item.FileName}");
-//    }
-//}
-           // catch { }
+    byte[] data = await response.Content.ReadAsByteArrayAsync();
+    await File.WriteAllBytesAsync(savePath, data);
+
+    Console.WriteLine($"Successfully downloaded: {item.FileName}");
+    }
+}
+            catch { }
         }
 
 
@@ -3133,137 +3133,167 @@ namespace ModManager
             ToggleOverlay(false);
         }
 
-        private void StartCSLol2(CancellationToken token)
+        private async void StartCSLol2(CancellationToken token)
         {
             string overlayPath = Path.Combine(CurrentOverlayProfile(), "overlay");
 
-            bool requiresElevation = false;
-            if (Elevator.ShouldElevateInjector() == 1)
+            Feed.Text = "Checking patcher & verifying environment...";
+            PreparedPatcher prep = await PatcherDelivery.PrepareSessionAsync(token);
+
+            // Fallback for local testing before LTK staging/production is live (if a manual DLL was placed in AppDataRoot\patcher\manual):
+            if (!prep.Ok)
             {
-                requiresElevation = true;
+                string manualDir = Path.Combine(PatcherConfig.Root, "manual");
+                string manualDll = Path.Combine(manualDir, PatcherConfig.DllName);
+                if (File.Exists(manualDll) && File.Exists(PatcherConfig.BundledHost))
+                {
+                    string manualHost = Path.Combine(manualDir, PatcherConfig.HostName);
+                    File.Copy(PatcherConfig.BundledHost, manualHost, overwrite: true);
+                    prep = new PreparedPatcher(true, null, manualHost, manualDll, "manual");
+                }
             }
-            if (Elevator.ShouldElevateInjector() == 2)
+
+            if (!prep.Ok || string.IsNullOrEmpty(prep.HostPath))
             {
-                Stop_loader_internal();
+                ToggleFeed(false);
+                _isLoaderRunning = false;
+                MessageBox.Show(prep.Error ?? "Failed to prepare patcher.", "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                await Stop_loader_internal();
                 return;
             }
 
             CSLolHostManager.Initialize(
-        overlayPath,
-        requiresElevation,
-        token,
+                overlayPath,
+                prep.HostPath,
+                token,
 
-        text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
+                text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
 
-        () => Application.Current.Dispatcher.Invoke(() =>
-        {
-            ToggleFeed(false);
-            _isLoaderRunning = false;
-            _modLoadCts = null;
-        }),
-
-        // Callback takes (oldState, newState)
-        (oldState, newState) => Application.Current.Dispatcher.Invoke(async () =>
-        {
-            if (oldState == "waiting" && newState != "waiting")
-            {
-                if (!token.IsCancellationRequested && settings.reinitialize)
+                () => Application.Current.Dispatcher.Invoke(() =>
                 {
-                    try
+                    ToggleFeed(false);
+                    _isLoaderRunning = false;
+                    _modLoadCts = null;
+                }),
+
+                // Callback takes (oldState, newState)
+                (oldState, newState) => Application.Current.Dispatcher.Invoke(async () =>
+                {
+                    if (oldState == "waiting" && newState != "waiting")
                     {
-                        await Task.Delay(1500, token);
-                        Feed.Text = "Re-Loading Mods...";
-                        ToggleOverlay(true);
-                        ClearPaintActiveMods();
-                        await InitializeModsAsync(token);
-                        Feed.Text = "Mods re-loaded. Waiting for game to start...";
+                        if (!token.IsCancellationRequested && settings.reinitialize)
+                        {
+                            try
+                            {
+                                await Task.Delay(1500, token);
+                                Feed.Text = "Re-Loading Mods...";
+                                ToggleOverlay(true);
+                                ClearPaintActiveMods();
+                                await InitializeModsAsync(token);
+                                Feed.Text = "Mods re-loaded. Waiting for game to start...";
+                            }
+                            catch (OperationCanceledException)
+                            {
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                                await Stop_loader_internal();
+                            }
+                        }
                     }
-                    catch (OperationCanceledException)
+                }),
+
+                (wadFile, errorStatus) => Application.Current.Dispatcher.Invoke(() =>
+                {
+                    _modLoadCts?.Cancel();
+
+                    if (errorStatus == "c0000229" && !settings.poofini) { return; }
+
+                    string warningPrompt = $"{(errorStatus == "c0000229" ? "Skinhack" : "Problem")} detected in {wadFile}. (Code: {errorStatus} )\n\n" +
+                                           $"Please Disable or Delete {(errorStatus == "c0000229" ? "Skinhacks" : "Corrupted mod")}.";
+
+                    CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Skinhack" : "Corrupted mod")} Detected");
+                }),
+
+                errorMsg => Application.Current.Dispatcher.Invoke(() =>
+                {
+                    if (!_isLoaderRunning) return;
+                    ToggleFeed(false);
+                    _isLoaderRunning = false;
+                    MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Stop_loader_internal();
+                }),
+
+                // onEndOfLife: Guide Section 3.9 ("When the DLL logs end of life reached, sync at once.")
+                onEndOfLife: () =>
+                {
+                    _ = Task.Run(async () =>
                     {
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Overlay Generation Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        await Stop_loader_internal();
-                    }
-                }
-            }
-        }),
+                        string? err = await PatcherDelivery.SyncAsync(CancellationToken.None);
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            Feed.Text = err == null
+                                ? "Patcher DLL updated after reaching end-of-life. Restart session."
+                                : $"Patcher DLL expired and sync failed: {err}";
+                        });
+                    });
+                },
 
-        (wadFile, errorStatus) => Application.Current.Dispatcher.Invoke(() =>
-        {
-            _modLoadCts?.Cancel();
-
-            if (errorStatus == "c0000229" && !settings.poofini) { return; }
-
-            string warningPrompt = $"{(errorStatus == "c0000229" ? "Skinhack" : "Problem")} detected in {wadFile}. (Code: {errorStatus} )\n\n" +
-                                   $"Please Disable or Delete {(errorStatus == "c0000229" ? "Skinhacks" : "Corrupted mod")}.";
-
-            CustomMessageBox.Show(warningPrompt, ["Yes", "Okay", "I Will"], $"{(errorStatus == "c0000229" ? "Skinhack" : "Corrupted mod")} Detected");
-        }),
-
-        errorMsg => Application.Current.Dispatcher.Invoke(() =>
-        {
-            if (!_isLoaderRunning) return;
-            ToggleFeed(false);
-            _isLoaderRunning = false;
-            MessageBox.Show(errorMsg, "LTK Patcher Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            Stop_loader_internal();
-        }),
-        settings.poofini
-    );
-
+                poof: settings.poofini
+            );
         }
-    //     private void StartCSLol(CancellationToken token)
-    //     {
-    //         CSLolManager.Initialize(
-    //     Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile, "overlay")
-    //         + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
-    //             ? "‗PBE‗profile"
-    //             : ""),
-    //     token,
-    //             text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
-    //             () => Application.Current.Dispatcher.Invoke(() =>
-    //             {
-    //                 ToggleFeed(false);
-    //                 _isLoaderRunning = false;
-    //                 _modLoadCts = null;
-    //             }),
-    //             // Game status changed callback - reinitialize mods
-    //             () => Application.Current.Dispatcher.Invoke(async () =>
-    //             {
-    //                 if (!token.IsCancellationRequested)
-    //                 {
-    //                     if (settings.reinitialize) { 
-    //                         try
-    //                         {
-    //                             Thread.Sleep(500);
-    //                             Feed.Text = "Re-Loading mods...";
-    //                             ToggleOverlay(true);
-    //                             ClearPaintActiveMods();
-    //                             await InitializeModsAsync(token);
-    //                             Feed.Text = "Mods re-loaded. Waiting for game to start...";
-    //                         }
-    //                         catch (OperationCanceledException)
-    //                         {
-    //                             // Expected when cancellation is requested
-    //                         }
-    //                         catch (Exception ex)
-    //                         {
-    //                             MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-    //                         }
-    //                     }
-    //                 }
-    //             }),
-    //             errorMsg => Application.Current.Dispatcher.Invoke(() =>
-    //             {
-    //                 ToggleFeed(false);
-    //                 _isLoaderRunning = false;
-    //                 MessageBox.Show(errorMsg, "CSLol Error", MessageBoxButton.OK, MessageBoxImage.Error);
-    //                 Stop_loader_internal();
-    //             })
-    //         );
-    //     }
+
+        //     private void StartCSLol(CancellationToken token)
+        //     {
+        //         CSLolManager.Initialize(
+        //     Path.Combine(Directory.GetCurrentDirectory(), "profiles", settings.CurrentProfile, "overlay")
+        //         + (settings.gamepath?.EndsWith(@"(PBE)\Game\League of Legends.exe", StringComparison.OrdinalIgnoreCase) == true
+        //             ? "‗PBE‗profile"
+        //             : ""),
+        //     token,
+        //             text => Application.Current.Dispatcher.Invoke(() => Feed.Text = text),
+        //             () => Application.Current.Dispatcher.Invoke(() =>
+        //             {
+        //                 ToggleFeed(false);
+        //                 _isLoaderRunning = false;
+        //                 _modLoadCts = null;
+        //             }),
+        //             // Game status changed callback - reinitialize mods
+        //             () => Application.Current.Dispatcher.Invoke(async () =>
+        //             {
+        //                 if (!token.IsCancellationRequested)
+        //                 {
+        //                     if (settings.reinitialize) { 
+        //                         try
+        //                         {
+        //                             Thread.Sleep(500);
+        //                             Feed.Text = "Re-Loading mods...";
+        //                             ToggleOverlay(true);
+        //                             ClearPaintActiveMods();
+        //                             await InitializeModsAsync(token);
+        //                             Feed.Text = "Mods re-loaded. Waiting for game to start...";
+        //                         }
+        //                         catch (OperationCanceledException)
+        //                         {
+        //                             // Expected when cancellation is requested
+        //                         }
+        //                         catch (Exception ex)
+        //                         {
+        //                             MessageBox.Show($"Error reinitializing mods: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        //                         }
+        //                     }
+        //                 }
+        //             }),
+        //             errorMsg => Application.Current.Dispatcher.Invoke(() =>
+        //             {
+        //                 ToggleFeed(false);
+        //                 _isLoaderRunning = false;
+        //                 MessageBox.Show(errorMsg, "CSLol Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        //                 Stop_loader_internal();
+        //             })
+        //         );
+        //     }
         private void OnDropMode(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(typeof(ModListEntry)))
@@ -3478,8 +3508,15 @@ namespace ModManager
         HashSet<string> mods_loaded_in_over = new HashSet<string>();
         List<int> folders_loaded_in = new List<int>();
 
-        private string CurrentOverlayProfile() => ProfileOverlay.ProfilePath(
-            Directory.GetCurrentDirectory(), settings.CurrentProfile, settings.tft_mode, settings.gamepath);
+        private string CurrentOverlayProfile()
+        {
+            Directory.CreateDirectory(PatcherConfig.ProfilesRoot);
+            return ProfileOverlay.ProfilePath(
+                PatcherConfig.AppDataRoot,
+                currentProfileName, // your existing profile name variable
+                settings.tft_mode,
+                settings.gamepath);
+        }
 
         public async Task WriteWads(CancellationToken token)
         {
@@ -4020,6 +4057,7 @@ namespace ModManager
                     if ((DateTime.Now - lastCheck).TotalHours < 48) return;
                 }
             }
+            PatcherDelivery.Initialize();
             DownloadCslolDll();
 
             const string OWNER = "Aurecueil";

@@ -7,6 +7,13 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+env:
+  # staging | production. Build the two as separate builds, never one binary for both.
+  # Keep "staging" until LTK confirms production accepts cslol-go.
+  PATCHER_ENV: staging
+  # Pin the LTK Manager commit you take the attest scripts from (a full SHA, not a branch).
+  LTK_MANAGER_REF: "827ee00252181bec1e3b88ae8bf7429e461152fe"
+
 jobs:
   build:
     runs-on: windows-latest
@@ -21,6 +28,11 @@ jobs:
         dotnet-version: |
           8.0.x
           10.0.x
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
@@ -37,17 +49,88 @@ jobs:
         CSLOL_TEST_MOD_TOOLS: ${{ github.workspace }}\Tools\mod-tools.exe
       run: dotnet test tests/ModPkg.Tests/ModPkg.Tests.csproj --configuration Release
 
+    # ---- build attestation (guide section 2) ---------------------------------
+
+    - name: Read version from csproj
+      id: ver
+      shell: pwsh
+      run: |
+        $v = ([xml](Get-Content ModLoader/ModLoader.csproj)).Project.PropertyGroup.Version |
+             Where-Object { $_ } | Select-Object -First 1
+        if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "csproj <Version> must be major.minor.patch, got '$v'" }
+        "version=$v" >> $env:GITHUB_OUTPUT
+
+    - name: Fetch LTK attest scripts
+      uses: actions/checkout@v4
+      with:
+        repository: LeagueToolkit/ltk-manager
+        ref: ${{ env.LTK_MANAGER_REF }}
+        path: .ltk-manager
+        sparse-checkout: |
+          scripts/attest-build.mjs
+
+    - name: Attest build
+      shell: pwsh
+      env:
+        # Not available to PRs from forks: those builds compile without an attestation (tests only).
+        LTK_PATCHER_ATTESTATION_KEY: ${{ secrets.LTK_PATCHER_ATTESTATION_KEY }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:LTK_PATCHER_ATTESTATION_KEY)) {
+          Write-Warning "No attestation key available; this build cannot register with the patcher service."
+          exit 0
+        }
+        $out = node .ltk-manager/scripts/attest-build.mjs --client cslol-go --protocol 3 "${{ steps.ver.outputs.version }}" "$env:GITHUB_SHA"
+        if ($LASTEXITCODE -ne 0) { throw "attest-build failed" }
+        $att = ($out | Out-String).Trim()
+        if ($att -notmatch '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$') { throw "unexpected attestation format" }
+        Write-Host "::add-mask::$att"      # never log it
+        $src = "namespace ModManager { internal static class BuildAttestation { public const string Value = `"$att`"; } }"
+        Set-Content -Path ModLoader/BuildAttestation.cs -Value $src -Encoding utf8
+
+    # ---- build ---------------------------------------------------------------
+
     - name: Restore dependencies
       run: dotnet restore ModLoader.sln
 
     - name: Build
-      run: dotnet build ModLoader.sln --configuration Release --no-restore
+      run: dotnet build ModLoader.sln --configuration Release --no-restore -p:PatcherEnv=${{ env.PATCHER_ENV }}
 
     - name: Publish
-      run: dotnet publish ModLoader/ModLoader.csproj -c Release -o ./publish
+      run: dotnet publish ModLoader/ModLoader.csproj -c Release -o ./publish -p:PatcherEnv=${{ env.PATCHER_ENV }}
+
+    # ---- guards (guide section 4.3 / 7) --------------------------------------
+
+    - name: Guard - no DLL in the output, host is bundled
+      shell: pwsh
+      run: |
+        $dll = Get-ChildItem ./publish -Recurse -Filter ltk_patcher_dll.dll -ErrorAction SilentlyContinue
+        if ($dll) { throw "ltk_patcher_dll.dll must never be bundled: $($dll.FullName)" }
+        if (-not (Test-Path ./publish/cslol-tools/ltk_patcher_host.exe)) { throw "ltk_patcher_host.exe missing from publish/cslol-tools" }
+        if (-not (Test-Path ./publish/ModLoader.exe)) { throw "ModLoader.exe missing (the exe name is part of the trust chain)" }
+
+    # ---- sign ModLoader.exe with the pinned certificate ----------------------
+    # Skeleton: adapt to however you hold the cert (PFX secret, Azure Trusted Signing, HSM...).
+    # Skip it and the build is unsigned, which the DLL rejects with VRF00000009.
+
+    - name: Sign ModLoader.exe
+      if: github.event_name != 'pull_request'
+      shell: pwsh
+      env:
+        SIGN_PFX_BASE64: ${{ secrets.SIGN_PFX_BASE64 }}
+        SIGN_PFX_PASSWORD: ${{ secrets.SIGN_PFX_PASSWORD }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:SIGN_PFX_BASE64)) { Write-Warning "No signing cert; build is unsigned."; exit 0 }
+        $pfx = Join-Path $env:RUNNER_TEMP "sign.pfx"
+        [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
+        $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+                     Sort-Object FullName | Select-Object -Last 1).FullName
+        & $signtool sign /f $pfx /p $env:SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ./publish/ModLoader.exe
+        if ($LASTEXITCODE -ne 0) { throw "signtool failed" }failed" }
+        & $signtool verify /q /a ./publish/ModLoader.exe
+        Remove-Item $pfx -Force
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ModLoader-Build
+        name: ModLoader-Build-${{ env.PATCHER_ENV }}
         path: ./publish
