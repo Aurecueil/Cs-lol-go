@@ -1061,10 +1061,10 @@ foreach (var item in downloads)
 {
     string savePath = Path.Combine(targetDir, item.FileName);
 
-    Send a request to inspect the response header first
+    //Send a request to inspect the response header first
     using HttpResponseMessage response = await client.GetAsync(item.Url);
    
-    Throws an exception if HTTP status is 404, 500, etc.
+    //Throws an exception if HTTP status is 404, 500, etc.
     response.EnsureSuccessStatusCode(); 
 
     byte[] data = await response.Content.ReadAsByteArrayAsync();
@@ -3513,7 +3513,7 @@ foreach (var item in downloads)
             Directory.CreateDirectory(PatcherConfig.ProfilesRoot);
             return ProfileOverlay.ProfilePath(
                 PatcherConfig.AppDataRoot,
-                currentProfileName, // your existing profile name variable
+                 settings.CurrentProfile, // your existing profile name variable
                 settings.tft_mode,
                 settings.gamepath);
         }
