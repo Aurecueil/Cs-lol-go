@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Hashing;
 using System.Linq;
 using System.Text;
+using System.Windows.Media.Imaging;
 
 namespace ModPkgLibSpace
 {
@@ -181,43 +182,53 @@ namespace ModPkgLibSpace
     {
         public class Bitmap : IDisposable
         {
-            private SKBitmap bitmap;
+            private BitmapImage? bitmap;
 
             public Bitmap(string path)
             {
-                bitmap = SKBitmap.Decode(path);
+                bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.UriSource = new Uri(Path.GetFullPath(path));
+                bitmap.EndInit();
+                bitmap.Freeze();
             }
 
-            public SKBitmap GetBitmap() => bitmap;
+            public BitmapSource? GetBitmap() => bitmap;
 
-            public void Dispose() => bitmap?.Dispose();
+            public void Dispose()
+            {
+                bitmap = null;
+            }
         }
 
-       public class SimpleEncoder
+        public class SimpleEncoder
+        {
+            public byte[] DecodeWebPToPng(byte[] webpData) => ConvertViaWpf(webpData, new PngBitmapEncoder());
+
+            public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90) =>
+                ConvertViaWpf(webpData, new JpegBitmapEncoder { QualityLevel = quality });
+
+            private static byte[] ConvertViaWpf(byte[] inputData, BitmapEncoder encoder)
             {
-                public byte[] DecodeWebPToPng(byte[] webpData)
+                try
                 {
-                    // SKBitmap.Decode can accept byte[] directly
-                    using var bitmap = SKBitmap.Decode(webpData);
-                    if (bitmap == null) return webpData; // Fallback if decoding fails
+                    using var inStream = new MemoryStream(inputData);
+                    // BitmapFrame automatically decodes WebP on Windows 10/11 or via system/installed WIC codecs
+                    var frame = BitmapFrame.Create(inStream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
 
-                    using var image = SKImage.FromBitmap(bitmap);
-                    using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-                    return data.ToArray();
+                    encoder.Frames.Add(frame);
+
+                    using var outStream = new MemoryStream();
+                    encoder.Save(outStream);
+                    return outStream.ToArray();
                 }
-
-                public byte[] DecodeWebPToJpg(byte[] webpData, int quality = 90)
+                catch
                 {
-                    using var bitmap = SKBitmap.Decode(webpData);
-                    if (bitmap == null) return webpData; // Fallback if decoding fails
-
-                    using var image = SKImage.FromBitmap(bitmap);
-                    using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-                    return data.ToArray();
+                    return inputData; // Fallback
                 }
             }
-        
-    }
+        }
 
     public static class ModPkgLib
     {

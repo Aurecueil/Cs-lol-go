@@ -62,7 +62,6 @@
 		<PackageReference Include="Extended.Wpf.Toolkit" Version="5.0.0" />
 		<PackageReference Include="Imazen.WebP" Version="10.0.1" />
 		<PackageReference Include="SharpCompress" Version="0.48.0" />
-		<PackageReference Include="SkiaSharp" Version="4.154.0" />
 		<PackageReference Include="System.Drawing.Common" Version="10.0.1" />
 		<PackageReference Include="System.IO.Hashing" Version="10.0.1" />
 		<PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
