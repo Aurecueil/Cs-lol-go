@@ -108,6 +108,7 @@ jobs:
     - name: Sign ModLoader.exe
       if: github.event_name != 'pull_request'
       shell: pwsh
+      timeout-minutes: 3
       env:
         SIGN_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
         SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
@@ -118,24 +119,43 @@ jobs:
 
         $secPassword = ConvertTo-SecureString $env:SIGN_PFX_PASSWORD -AsPlainText -Force
         
-        # 1. Import into Root so Windows trust provider trusts this self-signed authority
+        # Import into Root and Personal stores so Windows trust provider validates it locally
         Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\Root -Password $secPassword | Out-Null
-        # 2. Also place in Personal store for certificate discovery
         Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $secPassword | Out-Null
 
         # Locate signtool
         $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
                      Sort-Object FullName | Select-Object -Last 1).FullName
 
-        # Sign with RFC 3161 timestamp
-        & $signtool sign /f $pfx /p $env:SIGN_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ./publish/ModLoader.exe
-        if ($LASTEXITCODE -ne 0) { throw "signtool sign failed" }
+        # Timestamp servers to try in order (using HTTPS RFC 3161)
+        $tsaUrls = @(
+          "http://timestamp.digicert.com",
+          "https://timestamp.sectigo.com",
+          "http://timestamp.sectigo.com",
+          "http://timestamp.globalsign.com/tsa/r6advanced1"
+        )
 
-        # Verify against the user's Root store (/s Root)
-        & $signtool verify /pa /s Root ./publish/ModLoader.exe
+        $signed = $false
+        foreach ($url in $tsaUrls) {
+          Write-Host "Attempting signature with timestamp server: $url"
+          & $signtool sign /f $pfx /p $env:SIGN_PFX_PASSWORD /fd SHA256 /tr $url /td SHA256 ./publish/ModLoader.exe
+          if ($LASTEXITCODE -eq 0) {
+            $signed = $true
+            Write-Host "Successfully signed and timestamped with $url"
+            break
+          }
+          Write-Warning "Timestamping with $url failed; trying next TSA..."
+        }
+
+        if (-not $signed) {
+          throw "Failed to sign and timestamp ModLoader.exe across all timestamp servers."
+        }
+
+        # Verify against local Root store including verification of the timestamp
+        & $signtool verify /v /s Root ./publish/ModLoader.exe
         if ($LASTEXITCODE -ne 0) { throw "signtool verify failed" }
 
-        # Clean up temporary PFX file
+        # Clean up temporary PFX
         Remove-Item $pfx -Force
 
     - name: Upload Build Artifact
