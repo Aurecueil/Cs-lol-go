@@ -108,7 +108,6 @@ jobs:
     - name: Sign ModLoader.exe
       if: github.event_name != 'pull_request'
       shell: pwsh
-      timeout-minutes: 3
       env:
         SIGN_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
         SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
@@ -119,43 +118,63 @@ jobs:
 
         $secPassword = ConvertTo-SecureString $env:SIGN_PFX_PASSWORD -AsPlainText -Force
         
-        # Import into Root and Personal stores so Windows trust provider validates it locally
         Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\Root -Password $secPassword | Out-Null
         Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $secPassword | Out-Null
 
-        # Locate signtool
         $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
                      Sort-Object FullName | Select-Object -Last 1).FullName
 
-        # Timestamp servers to try in order (using HTTPS RFC 3161)
+        $targetFile = (Resolve-Path "./publish/ModLoader.exe").Path
+
+        # List of fast RFC 3161 timestamp authorities
         $tsaUrls = @(
-          "http://timestamp.digicert.com",
-          "https://timestamp.sectigo.com",
           "http://timestamp.sectigo.com",
-          "http://timestamp.globalsign.com/tsa/r6advanced1"
+          "http://tsa.starfieldtech.com",
+          "http://timestamp.digicert.com",
+          "http://timestamp.entrust.net/TSS/RFC3161sha2TS"
         )
 
         $signed = $false
         foreach ($url in $tsaUrls) {
-          Write-Host "Attempting signature with timestamp server: $url"
-          & $signtool sign /f $pfx /p $env:SIGN_PFX_PASSWORD /fd SHA256 /tr $url /td SHA256 ./publish/ModLoader.exe
-          if ($LASTEXITCODE -eq 0) {
+          Write-Host "Trying timestamp server: $url"
+
+          $signArgs = @(
+            "sign",
+            "/f", $pfx,
+            "/p", $env:SIGN_PFX_PASSWORD,
+            "/fd", "SHA256",
+            "/tr", $url,
+            "/td", "SHA256",
+            $targetFile
+          )
+
+          # Start signtool with a strict 15-second timeout so unresponsive servers get killed immediately
+          $proc = Start-Process -FilePath $signtool -ArgumentList $signArgs -NoNewWindow -PassThru
+          $completed = $proc.WaitForExit(15000)
+
+          if (-not $completed) {
+            Write-Warning "Timed out after 15s talking to $url; terminating process and switching server..."
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            continue
+          }
+
+          if ($proc.ExitCode -eq 0) {
             $signed = $true
             Write-Host "Successfully signed and timestamped with $url"
             break
+          } else {
+            Write-Warning "Signing failed using $url (exit code: $($proc.ExitCode)). Trying next server..."
           }
-          Write-Warning "Timestamping with $url failed; trying next TSA..."
         }
 
         if (-not $signed) {
-          throw "Failed to sign and timestamp ModLoader.exe across all timestamp servers."
+          throw "Signing failed: None of the timestamp servers responded successfully within timeout."
         }
 
-        # Verify against local Root store including verification of the timestamp
-        & $signtool verify /v /s Root ./publish/ModLoader.exe
+        # Verify signature against local root store
+        & $signtool verify /v /s Root $targetFile
         if ($LASTEXITCODE -ne 0) { throw "signtool verify failed" }
 
-        # Clean up temporary PFX
         Remove-Item $pfx -Force
 
     - name: Upload Build Artifact
